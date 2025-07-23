@@ -29,7 +29,16 @@ export const SOCIAL_CONFIG = {
   APP_URL: import.meta.env.VITE_APP_URL || import.meta.env.PUBLIC_APP_URL || 'https://ethshot.io',
   TWITTER_URL: import.meta.env.VITE_TWITTER_URL || import.meta.env.PUBLIC_TWITTER_URL || 'https://twitter.com/ethshot',
   GITHUB_URL: import.meta.env.VITE_GITHUB_URL || import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/ethshot/ethshot-web',
-  DISCORD_URL: import.meta.env.VITE_DISCORD_URL || import.meta.env.PUBLIC_DISCORD_INVITE || import.meta.env.PUBLIC_DISCORD_URL || 'https://discord.gg/ethshot',
+  DISCORD_URL: import.meta.env.VITE_DISCORD_INVITE || import.meta.env.VITE_DISCORD_URL || import.meta.env.PUBLIC_DISCORD_INVITE || import.meta.env.PUBLIC_DISCORD_URL || 'https://discord.gg/ethshot',
+};
+
+// Wallet URLs
+export const WALLET_URLS = {
+  METAMASK: 'https://metamask.io',
+  WALLETCONNECT: 'https://walletconnect.com',
+  PHANTOM: 'https://phantom.app',
+  COINBASE: 'https://www.coinbase.com/wallet',
+  TRUST: 'https://trustwallet.com',
 };
 
 // UI Configuration

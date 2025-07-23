@@ -126,6 +126,70 @@
         <p>Check your transaction on Etherscan if you're unsure about its status.</p>
       </div>
     </div>
+
+    <!-- Supported Wallets -->
+    <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
+      <h2 class="text-2xl font-bold text-white mb-4 flex items-center space-x-3">
+        <span>👛</span>
+        <span>Which wallets are supported?</span>
+      </h2>
+      <div class="text-gray-300 space-y-4">
+        <p>ETH Shot supports all major Ethereum wallets. Here are the most popular options:</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <a
+            href="https://metamask.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center space-x-3 p-3 bg-gray-700/50 rounded-lg hover:bg-gray-600/50 transition-colors"
+          >
+            <img src="/icons/metamask.svg" alt="MetaMask" class="w-8 h-8" />
+            <div>
+              <div class="font-semibold text-white">MetaMask</div>
+              <div class="text-sm text-gray-400">Browser extension & mobile app</div>
+            </div>
+          </a>
+          <a
+            href="https://walletconnect.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center space-x-3 p-3 bg-gray-700/50 rounded-lg hover:bg-gray-600/50 transition-colors"
+          >
+            <img src="/icons/walletconnect.svg" alt="WalletConnect" class="w-8 h-8" />
+            <div>
+              <div class="font-semibold text-white">WalletConnect</div>
+              <div class="text-sm text-gray-400">Connect any mobile wallet</div>
+            </div>
+          </a>
+          <a
+            href="https://www.coinbase.com/wallet"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center space-x-3 p-3 bg-gray-700/50 rounded-lg hover:bg-gray-600/50 transition-colors"
+          >
+            <img src="/icons/coinbase.svg" alt="Coinbase Wallet" class="w-8 h-8" />
+            <div>
+              <div class="font-semibold text-white">Coinbase Wallet</div>
+              <div class="text-sm text-gray-400">Self-custody wallet</div>
+            </div>
+          </a>
+          <a
+            href="https://trustwallet.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center space-x-3 p-3 bg-gray-700/50 rounded-lg hover:bg-gray-600/50 transition-colors"
+          >
+            <img src="/icons/trust.svg" alt="Trust Wallet" class="w-8 h-8" />
+            <div>
+              <div class="font-semibold text-white">Trust Wallet</div>
+              <div class="text-sm text-gray-400">Mobile-first wallet</div>
+            </div>
+          </a>
+        </div>
+        <p class="text-sm text-gray-400">
+          Don't have a wallet? Click any of the links above to download and set up your preferred wallet.
+        </p>
+      </div>
+    </div>
   </div>
 
   <!-- Still Have Questions -->

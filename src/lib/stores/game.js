@@ -481,24 +481,40 @@ const createGameStore = () => {
       // Log transaction to database
       try {
         await db.recordShot({
-          player_address: wallet.address,
+          playerAddress: wallet.address,
           amount: ethers.formatEther(shotCost),
           won,
-          tx_hash: receipt.hash,
-          block_number: receipt.blockNumber,
+          txHash: receipt.hash,
+          blockNumber: receipt.blockNumber,
           timestamp: new Date().toISOString()
         });
 
         if (won) {
           // Also record as winner
           await db.recordWinner({
-            player_address: wallet.address,
+            winnerAddress: wallet.address,
             amount: ethers.formatEther(await contract.getCurrentPot()),
-            tx_hash: receipt.hash,
-            block_number: receipt.blockNumber,
+            txHash: receipt.hash,
+            blockNumber: receipt.blockNumber,
             timestamp: new Date().toISOString()
           });
         }
+
+        // Update or create player record
+        const existingPlayer = await db.getPlayer(wallet.address);
+        const newTotalShots = (existingPlayer?.total_shots || 0) + 1;
+        const newTotalSpent = parseFloat(existingPlayer?.total_spent || '0') + parseFloat(ethers.formatEther(shotCost));
+        const newTotalWon = won ?
+          parseFloat(existingPlayer?.total_won || '0') + parseFloat(ethers.formatEther(await contract.getCurrentPot())) :
+          parseFloat(existingPlayer?.total_won || '0');
+
+        await db.upsertPlayer({
+          address: wallet.address,
+          totalShots: newTotalShots,
+          totalSpent: newTotalSpent.toString(),
+          totalWon: newTotalWon.toString(),
+          lastShotTime: new Date().toISOString()
+        });
       } catch (dbError) {
         console.error('Failed to log transaction to database:', dbError);
         // Don't fail the whole transaction for database errors
@@ -576,13 +592,13 @@ const createGameStore = () => {
       // Log sponsorship to database
       try {
         await db.recordSponsor({
-          sponsor_address: wallet.address,
+          sponsorAddress: wallet.address,
           name,
-          logo_url: logoUrl,
-          sponsor_url: sponsorUrl,
+          logoUrl,
+          sponsorUrl,
           amount: ethers.formatEther(sponsorCost),
-          tx_hash: receipt.hash,
-          block_number: receipt.blockNumber,
+          txHash: receipt.hash,
+          blockNumber: receipt.blockNumber,
           timestamp: new Date().toISOString(),
           active: true
         });
