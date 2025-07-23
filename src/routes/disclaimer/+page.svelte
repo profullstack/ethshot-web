@@ -1,5 +1,6 @@
 <script>
   import { goto } from '$app/navigation';
+  import { GAME_CONFIG } from '../lib/config.js';
 </script>
 
 <svelte:head>
@@ -22,7 +23,7 @@
       <div class="text-red-300 space-y-4 text-left max-w-2xl mx-auto">
         <p><strong>⚠️ High Risk Activity:</strong> ETH Shot is a gambling game with real financial risk. You can lose all ETH you spend.</p>
         <p><strong>💸 Only Play What You Can Afford:</strong> Never play with money you need for essentials like rent, food, or bills.</p>
-        <p><strong>🎲 Low Win Probability:</strong> Each shot has only a 1% chance of winning. Most players will lose their ETH.</p>
+        <p><strong>🎲 Low Win Probability:</strong> Each shot has only a {GAME_CONFIG.WIN_PERCENTAGE}% chance of winning. Most players will lose their ETH.</p>
         <p><strong>⛓️ Blockchain Risks:</strong> Smart contracts can have bugs. Transactions are irreversible.</p>
         <p><strong>📍 Legal Compliance:</strong> Gambling may be illegal in your jurisdiction. Check local laws.</p>
         <p><strong>🧠 Addiction Warning:</strong> Gambling can be addictive. Seek help if you can't control your playing.</p>
