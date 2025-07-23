@@ -55,8 +55,8 @@ const createWalletStore = () => {
     }
   };
 
-  // Connect wallet
-  const connect = async () => {
+  // Connect wallet with multiple options
+  const connect = async (walletType = 'auto') => {
     if (!browser) {
       console.warn('Wallet connection skipped on server');
       return;
@@ -75,21 +75,73 @@ const createWalletStore = () => {
 
       let instance;
 
-      // Check for injected wallet (MetaMask, etc.) - Direct connection
-      if (window.ethereum) {
+      // Auto-detect or use specific wallet type
+      if (walletType === 'auto' || walletType === 'injected') {
+        // Check for injected wallet (MetaMask, Phantom, etc.) - Direct connection
+        if (window.ethereum) {
+          try {
+            console.log('🔗 Requesting injected wallet connection...');
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            console.log('✅ Injected wallet connected:', accounts[0]);
+            instance = window.ethereum;
+          } catch (metamaskError) {
+            console.error('❌ Injected wallet connection failed:', metamaskError);
+            if (walletType === 'injected') {
+              throw new Error('Injected wallet connection failed: ' + metamaskError.message);
+            }
+            // If auto mode, continue to try WalletConnect
+          }
+        }
+      }
+
+      // Try WalletConnect if no injected wallet or specifically requested
+      if (!instance && (walletType === 'auto' || walletType === 'walletconnect')) {
         try {
-          console.log('🔗 Requesting wallet connection...');
-          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-          console.log('✅ Wallet connected:', accounts[0]);
-          instance = window.ethereum;
-        } catch (metamaskError) {
-          console.error('❌ Wallet connection failed:', metamaskError);
-          throw new Error('Wallet connection failed: ' + metamaskError.message);
+          console.log('🔗 Initializing WalletConnect...');
+          
+          // Check if WalletConnect Project ID is configured
+          if (!WALLET_CONFIG.WALLETCONNECT_PROJECT_ID) {
+            const errorMsg = 'WalletConnect Project ID not configured. Please set VITE_WALLETCONNECT_PROJECT_ID in your environment variables.';
+            console.error('❌', errorMsg);
+            if (walletType === 'walletconnect') {
+              throw new Error(errorMsg);
+            }
+            // If auto mode, skip WalletConnect and continue
+            console.log('⚠️ Skipping WalletConnect due to missing Project ID');
+          } else {
+            // Dynamic import for WalletConnect
+            const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
+            
+            const walletConnectProvider = await EthereumProvider.init({
+              projectId: WALLET_CONFIG.WALLETCONNECT_PROJECT_ID,
+              chains: [NETWORK_CONFIG.CHAIN_ID],
+              rpcMap: {
+                [NETWORK_CONFIG.CHAIN_ID]: NETWORK_CONFIG.RPC_URL
+              },
+              metadata: {
+                name: 'ETH Shot',
+                description: 'A viral, pay-to-play, Ethereum-powered game',
+                url: 'https://ethshot.io',
+                icons: ['https://ethshot.io/favicon.png']
+              }
+            });
+
+            console.log('🔗 Requesting WalletConnect connection...');
+            await walletConnectProvider.connect();
+            console.log('✅ WalletConnect connected');
+            instance = walletConnectProvider;
+          }
+          
+        } catch (walletConnectError) {
+          console.error('❌ WalletConnect connection failed:', walletConnectError);
+          if (walletType === 'walletconnect') {
+            throw new Error('WalletConnect connection failed: ' + walletConnectError.message);
+          }
         }
       }
 
       if (!instance) {
-        throw new Error('No wallet found. Please install MetaMask or another Web3 wallet.');
+        throw new Error('No wallet connection available. Please install MetaMask or use a WalletConnect-compatible mobile wallet.');
       }
 
       console.log('🔧 Creating provider and signer...');

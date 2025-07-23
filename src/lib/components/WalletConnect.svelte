@@ -4,12 +4,12 @@
 
   let connecting = false;
 
-  const handleConnect = async () => {
-    console.log('🔗 WalletConnect handleConnect called');
+  const handleConnect = async (walletType = 'auto') => {
+    console.log('🔗 WalletConnect handleConnect called with type:', walletType);
     connecting = true;
     try {
       console.log('🔗 Calling walletStore.connect()...');
-      await walletStore.connect();
+      await walletStore.connect(walletType);
       console.log('🔗 Wallet connected successfully!');
       toastStore.success('Wallet connected successfully!');
     } catch (error) {
@@ -20,6 +20,9 @@
       console.log('🔗 WalletConnect handleConnect finished');
     }
   };
+
+  const handleInjectedConnect = () => handleConnect('injected');
+  const handleWalletConnect = () => handleConnect('walletconnect');
 </script>
 
 <div class="wallet-connect">
@@ -40,23 +43,46 @@
       </p>
     </div>
 
-    <!-- Connect Button -->
-    <button
-      on:click={handleConnect}
-      onclick="console.log('WalletConnect button clicked via onclick!');"
-      disabled={connecting}
-      class="connect-button"
-      style="pointer-events: auto; cursor: pointer; z-index: 1000; position: relative;"
-    >
-      {#if connecting}
-        <div class="flex items-center space-x-3">
-          <div class="spinner w-5 h-5"></div>
-          <span>Connecting...</span>
+    <!-- Connect Buttons -->
+    <div class="connect-buttons space-y-3">
+      <!-- Auto Connect (tries injected first, then WalletConnect) -->
+      <button
+        on:click={handleConnect}
+        disabled={connecting}
+        class="connect-button connect-button-primary"
+        style="pointer-events: auto; cursor: pointer; z-index: 1000; position: relative;"
+      >
+        {#if connecting}
+          <div class="flex items-center space-x-3">
+            <div class="spinner w-5 h-5"></div>
+            <span>Connecting...</span>
+          </div>
+        {:else}
+          <span>Connect Wallet</span>
+        {/if}
+      </button>
+
+      <!-- Specific wallet options for mobile users -->
+      <div class="wallet-options">
+        <p class="text-xs text-gray-500 mb-2">Or choose a specific option:</p>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            on:click={handleInjectedConnect}
+            disabled={connecting}
+            class="connect-button connect-button-secondary"
+          >
+            <span class="text-sm">Browser Wallet</span>
+          </button>
+          <button
+            on:click={handleWalletConnect}
+            disabled={connecting}
+            class="connect-button connect-button-secondary"
+          >
+            <span class="text-sm">Mobile Wallet</span>
+          </button>
         </div>
-      {:else}
-        <span>Connect Wallet</span>
-      {/if}
-    </button>
+      </div>
+    </div>
 
     <!-- Supported Wallets -->
     <div class="supported-wallets">
@@ -115,12 +141,31 @@
   }
 
   .connect-button {
-    @apply w-full bg-gradient-to-r from-blue-500 to-blue-600;
-    @apply hover:from-blue-400 hover:to-blue-500;
-    @apply text-white font-semibold py-4 px-6 rounded-xl;
+    @apply w-full text-white font-semibold py-4 px-6 rounded-xl;
     @apply transition-all duration-200 transform hover:scale-105;
-    @apply focus:outline-none focus:ring-4 focus:ring-blue-500/50;
+    @apply focus:outline-none focus:ring-4;
     @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+  }
+
+  .connect-button-primary {
+    @apply bg-gradient-to-r from-blue-500 to-blue-600;
+    @apply hover:from-blue-400 hover:to-blue-500;
+    @apply focus:ring-blue-500/50;
+  }
+
+  .connect-button-secondary {
+    @apply bg-gradient-to-r from-gray-600 to-gray-700;
+    @apply hover:from-gray-500 hover:to-gray-600;
+    @apply focus:ring-gray-500/50;
+    @apply py-3 text-sm;
+  }
+
+  .connect-buttons {
+    @apply w-full;
+  }
+
+  .wallet-options {
+    @apply mt-4;
   }
 
   .supported-wallets {
