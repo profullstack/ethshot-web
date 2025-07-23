@@ -1,6 +1,6 @@
 <script>
   import { goto } from '$app/navigation';
-  import { GAME_CONFIG } from '../lib/config.js';
+  import { GAME_CONFIG } from '$lib/config.js';
 </script>
 
 <svelte:head>
