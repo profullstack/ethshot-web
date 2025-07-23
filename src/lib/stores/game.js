@@ -47,6 +47,18 @@ const rpcCache = {
   clear() {
     this.data.clear();
     this.timestamps.clear();
+  },
+  
+  invalidate(keys) {
+    if (Array.isArray(keys)) {
+      keys.forEach(key => {
+        this.data.delete(key);
+        this.timestamps.delete(key);
+      });
+    } else {
+      this.data.delete(keys);
+      this.timestamps.delete(keys);
+    }
   }
 };
 
@@ -551,6 +563,9 @@ const createGameStore = () => {
         // Don't fail the whole transaction for database errors, but make it visible
       }
 
+      // Clear cache to force fresh data fetch
+      rpcCache.invalidate('currentPot');
+      
       // Refresh game state
       await loadGameState();
       await loadPlayerData(wallet.address);
@@ -637,6 +652,9 @@ const createGameStore = () => {
         console.error('Failed to log sponsorship to database:', dbError);
         // Don't fail the whole transaction for database errors
       }
+      
+      // Clear cache to force fresh data fetch
+      rpcCache.invalidate(['currentPot', 'currentSponsor']);
       
       // Refresh game state
       await loadGameState();
