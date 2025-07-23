@@ -1,6 +1,9 @@
 <script>
   import { walletStore, isConnected, walletAddress, walletBalance } from '../stores/wallet.js';
   import { gameStore, currentPot } from '../stores/game.js';
+  import WalletConnect from './WalletConnect.svelte';
+
+  let showWalletModal = false;
 
   // Truncate address for display
   const truncateAddress = (address) => {
@@ -8,13 +11,9 @@
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  // Handle wallet connection
-  const handleConnect = async () => {
-    try {
-      await walletStore.connect();
-    } catch (error) {
-      console.error('Failed to connect wallet:', error);
-    }
+  // Handle wallet connection - show modal
+  const handleConnect = () => {
+    showWalletModal = true;
   };
 
   // Handle wallet disconnection
@@ -25,6 +24,11 @@
       console.error('Failed to disconnect wallet:', error);
     }
   };
+
+  // Close modal when wallet connects successfully
+  $: if ($isConnected && showWalletModal) {
+    showWalletModal = false;
+  }
 </script>
 
 <header class="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
@@ -129,6 +133,26 @@
     </div>
   </div>
 </header>
+
+<!-- Wallet Connection Modal -->
+{#if showWalletModal}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" on:click={() => showWalletModal = false}>
+    <div class="bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4" on:click|stopPropagation>
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-white">Connect Wallet</h2>
+        <button
+          on:click={() => showWalletModal = false}
+          class="text-gray-400 hover:text-white"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <WalletConnect />
+    </div>
+  </div>
+{/if}
 
 <style>
   .gradient-text {

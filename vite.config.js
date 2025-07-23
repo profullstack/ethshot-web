@@ -24,7 +24,12 @@ export default defineConfig({
   
   // Optimization
   optimizeDeps: {
-    include: ['ethers', 'web3modal', 'is-typedarray'],
+    include: [
+      'ethers',
+      'web3modal',
+      'events',
+      '@stablelib/random'
+    ],
     exclude: [
       '@walletconnect/web3-provider',
       '@walletconnect/client',
@@ -33,8 +38,25 @@ export default defineConfig({
       '@walletconnect/encoding',
       '@walletconnect/socket-transport',
       '@walletconnect/browser-utils',
-      '@walletconnect/jsonrpc-utils'
+      '@walletconnect/jsonrpc-utils',
+      '@walletconnect/environment',
+      '@walletconnect/time',
+      'pino'
     ]
+  },
+  
+  // Resolve configuration for WalletConnect compatibility
+  resolve: {
+    alias: {
+      // Fix for WalletConnect environment module
+      '@walletconnect/environment': '@walletconnect/environment/dist/esm/index.js',
+      // Fix for WalletConnect time module
+      '@walletconnect/time': '@walletconnect/time/dist/esm/index.js',
+      // Only polyfill events module for EventEmitter
+      events: 'events',
+      // Stub pino logger for browser compatibility
+      pino: '/src/lib/utils/pino-stub.js'
+    }
   },
   
   // Define global constants

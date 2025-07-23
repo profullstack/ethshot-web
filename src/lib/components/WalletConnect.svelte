@@ -1,8 +1,22 @@
 <script>
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
+  import { isMobile } from '../utils/device-detection.js';
+  import { onMount } from 'svelte';
 
   let connecting = false;
+  let showMobileWallet = false;
+  
+  // Detect if we're on a mobile device after component mounts
+  onMount(() => {
+    showMobileWallet = isMobile();
+    console.log('Device detection:', {
+      isMobile: isMobile(),
+      userAgent: navigator.userAgent,
+      screenWidth: window.innerWidth,
+      showMobileWallet
+    });
+  });
 
   const handleConnect = async (walletType = 'auto') => {
     console.log('🔗 WalletConnect handleConnect called with type:', walletType);
@@ -16,8 +30,11 @@
       console.error('🔗 Failed to connect wallet:', error);
       console.error('🔗 Error details:', {
         message: error.message,
+        code: error.code,
         stack: error.stack,
-        name: error.name
+        name: error.name,
+        cause: error.cause,
+        toString: error.toString()
       });
       
       // Show specific error message to user
@@ -55,7 +72,7 @@
     <div class="connect-buttons space-y-3">
       <!-- Auto Connect (tries injected first, then WalletConnect) -->
       <button
-        on:click={handleConnect}
+        on:click={() => handleConnect()}
         disabled={connecting}
         class="connect-button connect-button-primary"
         style="pointer-events: auto; cursor: pointer; z-index: 1000; position: relative;"
@@ -70,10 +87,10 @@
         {/if}
       </button>
 
-      <!-- Specific wallet options for mobile users -->
+      <!-- Specific wallet options -->
       <div class="wallet-options">
         <p class="text-xs text-gray-500 mb-2">Or choose a specific option:</p>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid {showMobileWallet ? 'grid-cols-2' : 'grid-cols-1'} gap-2">
           <button
             on:click={handleInjectedConnect}
             disabled={connecting}
@@ -81,13 +98,15 @@
           >
             <span class="text-sm">Browser Wallet</span>
           </button>
-          <button
-            on:click={handleWalletConnect}
-            disabled={connecting}
-            class="connect-button connect-button-secondary"
-          >
-            <span class="text-sm">Mobile Wallet</span>
-          </button>
+          {#if showMobileWallet}
+            <button
+              on:click={handleWalletConnect}
+              disabled={connecting}
+              class="connect-button connect-button-secondary"
+            >
+              <span class="text-sm">Mobile Wallet</span>
+            </button>
+          {/if}
         </div>
       </div>
     </div>

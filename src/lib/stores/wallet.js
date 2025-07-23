@@ -144,7 +144,14 @@ const createWalletStore = () => {
           
         } catch (walletConnectError) {
           console.error('❌ WalletConnect connection failed:', walletConnectError);
-          throw new Error('WalletConnect connection failed: ' + walletConnectError.message);
+          console.error('❌ WalletConnect error details:', {
+            message: walletConnectError.message,
+            code: walletConnectError.code,
+            stack: walletConnectError.stack,
+            name: walletConnectError.name,
+            cause: walletConnectError.cause
+          });
+          throw new Error('WalletConnect connection failed: ' + (walletConnectError.message || 'Unknown error'));
         }
       }
 
