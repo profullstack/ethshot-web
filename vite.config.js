@@ -18,12 +18,7 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: true,
     rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['ethers'],
-          web3: ['@walletconnect/web3-provider', 'web3modal']
-        }
-      }
+      output: {}
     }
   },
   

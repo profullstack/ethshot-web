@@ -84,3 +84,4 @@ docker-compose*
 *.tgz
 *.tar.gz
 .cache/
+pnpm-lock.yaml
