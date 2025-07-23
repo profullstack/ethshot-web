@@ -70,7 +70,7 @@ const createGameStore = () => {
       return;
     }
 
-    const contractAddress = import.meta.env.PUBLIC_CONTRACT_ADDRESS;
+    const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS;
     if (!contractAddress || contractAddress === '0x1234567890123456789012345678901234567890') {
       console.warn('Contract address not configured or using placeholder');
       update(state => ({
