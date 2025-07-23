@@ -1,5 +1,6 @@
 <script>
   import { currentPot, gameStore } from '../stores/game.js';
+  import { GAME_CONFIG } from '../config.js';
   import { onMount } from 'svelte';
 
   let animatedPot = '0.000';
@@ -76,12 +77,12 @@
   <!-- Pot Stats -->
   <div class="pot-stats">
     <div class="stat-item">
-      <div class="stat-value">90%</div>
+      <div class="stat-value">{GAME_CONFIG.WINNER_PAYOUT_PERCENTAGE}%</div>
       <div class="stat-label">Winner Gets</div>
     </div>
     <div class="stat-divider"></div>
     <div class="stat-item">
-      <div class="stat-value">10%</div>
+      <div class="stat-value">{GAME_CONFIG.HOUSE_FEE_PERCENTAGE}%</div>
       <div class="stat-label">House Fee</div>
     </div>
   </div>

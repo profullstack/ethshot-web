@@ -30,54 +30,69 @@ const createWalletStore = () => {
 
     try {
       // Dynamic imports for browser-only libraries
-      const [ethersModule, web3ModalModule, walletConnectModule] = await Promise.all([
-        import('ethers'),
-        import('web3modal'),
-        import('@walletconnect/web3-provider')
-      ]);
-
+      const ethersModule = await import('ethers');
       ethers = ethersModule;
-      Web3Modal = web3ModalModule.default;
-      WalletConnectProvider = walletConnectModule.default;
 
-      if (!ethers || !Web3Modal || !WalletConnectProvider) {
-        throw new Error('Failed to load required Web3 libraries');
+      if (!ethers) {
+        throw new Error('Failed to load ethers library');
       }
 
-      const providerOptions = {
-        walletconnect: {
-          package: WalletConnectProvider,
-          options: {
-            infuraId: WALLET_CONFIG.INFURA_PROJECT_ID,
-            rpc: {
-              1: RPC_URLS.MAINNET,
-              11155111: RPC_URLS.SEPOLIA,
+      // Try to load Web3Modal with fallback
+      try {
+        const web3ModalModule = await import('web3modal');
+        Web3Modal = web3ModalModule.default || web3ModalModule;
+      } catch (web3ModalError) {
+        console.warn('Web3Modal not available:', web3ModalError.message);
+        // Continue without Web3Modal - MetaMask can still work
+      }
+
+      // Try to load WalletConnect with fallback
+      try {
+        const walletConnectModule = await import('@walletconnect/web3-provider');
+        WalletConnectProvider = walletConnectModule.default || walletConnectModule;
+      } catch (walletConnectError) {
+        console.warn('WalletConnect not available:', walletConnectError.message);
+        // Continue without WalletConnect
+      }
+
+      // Initialize Web3Modal only if available
+      if (Web3Modal) {
+        const providerOptions = {};
+        
+        // Add WalletConnect only if available
+        if (WalletConnectProvider) {
+          providerOptions.walletconnect = {
+            package: WalletConnectProvider,
+            options: {
+              infuraId: WALLET_CONFIG.INFURA_PROJECT_ID,
+              rpc: {
+                1: RPC_URLS.MAINNET,
+                11155111: RPC_URLS.SEPOLIA,
+              },
             },
-          },
-        },
-      };
+          };
+        }
 
-      web3Modal = new Web3Modal({
-        network: 'mainnet',
-        cacheProvider: WALLET_CONFIG.WALLETCONNECT_CACHE_PROVIDER,
-        providerOptions,
-        theme: WALLET_CONFIG.WALLETCONNECT_THEME,
-      });
+        web3Modal = new Web3Modal({
+          network: 'mainnet',
+          cacheProvider: WALLET_CONFIG.WALLETCONNECT_CACHE_PROVIDER,
+          providerOptions,
+          theme: WALLET_CONFIG.WALLETCONNECT_THEME,
+        });
 
-      if (!web3Modal) {
-        throw new Error('Failed to initialize Web3Modal');
+        // Check if user was previously connected
+        if (web3Modal.cachedProvider) {
+          console.log('Previous wallet connection found, ready to reconnect');
+        }
+      } else {
+        console.warn('Web3Modal not available, only MetaMask direct connection will work');
       }
 
-      // Check if user was previously connected
-      if (web3Modal.cachedProvider) {
-        // Don't auto-connect on init to avoid errors, let user manually connect
-        console.log('Previous wallet connection found, ready to reconnect');
-      }
     } catch (error) {
-      console.error('Failed to initialize Web3Modal:', error);
-      const errorMessage = error.message || 'Failed to initialize wallet libraries';
+      console.error('Failed to initialize Web3 libraries:', error);
+      const errorMessage = 'Wallet libraries not fully available. MetaMask direct connection may still work.';
       update(state => ({ ...state, error: errorMessage }));
-      throw new Error(errorMessage);
+      // Don't throw error - allow fallback to MetaMask
     }
   };
 
@@ -91,18 +106,38 @@ const createWalletStore = () => {
     update(state => ({ ...state, connecting: true, error: null }));
 
     try {
-      if (!web3Modal) {
+      if (!ethers) {
         await init();
       }
 
-      if (!web3Modal || !ethers) {
-        throw new Error('Web3 libraries not initialized. Please check your environment configuration.');
+      if (!ethers) {
+        throw new Error('Ethers library not available. Please refresh and try again.');
       }
 
-      const instance = await web3Modal.connect();
-      
+      let instance;
+
+      // Try Web3Modal first if available
+      if (web3Modal) {
+        try {
+          instance = await web3Modal.connect();
+        } catch (modalError) {
+          console.warn('Web3Modal connection failed, trying MetaMask directly:', modalError);
+          instance = null;
+        }
+      }
+
+      // Fallback to MetaMask direct connection
+      if (!instance && window.ethereum) {
+        try {
+          await window.ethereum.request({ method: 'eth_requestAccounts' });
+          instance = window.ethereum;
+        } catch (metamaskError) {
+          throw new Error('MetaMask connection failed: ' + metamaskError.message);
+        }
+      }
+
       if (!instance) {
-        throw new Error('Failed to get wallet provider instance');
+        throw new Error('No wallet found. Please install MetaMask or another Web3 wallet.');
       }
 
       provider = new ethers.BrowserProvider(instance);
@@ -131,9 +166,11 @@ const createWalletStore = () => {
       console.error('Failed to connect wallet:', error);
       
       let errorMessage = 'Failed to connect wallet';
-      if (error.message.includes('User rejected')) {
+      if (error.message.includes('User rejected') || error.message.includes('User denied')) {
         errorMessage = 'Connection cancelled by user';
-      } else if (error.message.includes('not initialized')) {
+      } else if (error.message.includes('No wallet found')) {
+        errorMessage = 'No wallet found. Please install MetaMask or another Web3 wallet.';
+      } else if (error.message.includes('not available')) {
         errorMessage = 'Wallet libraries not loaded. Please refresh and try again.';
       } else if (error.message) {
         errorMessage = error.message;
