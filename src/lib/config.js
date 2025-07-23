@@ -108,7 +108,12 @@ export const calculateUSDValue = (ethAmount) => {
 };
 
 export const formatEth = (amount) => {
-  return parseFloat(amount).toFixed(3);
+  // Handle small amounts properly - use 4 decimal places for amounts < 0.001
+  const num = parseFloat(amount);
+  if (num < 0.001 && num > 0) {
+    return num.toFixed(4);
+  }
+  return num.toFixed(3);
 };
 
 export const formatTime = (seconds) => {
