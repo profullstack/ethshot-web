@@ -182,7 +182,7 @@
         on:click={handleTakeShot}
         class="btn-game btn-primary animate-glow"
         disabled={false}
-        style="pointer-events: auto; cursor: pointer; z-index: 1000; position: relative;"
+        style="pointer-events: auto; cursor: pointer;"
       >
         <span class="text-3xl font-black">TAKE THE SHOT</span>
         <span class="text-sm opacity-90">{formatEth(GAME_CONFIG.SHOT_COST)} ETH • {GAME_CONFIG.WIN_PERCENTAGE}% chance to win</span>
@@ -192,7 +192,7 @@
 
     <!-- Pulse Effect for Ready State -->
     {#if $canTakeShot && !$isLoading && timeRemaining <= 0}
-      <div class="absolute inset-0 rounded-2xl bg-red-500/20 animate-ping"></div>
+      <div class="absolute inset-0 rounded-2xl bg-red-500/20 animate-ping pointer-events-none"></div>
     {/if}
   </div>
 
