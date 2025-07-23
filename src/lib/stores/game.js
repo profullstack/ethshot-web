@@ -313,7 +313,7 @@ const createGameStore = () => {
       ]);
 
       // Also load player data from database for additional stats
-      const dbPlayerStats = await db.getPlayerStats(address);
+      const dbPlayerStats = await db.getPlayer(address);
 
       update(state => ({
         ...state,
