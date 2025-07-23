@@ -1,9 +1,13 @@
 <script>
+  console.log('🔧 GameButton component loading...');
+  
   import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError } from '../stores/game.js';
   import { walletStore, isConnected, isCorrectNetwork } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatTime as configFormatTime } from '../config.js';
   import { onMount, onDestroy } from 'svelte';
+
+  console.log('✅ GameButton imports loaded successfully');
 
   let cooldownTimer = null;
   let timeRemaining = 0;
@@ -43,6 +47,7 @@
   // Handle taking a shot
   const handleTakeShot = async () => {
     console.log('🎯 TAKE SHOT BUTTON CLICKED!');
+    console.log('🔍 Button click handler executing...');
     
     console.log('Debug info:', {
       isConnected: $isConnected,
@@ -50,26 +55,35 @@
       canTakeShot: $canTakeShot,
       contractDeployed: $contractDeployed,
       isLoading: $isLoading,
-      gameError: $gameError
+      gameError: $gameError,
+      walletType: window.ethereum?.isPhantom ? 'Phantom' : window.ethereum?.isMetaMask ? 'MetaMask' : 'Unknown'
     });
 
     if (!$isConnected) {
-      console.log('❌ Wallet not connected');
+      console.log('❌ Wallet not connected - stopping here');
       toastStore.error('Please connect your wallet first');
       return;
     }
 
     if (!$isCorrectNetwork) {
-      console.log('❌ Wrong network');
+      console.log('❌ Wrong network - stopping here');
       toastStore.error('Please switch to the correct network');
       return;
     }
 
     console.log('✅ All checks passed, calling gameStore.takeShot()');
+    console.log('🚀 About to call gameStore.takeShot()...');
+    
     try {
-      await gameStore.takeShot();
+      const result = await gameStore.takeShot();
+      console.log('✅ gameStore.takeShot() completed:', result);
     } catch (error) {
-      console.error('Failed to take shot:', error);
+      console.error('❌ Failed to take shot:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
       toastStore.error('Failed to take shot: ' + error.message);
     }
   };
@@ -90,9 +104,14 @@
   }
 
   onMount(() => {
+    console.log('🔧 GameButton onMount called');
+    console.log('🔧 Cooldown remaining:', $cooldownRemaining);
+    
     if ($cooldownRemaining > 0) {
       startCooldownTimer();
     }
+    
+    console.log('✅ GameButton component mounted successfully');
   });
 
   onDestroy(() => {
@@ -163,11 +182,13 @@
         on:click={handleTakeShot}
         class="btn-game btn-primary animate-glow"
         disabled={false}
+        style="pointer-events: auto; cursor: pointer; z-index: 1000; position: relative;"
       >
         <span class="text-3xl font-black">TAKE THE SHOT</span>
         <span class="text-sm opacity-90">{formatEth(GAME_CONFIG.SHOT_COST)} ETH • {GAME_CONFIG.WIN_PERCENTAGE}% chance to win</span>
       </button>
     {/if}
+
 
     <!-- Pulse Effect for Ready State -->
     {#if $canTakeShot && !$isLoading && timeRemaining <= 0}

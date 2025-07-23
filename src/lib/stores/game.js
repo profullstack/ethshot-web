@@ -338,9 +338,10 @@ const createGameStore = () => {
   // Take a shot at the jackpot
   const takeShot = async () => {
     console.log('🎯 gameStore.takeShot() called!');
+    console.log('🔍 Starting takeShot function...');
     
     if (!browser || !ethers) {
-      console.log('❌ Web3 not available');
+      console.log('❌ Web3 not available - browser:', browser, 'ethers:', !!ethers);
       toastStore.error('Web3 not available');
       return;
     }
@@ -349,7 +350,9 @@ const createGameStore = () => {
     console.log('👛 Wallet state:', {
       connected: wallet.connected,
       hasSigner: !!wallet.signer,
-      address: wallet.address
+      address: wallet.address,
+      provider: !!wallet.provider,
+      chainId: wallet.chainId
     });
     
     if (!wallet.connected || !wallet.signer) {
@@ -362,7 +365,9 @@ const createGameStore = () => {
     console.log('🎮 Game state:', {
       contractDeployed: currentState.contractDeployed,
       hasContract: !!contract,
-      contractAddress: currentState.contractAddress
+      contractAddress: currentState.contractAddress,
+      loading: currentState.loading,
+      takingShot: currentState.takingShot
     });
     
     if (currentState.contractDeployed === false) {
@@ -378,25 +383,66 @@ const createGameStore = () => {
     }
 
     console.log('✅ All takeShot checks passed, starting transaction...');
-    update(state => ({ ...state, takingShot: true, error: null }));
 
     try {
       // Create contract instance with signer
       console.log('🔗 Connecting contract with signer...');
+      console.log('🔗 Contract address:', contract.target || contract.address);
+      console.log('🔗 Signer address:', await wallet.signer.getAddress());
+      
       const contractWithSigner = contract.connect(wallet.signer);
+      console.log('✅ Contract connected with signer');
       
       console.log('💰 Getting shot cost from contract...');
       const shotCost = await contract.SHOT_COST();
       console.log('💰 Shot cost:', ethers.formatEther(shotCost), 'ETH');
+      console.log('💰 Shot cost (wei):', shotCost.toString());
 
-      // Send transaction
+      // Check user balance
+      const balance = await wallet.provider.getBalance(wallet.address);
+      console.log('💳 User balance:', ethers.formatEther(balance), 'ETH');
+      
+      if (balance < shotCost) {
+        console.log('❌ Insufficient balance');
+        toastStore.error('Insufficient ETH balance');
+        return;
+      }
+
+      // Send transaction - this will trigger wallet approval dialog
       console.log('📤 Sending takeShot transaction...');
-      const tx = await contractWithSigner.takeShot({
-        value: shotCost,
-        gasLimit: 150000 // Set reasonable gas limit
+      console.log('📤 Transaction params:', {
+        value: shotCost.toString(),
+        gasLimit: 150000
       });
+      
+      console.log('🔍 About to call contractWithSigner.takeShot()...');
+      console.log('🔍 This should trigger Phantom approval dialog...');
+      
+      let tx;
+      try {
+        tx = await contractWithSigner.takeShot({
+          value: shotCost,
+          gasLimit: 150000 // Set reasonable gas limit
+        });
+        console.log('✅ Transaction created successfully:', tx.hash);
+        
+        // Only set loading state AFTER user approves transaction
+        console.log('🔄 Setting takingShot to true after approval...');
+        update(state => ({ ...state, takingShot: true, error: null }));
+        
+      } catch (txError) {
+        console.error('❌ Transaction creation failed:', txError);
+        console.error('❌ Error details:', {
+          message: txError.message,
+          code: txError.code,
+          reason: txError.reason,
+          action: txError.action
+        });
+        throw txError;
+      }
 
       console.log('✅ Transaction sent:', tx.hash);
+      console.log('✅ Transaction object:', tx);
       toastStore.info('Shot submitted! Waiting for confirmation...');
 
       // Wait for transaction confirmation

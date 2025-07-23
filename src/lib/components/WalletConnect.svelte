@@ -5,15 +5,19 @@
   let connecting = false;
 
   const handleConnect = async () => {
+    console.log('🔗 WalletConnect handleConnect called');
     connecting = true;
     try {
+      console.log('🔗 Calling walletStore.connect()...');
       await walletStore.connect();
+      console.log('🔗 Wallet connected successfully!');
       toastStore.success('Wallet connected successfully!');
     } catch (error) {
-      console.error('Failed to connect wallet:', error);
+      console.error('🔗 Failed to connect wallet:', error);
       toastStore.error('Failed to connect wallet. Please try again.');
     } finally {
       connecting = false;
+      console.log('🔗 WalletConnect handleConnect finished');
     }
   };
 </script>
@@ -39,8 +43,10 @@
     <!-- Connect Button -->
     <button
       on:click={handleConnect}
+      onclick="console.log('WalletConnect button clicked via onclick!');"
       disabled={connecting}
       class="connect-button"
+      style="pointer-events: auto; cursor: pointer; z-index: 1000; position: relative;"
     >
       {#if connecting}
         <div class="flex items-center space-x-3">
