@@ -1,0 +1,80 @@
+{
+  "name": "ethshot-web",
+  "version": "1.0.0",
+  "description": "A viral, pay-to-play, Ethereum-powered game where users take a chance to win an ETH jackpot",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "mocha test/**/*.test.js --recursive",
+    "test:coverage": "c8 mocha test/**/*.test.js --recursive",
+    "test:contracts": "hardhat test",
+    "lint": "eslint src server contracts --ext .js,.svelte",
+    "lint:fix": "eslint src server contracts --ext .js,.svelte --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "compile": "hardhat compile",
+    "deploy:testnet": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:mainnet": "hardhat run scripts/deploy.js --network mainnet",
+    "server:dev": "nodemon server/index.js",
+    "server:start": "node server/index.js"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@sveltejs/adapter-auto": "^3.3.1",
+    "@sveltejs/kit": "^2.25.1",
+    "@sveltejs/vite-plugin-svelte": "^3.1.2",
+    "@tailwindcss/typography": "^0.5.16",
+    "autoprefixer": "^10.4.21",
+    "c8": "^8.0.1",
+    "chai": "^4.4.1",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-svelte": "^2.35.1",
+    "hardhat": "^2.19.4",
+    "mocha": "^10.2.0",
+    "nodemon": "^3.0.3",
+    "postcss": "^8.5.6",
+    "prettier": "^3.2.4",
+    "prettier-plugin-svelte": "^3.1.2",
+    "sinon": "^21.0.0",
+    "svelte": "^4.2.7",
+    "tailwindcss": "^4.1.11",
+    "vite": "^5.0.3"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.52.0",
+    "@walletconnect/web3-provider": "^1.8.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.10.0",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "rate-limiter-flexible": "^4.0.1",
+    "redis": "^4.6.12",
+    "web3modal": "^1.9.12"
+  },
+  "keywords": [
+    "ethereum",
+    "web3",
+    "game",
+    "svelte",
+    "blockchain",
+    "jackpot"
+  ],
+  "author": "ETH Shot Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ethshot/ethshot-web.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ethshot/ethshot-web/issues"
+  },
+  "homepage": "https://ethshot.io"
+}

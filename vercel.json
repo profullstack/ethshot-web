@@ -1,0 +1,45 @@
+{
+  "framework": "svelte",
+  "buildCommand": "pnpm build",
+  "devCommand": "pnpm dev",
+  "installCommand": "pnpm install",
+  "outputDirectory": "build",
+  "env": {
+    "PUBLIC_SUPABASE_URL": "@public_supabase_url",
+    "PUBLIC_SUPABASE_ANON_KEY": "@public_supabase_anon_key",
+    "PUBLIC_CONTRACT_ADDRESS": "@public_contract_address",
+    "PUBLIC_RPC_URL": "@public_rpc_url",
+    "PUBLIC_APP_URL": "@public_app_url",
+    "PUBLIC_NETWORK_NAME": "@public_network_name",
+    "PUBLIC_CHAIN_ID": "@public_chain_id"
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

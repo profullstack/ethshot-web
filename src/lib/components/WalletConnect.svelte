@@ -1,0 +1,152 @@
+<script>
+  import { walletStore } from '../stores/wallet.js';
+  import { toastStore } from '../stores/toast.js';
+
+  let connecting = false;
+
+  const handleConnect = async () => {
+    connecting = true;
+    try {
+      await walletStore.connect();
+      toastStore.success('Wallet connected successfully!');
+    } catch (error) {
+      console.error('Failed to connect wallet:', error);
+      toastStore.error('Failed to connect wallet. Please try again.');
+    } finally {
+      connecting = false;
+    }
+  };
+</script>
+
+<div class="wallet-connect">
+  <div class="connect-container">
+    <!-- Wallet Icon -->
+    <div class="wallet-icon">
+      <svg class="w-16 h-16 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+      </svg>
+    </div>
+
+    <!-- Connect Message -->
+    <div class="connect-message">
+      <h3 class="text-2xl font-bold text-white mb-2">Connect Your Wallet</h3>
+      <p class="text-gray-400 text-center max-w-md">
+        Connect your Ethereum wallet to start playing ETH Shot. 
+        We support MetaMask, WalletConnect, and other popular wallets.
+      </p>
+    </div>
+
+    <!-- Connect Button -->
+    <button
+      on:click={handleConnect}
+      disabled={connecting}
+      class="connect-button"
+    >
+      {#if connecting}
+        <div class="flex items-center space-x-3">
+          <div class="spinner w-5 h-5"></div>
+          <span>Connecting...</span>
+        </div>
+      {:else}
+        <span>Connect Wallet</span>
+      {/if}
+    </button>
+
+    <!-- Supported Wallets -->
+    <div class="supported-wallets">
+      <p class="text-sm text-gray-500 mb-3">Supported wallets:</p>
+      <div class="wallet-grid">
+        <div class="wallet-item">
+          <img src="/icons/metamask.svg" alt="MetaMask" class="w-8 h-8" />
+          <span>MetaMask</span>
+        </div>
+        <div class="wallet-item">
+          <img src="/icons/walletconnect.svg" alt="WalletConnect" class="w-8 h-8" />
+          <span>WalletConnect</span>
+        </div>
+        <div class="wallet-item">
+          <img src="/icons/coinbase.svg" alt="Coinbase Wallet" class="w-8 h-8" />
+          <span>Coinbase</span>
+        </div>
+        <div class="wallet-item">
+          <img src="/icons/trust.svg" alt="Trust Wallet" class="w-8 h-8" />
+          <span>Trust</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Security Note -->
+    <div class="security-note">
+      <div class="flex items-start space-x-2">
+        <svg class="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+        </svg>
+        <div class="text-sm text-gray-400">
+          <p class="font-medium text-green-400 mb-1">Secure Connection</p>
+          <p>We never store your private keys. Your wallet remains in your control at all times.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .wallet-connect {
+    @apply flex justify-center items-center min-h-[400px];
+  }
+
+  .connect-container {
+    @apply bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700;
+    @apply p-8 text-center space-y-6 max-w-md w-full;
+  }
+
+  .wallet-icon {
+    @apply flex justify-center mb-4;
+  }
+
+  .connect-message {
+    @apply space-y-3;
+  }
+
+  .connect-button {
+    @apply w-full bg-gradient-to-r from-blue-500 to-blue-600;
+    @apply hover:from-blue-400 hover:to-blue-500;
+    @apply text-white font-semibold py-4 px-6 rounded-xl;
+    @apply transition-all duration-200 transform hover:scale-105;
+    @apply focus:outline-none focus:ring-4 focus:ring-blue-500/50;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+  }
+
+  .supported-wallets {
+    @apply space-y-3;
+  }
+
+  .wallet-grid {
+    @apply grid grid-cols-2 gap-3;
+  }
+
+  .wallet-item {
+    @apply flex items-center space-x-2 p-2 rounded-lg;
+    @apply bg-gray-700/50 border border-gray-600;
+    @apply text-sm text-gray-300;
+  }
+
+  .security-note {
+    @apply bg-gray-900/50 rounded-lg p-4 border border-gray-600;
+  }
+
+  .spinner {
+    @apply border-2 border-gray-300 border-t-white rounded-full animate-spin;
+  }
+
+  /* Mobile Responsive */
+  @media (max-width: 640px) {
+    .connect-container {
+      @apply p-6 mx-4;
+    }
+
+    .wallet-grid {
+      @apply grid-cols-1;
+    }
+  }
+</style>
