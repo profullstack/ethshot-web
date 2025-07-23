@@ -1,5 +1,6 @@
 <script>
   import { goto } from '$app/navigation';
+  import { GAME_CONFIG, formatEth } from '$lib/config.js';
 </script>
 
 <svelte:head>
@@ -20,7 +21,7 @@
   <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-8 border border-gray-700">
     <h2 class="text-2xl font-bold text-white mb-4">What is Sponsorship?</h2>
     <div class="text-gray-300 space-y-4">
-      <p>For just <strong class="text-purple-400">0.05 ETH</strong>, you can sponsor a round and:</p>
+      <p>For just <strong class="text-purple-400">{formatEth(GAME_CONFIG.SPONSOR_COST_ETH)} ETH</strong>, you can sponsor a round and:</p>
       <ul class="text-left max-w-md mx-auto space-y-2">
         <li>• Display your name/brand to all players</li>
         <li>• Show your logo on the game page</li>

@@ -1,5 +1,6 @@
 <script>
   import { currentSponsor } from '../stores/game.js';
+  import { GAME_CONFIG, formatEth } from '../config.js';
 
   // Mock sponsor data for demonstration
   let mockSponsor = null; // Set to null to show no sponsor state initially
@@ -76,7 +77,7 @@
       <div class="opportunity-text">
         <h4 class="opportunity-title">Sponsor This Round</h4>
         <p class="opportunity-description">
-          Get your brand seen by thousands of players for just 0.05 ETH
+          Get your brand seen by thousands of players for just {formatEth(GAME_CONFIG.SPONSOR_COST_ETH)} ETH
         </p>
       </div>
       <a 
