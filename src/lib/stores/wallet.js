@@ -1,7 +1,5 @@
 import { writable, derived } from 'svelte/store';
-import { ethers } from 'ethers';
-import Web3Modal from 'web3modal';
-import WalletConnectProvider from '@walletconnect/web3-provider';
+import { browser } from '$app/environment';
 
 // Wallet connection state
 const createWalletStore = () => {
@@ -18,10 +16,29 @@ const createWalletStore = () => {
 
   let web3Modal = null;
   let provider = null;
+  let ethers = null;
+  let Web3Modal = null;
+  let WalletConnectProvider = null;
 
-  // Initialize Web3Modal
+  // Initialize Web3Modal (browser only)
   const init = async () => {
+    if (!browser) {
+      console.warn('Web3Modal initialization skipped on server');
+      return;
+    }
+
     try {
+      // Dynamic imports for browser-only libraries
+      const [ethersModule, web3ModalModule, walletConnectModule] = await Promise.all([
+        import('ethers'),
+        import('web3modal'),
+        import('@walletconnect/web3-provider')
+      ]);
+
+      ethers = ethersModule;
+      Web3Modal = web3ModalModule.default;
+      WalletConnectProvider = walletConnectModule.default;
+
       const providerOptions = {
         walletconnect: {
           package: WalletConnectProvider,
@@ -54,8 +71,17 @@ const createWalletStore = () => {
 
   // Connect wallet
   const connect = async () => {
+    if (!browser) {
+      console.warn('Wallet connection skipped on server');
+      return;
+    }
+
     if (!web3Modal) {
       await init();
+    }
+
+    if (!web3Modal || !ethers) {
+      throw new Error('Web3 libraries not initialized');
     }
 
     update(state => ({ ...state, connecting: true, error: null }));
@@ -146,6 +172,10 @@ const createWalletStore = () => {
 
   // Update balance
   const updateBalance = async () => {
+    if (!browser || !ethers) {
+      return;
+    }
+
     update(state => {
       if (!state.connected || !state.provider || !state.address) {
         return state;
@@ -169,6 +199,10 @@ const createWalletStore = () => {
 
   // Switch network
   const switchNetwork = async targetChainId => {
+    if (!browser) {
+      return;
+    }
+
     update(state => {
       if (!state.provider || !window.ethereum) {
         return { ...state, error: 'No wallet connected' };
@@ -195,6 +229,10 @@ const createWalletStore = () => {
 
   // Add network
   const addNetwork = async networkConfig => {
+    if (!browser) {
+      return;
+    }
+
     update(state => {
       if (!window.ethereum) {
         return { ...state, error: 'No wallet connected' };

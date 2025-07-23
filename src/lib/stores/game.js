@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import { ethers } from 'ethers';
+import { browser } from '$app/environment';
 import { walletStore } from './wallet.js';
 import { toastStore } from './toast.js';
 import { db, formatAddress, formatEther, formatTimeAgo } from '../supabase.js';
@@ -59,22 +59,32 @@ const createGameStore = () => {
 
   let contract = null;
   let updateInterval = null;
+  let ethers = null;
 
-  // Initialize game store
+  // Initialize game store (browser only)
   const init = async () => {
+    if (!browser) {
+      console.warn('Game initialization skipped on server');
+      return;
+    }
+
     const contractAddress = import.meta.env.PUBLIC_CONTRACT_ADDRESS;
     if (!contractAddress) {
       console.warn('Contract address not configured');
       return;
     }
 
-    update(state => ({ 
-      ...state, 
+    update(state => ({
+      ...state,
       contractAddress,
-      loading: true 
+      loading: true
     }));
 
     try {
+      // Dynamic import for browser-only ethers library
+      const ethersModule = await import('ethers');
+      ethers = ethersModule;
+
       // Create contract instance with read-only provider
       const provider = new ethers.JsonRpcProvider(
         import.meta.env.PUBLIC_RPC_URL || 'https://sepolia.infura.io/v3/demo'
@@ -88,8 +98,8 @@ const createGameStore = () => {
       // Start real-time updates
       startRealTimeUpdates();
       
-      update(state => ({ 
-        ...state, 
+      update(state => ({
+        ...state,
         contract,
         loading: false,
         lastUpdate: new Date().toISOString()
@@ -97,17 +107,17 @@ const createGameStore = () => {
       
     } catch (error) {
       console.error('Failed to initialize game:', error);
-      update(state => ({ 
-        ...state, 
+      update(state => ({
+        ...state,
         loading: false,
-        error: error.message 
+        error: error.message
       }));
     }
   };
 
   // Load game state from contract and database
   const loadGameState = async () => {
-    if (!contract) return;
+    if (!browser || !contract || !ethers) return;
 
     try {
       // Load contract data
@@ -161,7 +171,7 @@ const createGameStore = () => {
 
   // Load player-specific data
   const loadPlayerData = async (address) => {
-    if (!contract || !address) return;
+    if (!browser || !contract || !address || !ethers) return;
 
     try {
       const [playerStats, canShoot, cooldownRemaining] = await Promise.all([
@@ -195,6 +205,11 @@ const createGameStore = () => {
 
   // Take a shot at the jackpot
   const takeShot = async () => {
+    if (!browser || !ethers) {
+      toastStore.error('Web3 not available');
+      return;
+    }
+
     const wallet = get(walletStore);
     if (!wallet.connected || !wallet.signer || !contract) {
       toastStore.error('Please connect your wallet first');
@@ -209,7 +224,7 @@ const createGameStore = () => {
       const shotCost = await contract.SHOT_COST();
 
       // Send transaction
-      const tx = await contractWithSigner.takeShot({ 
+      const tx = await contractWithSigner.takeShot({
         value: shotCost,
         gasLimit: 150000 // Set reasonable gas limit
       });
@@ -303,6 +318,11 @@ const createGameStore = () => {
 
   // Sponsor a round
   const sponsorRound = async (name, logoUrl) => {
+    if (!browser || !ethers) {
+      toastStore.error('Web3 not available');
+      return;
+    }
+
     const wallet = get(walletStore);
     if (!wallet.connected || !wallet.signer || !contract) {
       toastStore.error('Please connect your wallet first');
@@ -365,6 +385,10 @@ const createGameStore = () => {
 
   // Share on Twitter
   const shareOnTwitter = () => {
+    if (!browser) {
+      return;
+    }
+
     const state = get({ subscribe });
     const text = `I just took a shot at #ETHShot and the pot is now ${state.currentPot} ETH! 🎯 Try your luck:`;
     const url = 'https://ethshot.io';
@@ -374,6 +398,10 @@ const createGameStore = () => {
 
   // Copy link to clipboard
   const copyLink = async () => {
+    if (!browser) {
+      return;
+    }
+
     try {
       await navigator.clipboard.writeText('https://ethshot.io');
       toastStore.success('Link copied to clipboard!');
