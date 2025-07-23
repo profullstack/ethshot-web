@@ -39,6 +39,10 @@ const createWalletStore = () => {
       Web3Modal = web3ModalModule.default;
       WalletConnectProvider = walletConnectModule.default;
 
+      if (!ethers || !Web3Modal || !WalletConnectProvider) {
+        throw new Error('Failed to load required Web3 libraries');
+      }
+
       const providerOptions = {
         walletconnect: {
           package: WalletConnectProvider,
@@ -59,13 +63,20 @@ const createWalletStore = () => {
         theme: 'dark',
       });
 
+      if (!web3Modal) {
+        throw new Error('Failed to initialize Web3Modal');
+      }
+
       // Check if user was previously connected
       if (web3Modal.cachedProvider) {
-        await connect();
+        // Don't auto-connect on init to avoid errors, let user manually connect
+        console.log('Previous wallet connection found, ready to reconnect');
       }
     } catch (error) {
       console.error('Failed to initialize Web3Modal:', error);
-      update(state => ({ ...state, error: error.message }));
+      const errorMessage = error.message || 'Failed to initialize wallet libraries';
+      update(state => ({ ...state, error: errorMessage }));
+      throw new Error(errorMessage);
     }
   };
 
@@ -76,18 +87,23 @@ const createWalletStore = () => {
       return;
     }
 
-    if (!web3Modal) {
-      await init();
-    }
-
-    if (!web3Modal || !ethers) {
-      throw new Error('Web3 libraries not initialized');
-    }
-
     update(state => ({ ...state, connecting: true, error: null }));
 
     try {
+      if (!web3Modal) {
+        await init();
+      }
+
+      if (!web3Modal || !ethers) {
+        throw new Error('Web3 libraries not initialized. Please check your environment configuration.');
+      }
+
       const instance = await web3Modal.connect();
+      
+      if (!instance) {
+        throw new Error('Failed to get wallet provider instance');
+      }
+
       provider = new ethers.BrowserProvider(instance);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
@@ -112,12 +128,23 @@ const createWalletStore = () => {
       return { address, chainId: Number(network.chainId) };
     } catch (error) {
       console.error('Failed to connect wallet:', error);
+      
+      let errorMessage = 'Failed to connect wallet';
+      if (error.message.includes('User rejected')) {
+        errorMessage = 'Connection cancelled by user';
+      } else if (error.message.includes('not initialized')) {
+        errorMessage = 'Wallet libraries not loaded. Please refresh and try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       update(state => ({
         ...state,
         connecting: false,
-        error: error.message || 'Failed to connect wallet',
+        error: errorMessage,
       }));
-      throw error;
+      
+      throw new Error(errorMessage);
     }
   };
 
