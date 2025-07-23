@@ -437,9 +437,36 @@ const createGameStore = () => {
       const balance = await wallet.provider.getBalance(wallet.address);
       console.log('💳 User balance:', ethers.formatEther(balance), 'ETH');
       
-      if (balance < shotCost) {
-        console.log('❌ Insufficient balance');
-        toastStore.error('Insufficient ETH balance');
+      // Estimate gas first
+      let gasEstimate;
+      try {
+        gasEstimate = await contractWithSigner.takeShot.estimateGas({
+          value: shotCost
+        });
+        console.log('⛽ Gas estimate for takeShot:', gasEstimate.toString());
+      } catch (estimateError) {
+        console.warn('Failed to estimate gas for takeShot, using default:', estimateError.message);
+        gasEstimate = 150000n; // Fallback gas limit
+      }
+      
+      // Add 20% buffer to gas estimate, but cap at reasonable limit
+      const gasLimit = gasEstimate < 120000n ? 150000n : gasEstimate + (gasEstimate * 20n / 100n);
+      console.log('⛽ Using gas limit for takeShot:', gasLimit.toString());
+      
+      // Get current gas price and calculate total cost
+      const feeData = await wallet.provider.getFeeData();
+      const gasPrice = feeData.gasPrice || feeData.maxFeePerGas;
+      const estimatedGasCost = gasLimit * gasPrice;
+      const totalCost = shotCost + estimatedGasCost;
+      
+      console.log('💸 Shot cost:', ethers.formatEther(shotCost), 'ETH');
+      console.log('💸 Estimated gas cost:', ethers.formatEther(estimatedGasCost), 'ETH');
+      console.log('💸 Total estimated cost:', ethers.formatEther(totalCost), 'ETH');
+      
+      if (balance < totalCost) {
+        const shortfall = ethers.formatEther(totalCost - balance);
+        console.log('❌ Insufficient balance for total cost');
+        toastStore.error(`Insufficient ETH. Need ${shortfall} more ETH for gas fees.`);
         return;
       }
 
@@ -447,7 +474,7 @@ const createGameStore = () => {
       console.log('📤 Sending takeShot transaction...');
       console.log('📤 Transaction params:', {
         value: shotCost.toString(),
-        gasLimit: 150000
+        gasLimit: gasLimit.toString()
       });
       
       console.log('🔍 About to call contractWithSigner.takeShot()...');
@@ -457,7 +484,7 @@ const createGameStore = () => {
       try {
         tx = await contractWithSigner.takeShot({
           value: shotCost,
-          gasLimit: 200000 // Increased gas limit to prevent out of gas errors
+          gasLimit: gasLimit
         });
         console.log('✅ Transaction created successfully:', tx.hash);
         
@@ -586,10 +613,13 @@ const createGameStore = () => {
         // Don't fail the whole transaction for database errors, but make it visible
       }
 
-      // Clear cache to force fresh data fetch
-      rpcCache.invalidate(['contractBalance', 'houseFunds']);
+      // Clear ALL cache to force fresh data fetch
+      rpcCache.clear();
       
-      // Refresh game state
+      // Add a small delay to ensure blockchain state is updated
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refresh game state with fresh data
       await loadGameState();
       await loadPlayerData(wallet.address);
       
@@ -648,9 +678,45 @@ const createGameStore = () => {
       const contractWithSigner = contract.connect(wallet.signer);
       const sponsorCost = await contract.SPONSOR_COST();
 
+      // Check user balance including gas costs
+      const balance = await wallet.provider.getBalance(wallet.address);
+      console.log('💳 User balance:', ethers.formatEther(balance), 'ETH');
+      console.log('💰 Sponsor cost:', ethers.formatEther(sponsorCost), 'ETH');
+      
+      // Estimate gas first
+      let gasEstimate;
+      try {
+        gasEstimate = await contractWithSigner.sponsorRound.estimateGas(name, logoUrl, {
+          value: sponsorCost
+        });
+        console.log('⛽ Gas estimate:', gasEstimate.toString());
+      } catch (estimateError) {
+        console.warn('Failed to estimate gas, using default:', estimateError.message);
+        gasEstimate = 100000n; // Fallback to lower gas limit
+      }
+      
+      // Add 20% buffer to gas estimate, but cap at reasonable limit
+      const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
+      console.log('⛽ Using gas limit:', gasLimit.toString());
+      
+      // Get current gas price
+      const feeData = await wallet.provider.getFeeData();
+      const gasPrice = feeData.gasPrice || feeData.maxFeePerGas;
+      const estimatedGasCost = gasLimit * gasPrice;
+      const totalCost = sponsorCost + estimatedGasCost;
+      
+      console.log('💸 Estimated gas cost:', ethers.formatEther(estimatedGasCost), 'ETH');
+      console.log('💸 Total estimated cost:', ethers.formatEther(totalCost), 'ETH');
+      
+      if (balance < totalCost) {
+        const shortfall = ethers.formatEther(totalCost - balance);
+        toastStore.error(`Insufficient ETH. Need ${shortfall} more ETH for gas fees.`);
+        return;
+      }
+
       const tx = await contractWithSigner.sponsorRound(name, logoUrl, {
         value: sponsorCost,
-        gasLimit: 150000 // Increased gas limit to prevent out of gas errors
+        gasLimit: gasLimit
       });
 
       toastStore.info('Sponsorship submitted! Waiting for confirmation...');
@@ -676,10 +742,13 @@ const createGameStore = () => {
         // Don't fail the whole transaction for database errors
       }
       
-      // Clear cache to force fresh data fetch
-      rpcCache.invalidate(['contractBalance', 'houseFunds', 'currentSponsor']);
+      // Clear ALL cache to force fresh data fetch
+      rpcCache.clear();
       
-      // Refresh game state
+      // Add a small delay to ensure blockchain state is updated
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refresh game state with fresh data
       await loadGameState();
       await walletStore.updateBalance();
 
