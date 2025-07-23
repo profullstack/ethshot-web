@@ -13,6 +13,8 @@ const ETH_SHOT_ABI = [
   'function takeShot() external payable',
   'function sponsorRound(string calldata name, string calldata logoUrl) external payable',
   'function getCurrentPot() external view returns (uint256)',
+  'function getContractBalance() external view returns (uint256)',
+  'function getHouseFunds() external view returns (uint256)',
   'function getPlayerStats(address player) external view returns (tuple(uint256 totalShots, uint256 totalSpent, uint256 totalWon, uint256 lastShotTime))',
   'function canTakeShot(address player) external view returns (bool)',
   'function getCooldownRemaining(address player) external view returns (uint256)',
@@ -232,7 +234,8 @@ const createGameStore = () => {
 
     try {
       // Check cache first for contract data
-      let currentPot = rpcCache.get('currentPot');
+      let contractBalance = rpcCache.get('contractBalance');
+      let houseFunds = rpcCache.get('houseFunds');
       let shotCost = rpcCache.get('shotCost');
       let sponsorCost = rpcCache.get('sponsorCost');
       let currentSponsor = rpcCache.get('currentSponsor');
@@ -240,7 +243,8 @@ const createGameStore = () => {
 
       // Only fetch from contract if not cached
       const contractCalls = [];
-      if (!currentPot) contractCalls.push(['currentPot', () => contract.getCurrentPot()]);
+      if (!contractBalance) contractCalls.push(['contractBalance', () => contract.getContractBalance()]);
+      if (!houseFunds) contractCalls.push(['houseFunds', () => contract.getHouseFunds()]);
       if (!shotCost) contractCalls.push(['shotCost', () => contract.SHOT_COST()]);
       if (!sponsorCost) contractCalls.push(['sponsorCost', () => contract.SPONSOR_COST()]);
       if (!currentSponsor) contractCalls.push(['currentSponsor', () => contract.getCurrentSponsor()]);
@@ -257,7 +261,8 @@ const createGameStore = () => {
             rpcCache.set(key, result);
             
             // Assign to variables
-            if (key === 'currentPot') currentPot = result;
+            if (key === 'contractBalance') contractBalance = result;
+            else if (key === 'houseFunds') houseFunds = result;
             else if (key === 'shotCost') shotCost = result;
             else if (key === 'sponsorCost') sponsorCost = result;
             else if (key === 'currentSponsor') currentSponsor = result;
@@ -270,7 +275,8 @@ const createGameStore = () => {
           } catch (error) {
             console.warn(`Failed to fetch ${key}, using cached or default value:`, error.message);
             // Use cached values or defaults
-            if (key === 'currentPot') currentPot = currentPot || '0';
+            if (key === 'contractBalance') contractBalance = contractBalance || '0';
+            else if (key === 'houseFunds') houseFunds = houseFunds || '0';
             else if (key === 'shotCost') shotCost = shotCost || ethers.parseEther('0.001');
             else if (key === 'sponsorCost') sponsorCost = sponsorCost || ethers.parseEther('0.001');
             else if (key === 'currentSponsor') currentSponsor = currentSponsor || { active: false };
@@ -278,6 +284,23 @@ const createGameStore = () => {
           }
         }
       }
+
+      // Calculate actual pot (contract balance minus house funds)
+      console.log('🔍 Contract values:', {
+        contractBalance: contractBalance?.toString(),
+        houseFunds: houseFunds?.toString(),
+        contractBalanceEth: contractBalance ? ethers.formatEther(contractBalance) : 'N/A',
+        houseFundsEth: houseFunds ? ethers.formatEther(houseFunds) : 'N/A'
+      });
+      
+      const actualPot = contractBalance && houseFunds ?
+        (BigInt(contractBalance) - BigInt(houseFunds)).toString() :
+        contractBalance || '0';
+        
+      console.log('💰 Calculated pot:', {
+        actualPot: actualPot?.toString(),
+        actualPotEth: ethers.formatEther(actualPot)
+      });
 
       // Load database data (prioritize this over contract data)
       const [dbWinners, dbStats, dbSponsors, topPlayers] = await Promise.all([
@@ -298,7 +321,7 @@ const createGameStore = () => {
 
       update(state => ({
         ...state,
-        currentPot: ethers.formatEther(currentPot || '0'),
+        currentPot: ethers.formatEther(actualPot),
         shotCost: ethers.formatEther(shotCost || ethers.parseEther('0.001')),
         sponsorCost: ethers.formatEther(sponsorCost || ethers.parseEther('0.001')),
         currentSponsor: sponsor,
@@ -434,7 +457,7 @@ const createGameStore = () => {
       try {
         tx = await contractWithSigner.takeShot({
           value: shotCost,
-          gasLimit: 150000 // Set reasonable gas limit
+          gasLimit: 200000 // Increased gas limit to prevent out of gas errors
         });
         console.log('✅ Transaction created successfully:', tx.hash);
         
@@ -564,7 +587,7 @@ const createGameStore = () => {
       }
 
       // Clear cache to force fresh data fetch
-      rpcCache.invalidate('currentPot');
+      rpcCache.invalidate(['contractBalance', 'houseFunds']);
       
       // Refresh game state
       await loadGameState();
@@ -627,7 +650,7 @@ const createGameStore = () => {
 
       const tx = await contractWithSigner.sponsorRound(name, logoUrl, {
         value: sponsorCost,
-        gasLimit: 100000
+        gasLimit: 150000 // Increased gas limit to prevent out of gas errors
       });
 
       toastStore.info('Sponsorship submitted! Waiting for confirmation...');
@@ -654,7 +677,7 @@ const createGameStore = () => {
       }
       
       // Clear cache to force fresh data fetch
-      rpcCache.invalidate(['currentPot', 'currentSponsor']);
+      rpcCache.invalidate(['contractBalance', 'houseFunds', 'currentSponsor']);
       
       // Refresh game state
       await loadGameState();
