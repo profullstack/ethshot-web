@@ -12,12 +12,27 @@ async function main() {
   const balance = await ethers.provider.getBalance(deployer.address);
   console.log('💰 Account balance:', ethers.formatEther(balance), 'ETH\n');
 
+  // Get commission address from environment or use deployer as fallback
+  const commissionAddress = process.env.HOUSE_COMMISSION_ADDRESS || deployer.address;
+  
+  if (process.env.HOUSE_COMMISSION_ADDRESS) {
+    console.log('🏦 House commission address (from env):', commissionAddress);
+  } else {
+    console.log('🏦 House commission address (deployer):', commissionAddress);
+    console.log('⚠️  Set HOUSE_COMMISSION_ADDRESS in .env to use a different address\n');
+  }
+
+  // Validate commission address
+  if (!ethers.isAddress(commissionAddress)) {
+    throw new Error(`Invalid commission address: ${commissionAddress}`);
+  }
+
   // Get the contract factory
   const EthShot = await ethers.getContractFactory('EthShot');
 
-  // Deploy the contract
+  // Deploy the contract with commission address as owner
   console.log('⏳ Deploying EthShot contract...');
-  const ethShot = await EthShot.deploy(deployer.address);
+  const ethShot = await EthShot.deploy(commissionAddress);
 
   // Wait for deployment to complete
   await ethShot.waitForDeployment();
@@ -25,7 +40,7 @@ async function main() {
 
   console.log('✅ EthShot contract deployed successfully!');
   console.log('📍 Contract address:', contractAddress);
-  console.log('🏠 Owner address:', deployer.address);
+  console.log('🏠 Owner/Commission address:', commissionAddress);
 
   // Verify contract constants
   const shotCost = await ethShot.SHOT_COST();
@@ -46,7 +61,9 @@ async function main() {
   // Save deployment information
   const deploymentInfo = {
     contractAddress,
-    ownerAddress: deployer.address,
+    ownerAddress: commissionAddress,
+    commissionAddress: commissionAddress,
+    deployerAddress: deployer.address,
     network: network.name,
     chainId: network.chainId.toString(),
     deploymentTime: new Date().toISOString(),
@@ -61,7 +78,7 @@ async function main() {
 
   // Verification instructions
   console.log('\n🔍 To verify the contract on Etherscan, run:');
-  console.log(`npx hardhat verify --network ${network.name} ${contractAddress} "${deployer.address}"`);
+  console.log(`npx hardhat verify --network ${network.name} ${contractAddress} "${commissionAddress}"`);
 
   return deploymentInfo;
 }

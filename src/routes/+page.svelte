@@ -1,15 +1,39 @@
 <script>
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
-  import { gameStore } from '$lib/stores/game.js';
+  import { gameStore, winnerEventStore } from '$lib/stores/game.js';
   import GameButton from '$lib/components/GameButton.svelte';
   import PotDisplay from '$lib/components/PotDisplay.svelte';
   import Leaderboard from '$lib/components/Leaderboard.svelte';
   import SponsorBanner from '$lib/components/SponsorBanner.svelte';
   import RecentWinners from '$lib/components/RecentWinners.svelte';
   import WalletConnect from '$lib/components/WalletConnect.svelte';
+  import WinnerAnimation from '$lib/components/WinnerAnimation.svelte';
 
   let mounted = false;
+  let showWinnerAnimation = false;
+  let winnerAmount = '0';
+
+  // Listen for winner events from the winner event store
+  $: if ($winnerEventStore && $walletStore.address) {
+    const winnerEvent = $winnerEventStore;
+    const currentUser = $walletStore.address;
+    
+    // Check if the winner is the current user
+    if (winnerEvent.winner?.toLowerCase() === currentUser.toLowerCase()) {
+      winnerAmount = winnerEvent.amount || '0';
+      showWinnerAnimation = true;
+      
+      // Clear the winner event after showing animation
+      setTimeout(() => {
+        winnerEventStore.set(null);
+      }, 100);
+    }
+  }
+
+  const handleAnimationComplete = () => {
+    showWinnerAnimation = false;
+  };
 
   onMount(() => {
     mounted = true;
@@ -173,6 +197,13 @@
     </div>
   </div>
 {/if}
+
+<!-- Winner Animation Overlay -->
+<WinnerAnimation
+  show={showWinnerAnimation}
+  amount={winnerAmount}
+  on:complete={handleAnimationComplete}
+/>
 
 <style>
   @keyframes pulse {

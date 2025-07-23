@@ -4,6 +4,9 @@ import { walletStore } from './wallet.js';
 import { toastStore } from './toast.js';
 import { db, formatAddress, formatEther, formatTimeAgo } from '../supabase.js';
 
+// Winner event store for triggering animations
+export const winnerEventStore = writable(null);
+
 // ETH Shot contract ABI (simplified for key functions)
 const ETH_SHOT_ABI = [
   'function takeShot() external payable',
@@ -232,7 +235,15 @@ const createGameStore = () => {
         won = parsed.args.won;
         
         if (won) {
+          const potAmount = ethers.formatEther(await contract.getCurrentPot());
           toastStore.success('🎉 JACKPOT! You won the pot!');
+          
+          // Trigger winner animation
+          winnerEventStore.set({
+            winner: wallet.address,
+            amount: potAmount,
+            timestamp: new Date().toISOString()
+          });
         } else {
           toastStore.info('Shot taken! Better luck next time.');
         }
