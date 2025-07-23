@@ -38,6 +38,8 @@
 
   onMount(() => {
     mounted = true;
+    // Initialize game store for real-time updates
+    gameStore.init();
   });
 </script>
 

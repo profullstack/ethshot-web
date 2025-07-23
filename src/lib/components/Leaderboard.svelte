@@ -1,18 +1,50 @@
 <script>
+  import { onMount } from 'svelte';
   import { gameStore } from '../stores/game.js';
+  import { db, formatAddress } from '../supabase.js';
 
-  // Mock leaderboard data - in real app this would come from the store
-  let topPlayers = [
-    { address: '0x1234...5678', totalShots: 156, totalSpent: '0.156', totalWon: '2.340', rank: 1 },
-    { address: '0x2345...6789', totalShots: 89, totalSpent: '0.089', totalWon: '0.000', rank: 2 },
-    { address: '0x3456...7890', totalShots: 67, totalSpent: '0.067', totalWon: '1.200', rank: 3 },
-    { address: '0x4567...8901', totalShots: 45, totalSpent: '0.045', totalWon: '0.000', rank: 4 },
-    { address: '0x5678...9012', totalShots: 34, totalSpent: '0.034', totalWon: '0.000', rank: 5 },
-  ];
+  let topPlayers = [];
+  let loading = true;
+  let error = null;
+
+  // Load leaderboard from database on mount
+  onMount(async () => {
+    await loadLeaderboard();
+  });
+
+  async function loadLeaderboard() {
+    try {
+      loading = true;
+      error = null;
+      
+      // Get top players from database
+      const dbPlayers = await db.getTopPlayers(10, 'total_shots');
+      
+      if (dbPlayers && dbPlayers.length > 0) {
+        // Transform database format to component format and add ranks
+        topPlayers = dbPlayers.map((player, index) => ({
+          address: player.address,
+          totalShots: player.total_shots || 0,
+          totalSpent: player.total_spent || '0',
+          totalWon: player.total_won || '0',
+          rank: index + 1
+        }));
+      } else {
+        // No players in database yet
+        topPlayers = [];
+      }
+    } catch (err) {
+      console.error('Error loading leaderboard:', err);
+      error = 'Failed to load leaderboard';
+      topPlayers = [];
+    } finally {
+      loading = false;
+    }
+  }
 
   // Truncate address for display
   const truncateAddress = (address) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    return formatAddress(address);
   };
 
   // Get rank badge color
@@ -54,39 +86,67 @@
   </div>
 
   <div class="leaderboard-list">
-    {#each topPlayers as player (player.address)}
-      <div class="player-row">
-        <!-- Rank -->
-        <div class="rank-badge {getRankColor(player.rank)}">
-          <span class="rank-icon">{getRankIcon(player.rank)}</span>
-        </div>
-
-        <!-- Player Info -->
-        <div class="player-info">
-          <div class="player-address">
-            {truncateAddress(player.address)}
-          </div>
-          <div class="player-stats">
-            <span class="stat-item">
-              <span class="stat-value">{player.totalShots}</span>
-              <span class="stat-label">shots</span>
-            </span>
-            {#if parseFloat(player.totalWon) > 0}
-              <span class="stat-item winner">
-                <span class="stat-value">+{player.totalWon}</span>
-                <span class="stat-label">ETH</span>
-              </span>
-            {/if}
-          </div>
-        </div>
-
-        <!-- Spent Amount -->
-        <div class="spent-amount">
-          <div class="spent-value">{player.totalSpent} ETH</div>
-          <div class="spent-label">spent</div>
+    {#if loading}
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <p class="text-gray-400">Loading leaderboard...</p>
+      </div>
+    {:else if error}
+      <div class="error-state">
+        <div class="error-icon">⚠️</div>
+        <div class="error-text">
+          <p class="text-red-400">{error}</p>
+          <button
+            class="retry-button"
+            on:click={loadLeaderboard}
+          >
+            Try Again
+          </button>
         </div>
       </div>
-    {/each}
+    {:else if topPlayers.length > 0}
+      {#each topPlayers as player (player.address)}
+        <div class="player-row">
+          <!-- Rank -->
+          <div class="rank-badge {getRankColor(player.rank)}">
+            <span class="rank-icon">{getRankIcon(player.rank)}</span>
+          </div>
+
+          <!-- Player Info -->
+          <div class="player-info">
+            <div class="player-address">
+              {truncateAddress(player.address)}
+            </div>
+            <div class="player-stats">
+              <span class="stat-item">
+                <span class="stat-value">{player.totalShots}</span>
+                <span class="stat-label">shots</span>
+              </span>
+              {#if parseFloat(player.totalWon) > 0}
+                <span class="stat-item winner">
+                  <span class="stat-value">+{parseFloat(player.totalWon).toFixed(3)}</span>
+                  <span class="stat-label">ETH</span>
+                </span>
+              {/if}
+            </div>
+          </div>
+
+          <!-- Spent Amount -->
+          <div class="spent-amount">
+            <div class="spent-value">{parseFloat(player.totalSpent).toFixed(3)} ETH</div>
+            <div class="spent-label">spent</div>
+          </div>
+        </div>
+      {/each}
+    {:else}
+      <div class="no-players">
+        <div class="no-players-icon">🏆</div>
+        <div class="no-players-text">
+          <p class="text-gray-400">No players yet!</p>
+          <p class="text-sm text-gray-500">Be the first to take a shot</p>
+        </div>
+      </div>
+    {/if}
   </div>
 
   <!-- View All Button -->
@@ -178,6 +238,57 @@
     @apply inline-flex items-center space-x-2 text-sm;
     @apply text-blue-400 hover:text-blue-300 transition-colors;
     @apply font-medium;
+  }
+
+  /* Loading and Error States */
+  .loading-state {
+    @apply flex flex-col items-center justify-center p-8 text-center;
+  }
+
+  .loading-spinner {
+    @apply w-8 h-8 border-2 border-gray-600 border-t-blue-500 rounded-full;
+    animation: spin 1s linear infinite;
+  }
+
+  .error-state {
+    @apply flex items-center space-x-4 p-6 text-center;
+    @apply bg-red-900/20 rounded-lg border border-red-700/30;
+  }
+
+  .error-icon {
+    @apply text-2xl;
+  }
+
+  .error-text {
+    @apply flex-1;
+  }
+
+  .retry-button {
+    @apply mt-2 px-4 py-2 bg-red-600 hover:bg-red-700;
+    @apply text-white text-sm rounded-lg transition-colors;
+  }
+
+  .no-players {
+    @apply flex items-center space-x-4 p-6 text-center;
+    @apply bg-gray-900/50 rounded-lg border border-gray-700;
+  }
+
+  .no-players-icon {
+    @apply text-4xl opacity-50;
+  }
+
+  .no-players-text {
+    @apply flex-1;
+  }
+
+  /* Animations */
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   /* Mobile Responsive */

@@ -1,52 +1,63 @@
 <script>
+  import { onMount } from 'svelte';
   import { recentWinners } from '../stores/game.js';
+  import { db, formatAddress, formatTimeAgo } from '../supabase.js';
+  import { NETWORK_CONFIG } from '../config.js';
+
+  let winners = [];
+  let loading = true;
+  let error = null;
+
+  // Load winners from database on mount
+  onMount(async () => {
+    await loadWinners();
+  });
+
+  async function loadWinners() {
+    try {
+      loading = true;
+      error = null;
+      
+      // Try to get winners from database first
+      const dbWinners = await db.getRecentWinners(10);
+      
+      if (dbWinners && dbWinners.length > 0) {
+        // Transform database format to component format
+        winners = dbWinners.map(winner => ({
+          winner: winner.winner_address,
+          amount: winner.amount,
+          timestamp: winner.timestamp,
+          blockNumber: winner.block_number,
+          txHash: winner.tx_hash
+        }));
+      } else {
+        // Fall back to store data if database is empty
+        winners = $recentWinners || [];
+      }
+    } catch (err) {
+      console.error('Error loading winners:', err);
+      error = 'Failed to load recent winners';
+      // Fall back to store data on error
+      winners = $recentWinners || [];
+    } finally {
+      loading = false;
+    }
+  }
 
   // Truncate address for display
   const truncateAddress = (address) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    return formatAddress(address);
   };
 
   // Format time ago
   const timeAgo = (timestamp) => {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffInSeconds = Math.floor((now - time) / 1000);
-
-    if (diffInSeconds < 60) {
-      return `${diffInSeconds}s ago`;
-    } else if (diffInSeconds < 3600) {
-      return `${Math.floor(diffInSeconds / 60)}m ago`;
-    } else if (diffInSeconds < 86400) {
-      return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    } else {
-      return `${Math.floor(diffInSeconds / 86400)}d ago`;
-    }
+    return formatTimeAgo(timestamp);
   };
 
-  // Mock data for demonstration - in real app this comes from the store
-  let mockWinners = [
-    {
-      winner: '0x1234567890123456789012345678901234567890',
-      amount: '1.234',
-      timestamp: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
-      blockNumber: 18500000
-    },
-    {
-      winner: '0x2345678901234567890123456789012345678901',
-      amount: '0.567',
-      timestamp: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
-      blockNumber: 18499950
-    },
-    {
-      winner: '0x3456789012345678901234567890123456789012',
-      amount: '2.100',
-      timestamp: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-      blockNumber: 18499800
-    }
-  ];
-
-  // Use real winners if available, otherwise use mock data
-  $: winners = $recentWinners.length > 0 ? $recentWinners : mockWinners;
+  // React to store changes for real-time updates
+  $: if ($recentWinners && $recentWinners.length > 0) {
+    winners = $recentWinners;
+  }
 </script>
 
 <div class="recent-winners">
@@ -59,8 +70,26 @@
   </div>
 
   <div class="winners-list">
-    {#if winners.length > 0}
-      {#each winners as winner (winner.blockNumber)}
+    {#if loading}
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <p class="text-gray-400">Loading recent winners...</p>
+      </div>
+    {:else if error}
+      <div class="error-state">
+        <div class="error-icon">⚠️</div>
+        <div class="error-text">
+          <p class="text-red-400">{error}</p>
+          <button
+            class="retry-button"
+            on:click={loadWinners}
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    {:else if winners.length > 0}
+      {#each winners as winner (winner.blockNumber || winner.txHash)}
         <div class="winner-row">
           <!-- Winner Icon -->
           <div class="winner-icon">
@@ -72,9 +101,9 @@
           <!-- Winner Info -->
           <div class="winner-info">
             <div class="winner-address">
-              <a 
-                href="https://etherscan.io/address/{winner.winner}" 
-                target="_blank" 
+              <a
+                href="{NETWORK_CONFIG.BLOCK_EXPLORER_URL}/address/{winner.winner}"
+                target="_blank"
                 rel="noopener noreferrer"
                 class="address-link"
               >
@@ -89,7 +118,7 @@
           <!-- Winner Amount -->
           <div class="winner-amount">
             <div class="amount-value">
-              +{winner.amount} ETH
+              +{parseFloat(winner.amount).toFixed(3)} ETH
             </div>
             <div class="amount-usd">
               ${(parseFloat(winner.amount) * 2500).toLocaleString()}
@@ -250,7 +279,44 @@
     border-radius: 2px;
   }
 
+  /* Loading and Error States */
+  .loading-state {
+    @apply flex flex-col items-center justify-center p-8 text-center;
+  }
+
+  .loading-spinner {
+    @apply w-8 h-8 border-2 border-gray-600 border-t-blue-500 rounded-full;
+    animation: spin 1s linear infinite;
+  }
+
+  .error-state {
+    @apply flex items-center space-x-4 p-6 text-center;
+    @apply bg-red-900/20 rounded-lg border border-red-700/30;
+  }
+
+  .error-icon {
+    @apply text-2xl;
+  }
+
+  .error-text {
+    @apply flex-1;
+  }
+
+  .retry-button {
+    @apply mt-2 px-4 py-2 bg-red-600 hover:bg-red-700;
+    @apply text-white text-sm rounded-lg transition-colors;
+  }
+
   /* Animations */
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   @keyframes slideIn {
     from {
       opacity: 0;

@@ -2,11 +2,8 @@
   import { currentSponsor } from '../stores/game.js';
   import { GAME_CONFIG, formatEth } from '../config.js';
 
-  // Mock sponsor data for demonstration
-  let mockSponsor = null; // Set to null to show no sponsor state initially
-
-  // Use real sponsor if available, otherwise use mock data
-  $: sponsor = $currentSponsor || mockSponsor;
+  // Use real sponsor data from store
+  $: sponsor = $currentSponsor;
 
   // Format time remaining for sponsorship
   const timeAgo = (timestamp) => {
