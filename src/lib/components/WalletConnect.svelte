@@ -14,7 +14,15 @@
       toastStore.success('Wallet connected successfully!');
     } catch (error) {
       console.error('🔗 Failed to connect wallet:', error);
-      toastStore.error('Failed to connect wallet. Please try again.');
+      console.error('🔗 Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      // Show specific error message to user
+      const errorMessage = error.message || 'Failed to connect wallet. Please try again.';
+      toastStore.error(errorMessage);
     } finally {
       connecting = false;
       console.log('🔗 WalletConnect handleConnect finished');

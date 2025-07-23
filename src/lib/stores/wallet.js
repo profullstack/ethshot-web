@@ -75,9 +75,9 @@ const createWalletStore = () => {
 
       let instance;
 
-      // Auto-detect or use specific wallet type
-      if (walletType === 'auto' || walletType === 'injected') {
-        // Check for injected wallet (MetaMask, Phantom, etc.) - Direct connection
+      // Handle different wallet connection types
+      if (walletType === 'injected' || walletType === 'auto') {
+        // Check for injected wallet first
         if (window.ethereum) {
           try {
             console.log('🔗 Requesting injected wallet connection...');
@@ -86,62 +86,75 @@ const createWalletStore = () => {
             instance = window.ethereum;
           } catch (metamaskError) {
             console.error('❌ Injected wallet connection failed:', metamaskError);
+            console.error('❌ Error details:', {
+              message: metamaskError.message,
+              code: metamaskError.code,
+              stack: metamaskError.stack
+            });
             if (walletType === 'injected') {
               throw new Error('Injected wallet connection failed: ' + metamaskError.message);
             }
-            // If auto mode, continue to try WalletConnect
+            // If auto mode and injected fails, don't try WalletConnect on desktop
+            if (walletType === 'auto') {
+              throw new Error('Browser wallet connection failed: ' + metamaskError.message);
+            }
+          }
+        } else {
+          // No window.ethereum detected
+          if (walletType === 'injected') {
+            throw new Error('No browser wallet found. Please install MetaMask or another Web3 wallet.');
+          } else if (walletType === 'auto') {
+            // Auto mode but no window.ethereum - provide helpful message
+            throw new Error('No browser wallet found. Please install MetaMask or another Web3 wallet.');
           }
         }
       }
 
-      // Try WalletConnect if no injected wallet or specifically requested
-      if (!instance && (walletType === 'auto' || walletType === 'walletconnect')) {
+      // Only try WalletConnect if specifically requested
+      if (!instance && walletType === 'walletconnect') {
         try {
           console.log('🔗 Initializing WalletConnect...');
           
           // Check if WalletConnect Project ID is configured
           if (!WALLET_CONFIG.WALLETCONNECT_PROJECT_ID) {
-            const errorMsg = 'WalletConnect Project ID not configured. Please set VITE_WALLETCONNECT_PROJECT_ID in your environment variables.';
-            console.error('❌', errorMsg);
-            if (walletType === 'walletconnect') {
-              throw new Error(errorMsg);
-            }
-            // If auto mode, skip WalletConnect and continue
-            console.log('⚠️ Skipping WalletConnect due to missing Project ID');
-          } else {
-            // Dynamic import for WalletConnect
-            const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
-            
-            const walletConnectProvider = await EthereumProvider.init({
-              projectId: WALLET_CONFIG.WALLETCONNECT_PROJECT_ID,
-              chains: [NETWORK_CONFIG.CHAIN_ID],
-              rpcMap: {
-                [NETWORK_CONFIG.CHAIN_ID]: NETWORK_CONFIG.RPC_URL
-              },
-              metadata: {
-                name: 'ETH Shot',
-                description: 'A viral, pay-to-play, Ethereum-powered game',
-                url: 'https://ethshot.io',
-                icons: ['https://ethshot.io/favicon.png']
-              }
-            });
-
-            console.log('🔗 Requesting WalletConnect connection...');
-            await walletConnectProvider.connect();
-            console.log('✅ WalletConnect connected');
-            instance = walletConnectProvider;
+            throw new Error('WalletConnect Project ID not configured. Please set VITE_WALLETCONNECT_PROJECT_ID in your environment variables.');
           }
+
+          // Dynamic import for WalletConnect
+          const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
+          
+          const walletConnectProvider = await EthereumProvider.init({
+            projectId: WALLET_CONFIG.WALLETCONNECT_PROJECT_ID,
+            chains: [NETWORK_CONFIG.CHAIN_ID],
+            rpcMap: {
+              [NETWORK_CONFIG.CHAIN_ID]: NETWORK_CONFIG.RPC_URL
+            },
+            metadata: {
+              name: 'ETH Shot',
+              description: 'A viral, pay-to-play, Ethereum-powered game',
+              url: 'https://ethshot.io',
+              icons: ['https://ethshot.io/favicon.png']
+            }
+          });
+
+          console.log('🔗 Requesting WalletConnect connection...');
+          await walletConnectProvider.connect();
+          console.log('✅ WalletConnect connected');
+          instance = walletConnectProvider;
           
         } catch (walletConnectError) {
           console.error('❌ WalletConnect connection failed:', walletConnectError);
-          if (walletType === 'walletconnect') {
-            throw new Error('WalletConnect connection failed: ' + walletConnectError.message);
-          }
+          throw new Error('WalletConnect connection failed: ' + walletConnectError.message);
         }
       }
 
+      // Final check for successful connection
       if (!instance) {
-        throw new Error('No wallet connection available. Please install MetaMask or use a WalletConnect-compatible mobile wallet.');
+        if (walletType === 'auto') {
+          throw new Error('No wallet found. Please install MetaMask or another Web3 wallet.');
+        } else {
+          throw new Error(`Failed to connect ${walletType} wallet.`);
+        }
       }
 
       console.log('🔧 Creating provider and signer...');
