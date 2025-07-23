@@ -31,6 +31,7 @@ const createGameStore = () => {
     // Contract info
     contractAddress: NETWORK_CONFIG.CONTRACT_ADDRESS,
     contract: null,
+    contractDeployed: null, // null = unknown, true = deployed, false = not deployed
 
     // Game state
     currentPot: '0',
@@ -70,8 +71,15 @@ const createGameStore = () => {
     }
 
     const contractAddress = import.meta.env.PUBLIC_CONTRACT_ADDRESS;
-    if (!contractAddress) {
-      console.warn('Contract address not configured');
+    if (!contractAddress || contractAddress === '0x1234567890123456789012345678901234567890') {
+      console.warn('Contract address not configured or using placeholder');
+      update(state => ({
+        ...state,
+        contractAddress: contractAddress || 'Not configured',
+        contractDeployed: false,
+        loading: false,
+        error: 'Smart contract not deployed yet. Please deploy the contract first.'
+      }));
       return;
     }
 
@@ -91,25 +99,45 @@ const createGameStore = () => {
       
       contract = new ethers.Contract(contractAddress, ETH_SHOT_ABI, provider);
       
-      // Load initial game state
-      await loadGameState();
-      
-      // Start real-time updates
-      startRealTimeUpdates();
-      
-      update(state => ({
-        ...state,
-        contract,
-        loading: false,
-        lastUpdate: new Date().toISOString()
-      }));
+      // Check if contract is actually deployed by trying to call a view function
+      try {
+        await contract.SHOT_COST();
+        
+        update(state => ({
+          ...state,
+          contractDeployed: true
+        }));
+        
+        // Load initial game state
+        await loadGameState();
+        
+        // Start real-time updates
+        startRealTimeUpdates();
+        
+        update(state => ({
+          ...state,
+          contract,
+          loading: false,
+          lastUpdate: new Date().toISOString()
+        }));
+        
+      } catch (contractError) {
+        console.error('Contract not deployed or not accessible:', contractError);
+        update(state => ({
+          ...state,
+          contractDeployed: false,
+          loading: false,
+          error: 'Smart contract not found at the configured address. Please deploy the contract first.'
+        }));
+      }
       
     } catch (error) {
       console.error('Failed to initialize game:', error);
       update(state => ({
         ...state,
+        contractDeployed: false,
         loading: false,
-        error: error.message
+        error: `Failed to connect to blockchain: ${error.message}`
       }));
     }
   };
@@ -210,8 +238,19 @@ const createGameStore = () => {
     }
 
     const wallet = get(walletStore);
-    if (!wallet.connected || !wallet.signer || !contract) {
+    if (!wallet.connected || !wallet.signer) {
       toastStore.error('Please connect your wallet first');
+      return;
+    }
+
+    const currentState = get({ subscribe });
+    if (currentState.contractDeployed === false) {
+      toastStore.error('Smart contract not deployed yet. Please deploy the contract first.');
+      return;
+    }
+
+    if (!contract) {
+      toastStore.error('Game contract not initialized. Please refresh the page.');
       return;
     }
 
@@ -316,15 +355,26 @@ const createGameStore = () => {
   };
 
   // Sponsor a round
-  const sponsorRound = async (name, logoUrl) => {
+  const sponsorRound = async (name, logoUrl, sponsorUrl = null) => {
     if (!browser || !ethers) {
       toastStore.error('Web3 not available');
       return;
     }
 
     const wallet = get(walletStore);
-    if (!wallet.connected || !wallet.signer || !contract) {
+    if (!wallet.connected || !wallet.signer) {
       toastStore.error('Please connect your wallet first');
+      return;
+    }
+
+    const currentState = get({ subscribe });
+    if (currentState.contractDeployed === false) {
+      toastStore.error('Smart contract not deployed yet. Please deploy the contract first.');
+      return;
+    }
+
+    if (!contract) {
+      toastStore.error('Game contract not initialized. Please refresh the page.');
       return;
     }
 
@@ -353,6 +403,7 @@ const createGameStore = () => {
           sponsor_address: wallet.address,
           name,
           logo_url: logoUrl,
+          sponsor_url: sponsorUrl,
           amount: ethers.formatEther(sponsorCost),
           tx_hash: receipt.hash,
           block_number: receipt.blockNumber,
@@ -524,3 +575,7 @@ export const currentSponsor = derived(gameStore, $game => $game.currentSponsor);
 export const recentWinners = derived(gameStore, $game => $game.recentWinners);
 
 export const playerStats = derived(gameStore, $game => $game.playerStats);
+
+export const contractDeployed = derived(gameStore, $game => $game.contractDeployed);
+
+export const gameError = derived(gameStore, $game => $game.error);
