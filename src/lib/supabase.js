@@ -286,6 +286,7 @@ export const db = {
           sponsor_address: sponsorData.sponsorAddress.toLowerCase(),
           name: sponsorData.name,
           logo_url: sponsorData.logoUrl,
+          sponsor_url: sponsorData.sponsorUrl,
           amount: sponsorData.amount,
           tx_hash: sponsorData.txHash,
           active: true,

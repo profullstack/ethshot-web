@@ -290,17 +290,53 @@ const createGameStore = () => {
         contractBalance: contractBalance?.toString(),
         houseFunds: houseFunds?.toString(),
         contractBalanceEth: contractBalance ? ethers.formatEther(contractBalance) : 'N/A',
-        houseFundsEth: houseFunds ? ethers.formatEther(houseFunds) : 'N/A'
+        houseFundsEth: houseFunds ? ethers.formatEther(houseFunds) : 'N/A',
+        contractBalanceType: typeof contractBalance,
+        houseFundsType: typeof houseFunds,
+        contractBalanceFromCache: !!rpcCache.get('contractBalance'),
+        houseFundsFromCache: !!rpcCache.get('houseFunds')
       });
       
       const actualPot = contractBalance && houseFunds ?
-        (BigInt(contractBalance) - BigInt(houseFunds)).toString() :
-        contractBalance || '0';
+        BigInt(contractBalance) - BigInt(houseFunds) :
+        BigInt(contractBalance || '0');
         
       console.log('💰 Calculated pot:', {
-        actualPot: actualPot?.toString(),
-        actualPotEth: ethers.formatEther(actualPot)
+        actualPot: actualPot.toString(),
+        actualPotEth: ethers.formatEther(actualPot),
+        calculation: `${contractBalance?.toString()} - ${houseFunds?.toString()} = ${actualPot.toString()}`
       });
+      
+      // Force fresh contract calls if pot seems wrong
+      if (ethers.formatEther(actualPot) === '0.001') {
+        console.log('🚨 Pot is 0.001 ETH - forcing fresh contract calls to verify');
+        try {
+          const freshContractBalance = await contract.getContractBalance();
+          const freshHouseFunds = await contract.getHouseFunds();
+          console.log('🔄 Fresh contract data:', {
+            freshContractBalance: freshContractBalance.toString(),
+            freshHouseFunds: freshHouseFunds.toString(),
+            freshContractBalanceEth: ethers.formatEther(freshContractBalance),
+            freshHouseFundsEth: ethers.formatEther(freshHouseFunds),
+            freshPotEth: ethers.formatEther(freshContractBalance - freshHouseFunds)
+          });
+          
+          // Use fresh data if different
+          if (freshContractBalance.toString() !== contractBalance?.toString() ||
+              freshHouseFunds.toString() !== houseFunds?.toString()) {
+            console.log('📊 Using fresh data instead of cached data');
+            contractBalance = freshContractBalance;
+            houseFunds = freshHouseFunds;
+            actualPot = BigInt(contractBalance) - BigInt(houseFunds);
+            
+            // Update cache with fresh data
+            rpcCache.set('contractBalance', contractBalance);
+            rpcCache.set('houseFunds', houseFunds);
+          }
+        } catch (freshError) {
+          console.error('❌ Failed to fetch fresh contract data:', freshError);
+        }
+      }
 
       // Load database data (prioritize this over contract data)
       const [dbWinners, dbStats, dbSponsors, topPlayers] = await Promise.all([

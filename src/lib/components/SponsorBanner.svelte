@@ -4,6 +4,18 @@
 
   // Use real sponsor data from store
   $: sponsor = $currentSponsor;
+  
+  // Debug sponsor data
+  $: if (sponsor) {
+    console.log('🎪 Sponsor data:', {
+      sponsor,
+      hasLogoUrl: !!sponsor.logoUrl,
+      hasLogo_url: !!sponsor.logo_url,
+      hasSponsorUrl: !!sponsor.sponsor_url,
+      logoUrlValue: sponsor.logoUrl || sponsor.logo_url,
+      sponsorUrlValue: sponsor.sponsor_url
+    });
+  }
 
   // Format time remaining for sponsorship
   const timeAgo = (timestamp) => {
@@ -43,34 +55,38 @@
             class="sponsor-link"
             title="Visit {sponsor.name}"
           >
-            {#if sponsor.logoUrl}
+            <div class="sponsor-content-wrapper">
+              {#if sponsor.logoUrl || sponsor.logo_url}
+                <img
+                  src={sponsor.logoUrl || sponsor.logo_url}
+                  alt="{sponsor.name} logo"
+                  class="sponsor-logo clickable"
+                  on:error={(e) => e.target.style.display = 'none'}
+                />
+              {/if}
+              
+              <div class="sponsor-details">
+                <h4 class="sponsor-name clickable">{sponsor.name}</h4>
+                <p class="sponsor-tagline">Sponsoring this round • Click to visit</p>
+              </div>
+            </div>
+          </a>
+        {:else}
+          <!-- Non-clickable sponsor without URL -->
+          <div class="sponsor-content-wrapper">
+            {#if sponsor.logoUrl || sponsor.logo_url}
               <img
-                src={sponsor.logoUrl}
+                src={sponsor.logoUrl || sponsor.logo_url}
                 alt="{sponsor.name} logo"
-                class="sponsor-logo clickable"
+                class="sponsor-logo"
                 on:error={(e) => e.target.style.display = 'none'}
               />
             {/if}
             
             <div class="sponsor-details">
-              <h4 class="sponsor-name clickable">{sponsor.name}</h4>
-              <p class="sponsor-tagline">Sponsoring this round • Click to visit</p>
+              <h4 class="sponsor-name">{sponsor.name}</h4>
+              <p class="sponsor-tagline">Sponsoring this round</p>
             </div>
-          </a>
-        {:else}
-          <!-- Non-clickable sponsor without URL -->
-          {#if sponsor.logoUrl}
-            <img
-              src={sponsor.logoUrl}
-              alt="{sponsor.name} logo"
-              class="sponsor-logo"
-              on:error={(e) => e.target.style.display = 'none'}
-            />
-          {/if}
-          
-          <div class="sponsor-details">
-            <h4 class="sponsor-name">{sponsor.name}</h4>
-            <p class="sponsor-tagline">Sponsoring this round</p>
           </div>
         {/if}
       </div>
@@ -136,15 +152,19 @@
   }
 
   .sponsor-info {
-    @apply flex items-center space-x-4 flex-1;
+    @apply flex items-center flex-1;
   }
 
   .sponsor-link {
-    @apply flex items-center space-x-4 flex-1;
+    @apply flex items-center flex-1;
     @apply transition-all duration-200 rounded-lg p-2 -m-2;
     @apply hover:bg-white/10 hover:backdrop-blur-sm;
     @apply focus:outline-none focus:ring-2 focus:ring-purple-400/50;
     text-decoration: none;
+  }
+
+  .sponsor-content-wrapper {
+    @apply flex items-center justify-center space-x-4 flex-1;
   }
 
   .sponsor-logo {
@@ -158,7 +178,7 @@
   }
 
   .sponsor-details {
-    @apply flex-1;
+    @apply text-center;
   }
 
   .sponsor-name {
