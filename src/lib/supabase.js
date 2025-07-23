@@ -34,6 +34,7 @@ export const TABLES = {
   WINNERS: 'winners',
   SPONSORS: 'sponsors',
   GAME_STATS: 'game_stats',
+  LEADERBOARD: 'leaderboard',
 };
 
 // Database functions for ETH Shot game
@@ -50,15 +51,17 @@ export const db = {
         .from(TABLES.PLAYERS)
         .select('*')
         .eq('address', address.toLowerCase())
-        .single();
+        .limit(1);
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      if (error) {
+        console.warn('Supabase getPlayer query error (expected if player not found):', error);
+        return null;
       }
 
-      return data;
+      // Return first item if exists, otherwise null
+      return data && data.length > 0 ? data[0] : null;
     } catch (error) {
-      console.error('Error fetching player:', error);
+      console.warn('Error fetching player (expected if player not found):', error);
       return null;
     }
   },
@@ -206,10 +209,38 @@ export const db = {
         .order(orderBy, { ascending: false })
         .limit(limit);
 
-      if (error) throw error;
+      if (error) {
+        console.warn('Supabase getTopPlayers query error (expected if no data yet):', error);
+        return [];
+      }
       return data || [];
     } catch (error) {
-      console.error('Error fetching top players:', error);
+      console.warn('Error fetching top players (expected if no data yet):', error);
+      return [];
+    }
+  },
+
+  async getLeaderboard(limit = 10) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning empty array for getLeaderboard');
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.LEADERBOARD)
+        .select('*')
+        .order('score', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.warn('Supabase leaderboard query error (expected if no data yet):', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.warn('Error fetching leaderboard (expected if no data yet):', error);
       return [];
     }
   },
@@ -256,14 +287,14 @@ export const db = {
         .select('*')
         .eq('active', true)
         .order('timestamp', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error;
       }
 
-      return data;
+      // Return first item if exists, otherwise null
+      return data && data.length > 0 ? data[0] : null;
     } catch (error) {
       console.error('Error fetching current sponsor:', error);
       return null;
@@ -333,15 +364,17 @@ export const db = {
         .from(TABLES.GAME_STATS)
         .select('*')
         .eq('id', 1)
-        .single();
+        .limit(1);
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      if (error) {
+        console.warn('Supabase getGameStats query error (expected if no data yet):', error);
+        return null;
       }
 
-      return data;
+      // Return first item if exists, otherwise null
+      return data && data.length > 0 ? data[0] : null;
     } catch (error) {
-      console.error('Error fetching game stats:', error);
+      console.warn('Error fetching game stats (expected if no data yet):', error);
       return null;
     }
   },
