@@ -3,93 +3,96 @@
 
 // Game Configuration
 export const GAME_CONFIG = {
-  SHOT_COST: parseFloat(import.meta.env.PUBLIC_SHOT_COST_ETH || import.meta.env.VITE_SHOT_COST_ETH || '0.001'),
-  SHOT_COST_ETH: import.meta.env.PUBLIC_SHOT_COST_ETH || import.meta.env.VITE_SHOT_COST_ETH || '0.001',
-  SPONSOR_COST_ETH: import.meta.env.PUBLIC_SPONSOR_COST_ETH || import.meta.env.VITE_SPONSOR_COST_ETH || '0.05',
-  WIN_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_WIN_PERCENTAGE || import.meta.env.VITE_WIN_PERCENTAGE || '1'),
-  WINNER_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_WINNER_PAYOUT_PERCENTAGE || import.meta.env.VITE_WINNER_PAYOUT_PERCENTAGE || '90'),
-  WINNER_PAYOUT_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_WINNER_PAYOUT_PERCENTAGE || import.meta.env.VITE_WINNER_PAYOUT_PERCENTAGE || '90'),
-  HOUSE_FEE_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_HOUSE_FEE_PERCENTAGE || import.meta.env.VITE_HOUSE_FEE_PERCENTAGE || '10'),
-  COOLDOWN_HOURS: parseInt(import.meta.env.PUBLIC_COOLDOWN_HOURS || import.meta.env.VITE_COOLDOWN_HOURS || '1'),
-  COOLDOWN_SECONDS: parseInt(import.meta.env.PUBLIC_COOLDOWN_HOURS || import.meta.env.VITE_COOLDOWN_HOURS || '1') * 3600,
-  ETH_USD_PRICE: parseFloat(import.meta.env.PUBLIC_ETH_USD_PRICE || import.meta.env.VITE_ETH_USD_PRICE || '2500'),
+  SHOT_COST: parseFloat(import.meta.env.VITE_SHOT_COST_ETH || import.meta.env.PUBLIC_SHOT_COST_ETH || '0.0010'),
+  SHOT_COST_ETH: import.meta.env.VITE_SHOT_COST_ETH || import.meta.env.PUBLIC_SHOT_COST_ETH || '0.001',
+  SPONSOR_COST_ETH: import.meta.env.VITE_SPONSOR_COST_ETH || import.meta.env.PUBLIC_SPONSOR_COST_ETH || '0.05',
+  WIN_PERCENTAGE: parseFloat(import.meta.env.VITE_WIN_PERCENTAGE || import.meta.env.PUBLIC_WIN_PERCENTAGE || '1'),
+  WINNER_PERCENTAGE: parseFloat(import.meta.env.VITE_WINNER_PAYOUT_PERCENTAGE || import.meta.env.PUBLIC_WINNER_PAYOUT_PERCENTAGE || '90'),
+  WINNER_PAYOUT_PERCENTAGE: parseFloat(import.meta.env.VITE_WINNER_PAYOUT_PERCENTAGE || import.meta.env.PUBLIC_WINNER_PAYOUT_PERCENTAGE || '90'),
+  HOUSE_FEE_PERCENTAGE: parseFloat(import.meta.env.VITE_HOUSE_FEE_PERCENTAGE || import.meta.env.PUBLIC_HOUSE_FEE_PERCENTAGE || '10'),
+  COOLDOWN_HOURS: parseInt(import.meta.env.VITE_COOLDOWN_HOURS || import.meta.env.PUBLIC_COOLDOWN_HOURS || '1'),
+  COOLDOWN_SECONDS: parseInt(import.meta.env.VITE_COOLDOWN_HOURS || import.meta.env.PUBLIC_COOLDOWN_HOURS || '1') * 3600,
+  ETH_USD_PRICE: parseFloat(import.meta.env.VITE_ETH_USD_PRICE || import.meta.env.PUBLIC_ETH_USD_PRICE || '2500'),
 };
 
 // Network Configuration
 export const NETWORK_CONFIG = {
-  CHAIN_ID: parseInt(import.meta.env.PUBLIC_CHAIN_ID || '11155111'),
-  RPC_URL: import.meta.env.PUBLIC_RPC_URL || 'https://sepolia.infura.io/v3/demo',
-  NETWORK_NAME: import.meta.env.PUBLIC_NETWORK_NAME || 'Sepolia Testnet',
-  BLOCK_EXPLORER_URL: import.meta.env.PUBLIC_BLOCK_EXPLORER_URL || 'https://sepolia.etherscan.io',
-  CONTRACT_ADDRESS: import.meta.env.PUBLIC_CONTRACT_ADDRESS || '',
+  CHAIN_ID: parseInt(import.meta.env.VITE_CHAIN_ID || import.meta.env.PUBLIC_CHAIN_ID || '11155111'),
+  RPC_URL: import.meta.env.VITE_RPC_URL || import.meta.env.PUBLIC_RPC_URL || 'https://sepolia.infura.io/v3/demo',
+  NETWORK_NAME: import.meta.env.VITE_NETWORK_NAME || import.meta.env.PUBLIC_NETWORK_NAME || 'Sepolia Testnet',
+  BLOCK_EXPLORER_URL: import.meta.env.VITE_BLOCK_EXPLORER_URL || import.meta.env.PUBLIC_BLOCK_EXPLORER_URL || 'https://sepolia.etherscan.io',
+  CONTRACT_ADDRESS: import.meta.env.VITE_CONTRACT_ADDRESS || import.meta.env.PUBLIC_CONTRACT_ADDRESS || '',
 };
 
 // Social Media & External URLs
 export const SOCIAL_CONFIG = {
-  APP_URL: import.meta.env.PUBLIC_APP_URL || 'https://ethshot.io',
-  TWITTER_URL: import.meta.env.PUBLIC_TWITTER_URL || 'https://twitter.com/ethshot',
-  GITHUB_URL: import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/ethshot/ethshot-web',
-  DISCORD_URL: import.meta.env.PUBLIC_DISCORD_INVITE || import.meta.env.PUBLIC_DISCORD_URL || 'https://discord.gg/ethshot',
+  APP_URL: import.meta.env.VITE_APP_URL || import.meta.env.PUBLIC_APP_URL || 'https://ethshot.io',
+  TWITTER_URL: import.meta.env.VITE_TWITTER_URL || import.meta.env.PUBLIC_TWITTER_URL || 'https://twitter.com/ethshot',
+  GITHUB_URL: import.meta.env.VITE_GITHUB_URL || import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/ethshot/ethshot-web',
+  DISCORD_URL: import.meta.env.VITE_DISCORD_URL || import.meta.env.PUBLIC_DISCORD_INVITE || import.meta.env.PUBLIC_DISCORD_URL || 'https://discord.gg/ethshot',
 };
 
 // UI Configuration
 export const UI_CONFIG = {
-  TOAST_DURATION_MS: parseInt(import.meta.env.PUBLIC_TOAST_DURATION_MS || '5000'),
-  ANIMATION_DURATION_MS: parseInt(import.meta.env.PUBLIC_ANIMATION_DURATION_MS || '3000'),
-  LEADERBOARD_LIMIT: parseInt(import.meta.env.PUBLIC_LEADERBOARD_LIMIT || '10'),
-  RECENT_WINNERS_LIMIT: parseInt(import.meta.env.PUBLIC_RECENT_WINNERS_LIMIT || '5'),
+  TOAST_DURATION_MS: parseInt(import.meta.env.VITE_TOAST_DURATION_MS || import.meta.env.PUBLIC_TOAST_DURATION_MS || '5000'),
+  ANIMATION_DURATION_MS: parseInt(import.meta.env.VITE_ANIMATION_DURATION_MS || import.meta.env.PUBLIC_ANIMATION_DURATION_MS || '3000'),
+  LEADERBOARD_LIMIT: parseInt(import.meta.env.VITE_LEADERBOARD_LIMIT || import.meta.env.PUBLIC_LEADERBOARD_LIMIT || '10'),
+  RECENT_WINNERS_LIMIT: parseInt(import.meta.env.VITE_RECENT_WINNERS_LIMIT || import.meta.env.PUBLIC_RECENT_WINNERS_LIMIT || '5'),
 };
 
 // Database Configuration
 export const DB_CONFIG = {
   TABLES: {
-    PLAYERS: import.meta.env.PUBLIC_DB_TABLE_PLAYERS || 'players',
-    SHOTS: import.meta.env.PUBLIC_DB_TABLE_SHOTS || 'shots',
-    WINNERS: import.meta.env.PUBLIC_DB_TABLE_WINNERS || 'winners',
-    SPONSORS: import.meta.env.PUBLIC_DB_TABLE_SPONSORS || 'sponsors',
-    GAME_STATS: import.meta.env.PUBLIC_DB_TABLE_GAME_STATS || 'game_stats',
+    PLAYERS: import.meta.env.VITE_DB_TABLE_PLAYERS || import.meta.env.PUBLIC_DB_TABLE_PLAYERS || 'players',
+    SHOTS: import.meta.env.VITE_DB_TABLE_SHOTS || import.meta.env.PUBLIC_DB_TABLE_SHOTS || 'shots',
+    WINNERS: import.meta.env.VITE_DB_TABLE_WINNERS || import.meta.env.PUBLIC_DB_TABLE_WINNERS || 'winners',
+    SPONSORS: import.meta.env.VITE_DB_TABLE_SPONSORS || import.meta.env.PUBLIC_DB_TABLE_SPONSORS || 'sponsors',
+    GAME_STATS: import.meta.env.VITE_DB_TABLE_GAME_STATS || import.meta.env.PUBLIC_DB_TABLE_GAME_STATS || 'game_stats',
   },
 };
 
 // Development/Debug Configuration
 export const DEBUG_CONFIG = {
-  ENABLE_MOCK_DATA: import.meta.env.PUBLIC_ENABLE_MOCK_DATA === 'true',
-  LOG_LEVEL: import.meta.env.PUBLIC_LOG_LEVEL || 'info',
-  ENABLE_ANALYTICS: import.meta.env.PUBLIC_ENABLE_ANALYTICS !== 'false',
+  ENABLE_MOCK_DATA: import.meta.env.VITE_ENABLE_MOCK_DATA === 'true' || import.meta.env.PUBLIC_ENABLE_MOCK_DATA === 'true',
+  LOG_LEVEL: import.meta.env.VITE_LOG_LEVEL || import.meta.env.PUBLIC_LOG_LEVEL || 'info',
+  ENABLE_ANALYTICS: import.meta.env.VITE_ENABLE_ANALYTICS !== 'false' && import.meta.env.PUBLIC_ENABLE_ANALYTICS !== 'false',
 };
 
 // Wallet Configuration
 export const WALLET_CONFIG = {
-  INFURA_PROJECT_ID: import.meta.env.PUBLIC_INFURA_PROJECT_ID || 'demo',
-  WALLETCONNECT_THEME: import.meta.env.PUBLIC_WALLETCONNECT_THEME || 'dark',
-  WALLETCONNECT_CACHE_PROVIDER: import.meta.env.PUBLIC_WALLETCONNECT_CACHE_PROVIDER !== 'false',
+  INFURA_PROJECT_ID: import.meta.env.VITE_INFURA_PROJECT_ID || import.meta.env.PUBLIC_INFURA_PROJECT_ID || 'demo',
+  WALLETCONNECT_PROJECT_ID: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || import.meta.env.PUBLIC_WALLETCONNECT_PROJECT_ID || '',
+  WALLETCONNECT_THEME: import.meta.env.VITE_WALLETCONNECT_THEME || import.meta.env.PUBLIC_WALLETCONNECT_THEME || 'dark',
+  WALLETCONNECT_CACHE_PROVIDER: import.meta.env.VITE_WALLETCONNECT_CACHE_PROVIDER !== 'false' && import.meta.env.PUBLIC_WALLETCONNECT_CACHE_PROVIDER !== 'false',
 };
 
 // Network RPC URLs
 export const RPC_URLS = {
-  MAINNET: import.meta.env.PUBLIC_MAINNET_RPC_URL || 'https://mainnet.infura.io/v3/demo',
-  SEPOLIA: import.meta.env.PUBLIC_SEPOLIA_RPC_URL || 'https://sepolia.infura.io/v3/demo',
-  BASE: import.meta.env.PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org',
-  ARBITRUM: import.meta.env.PUBLIC_ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc',
+  MAINNET: import.meta.env.VITE_MAINNET_RPC_URL || import.meta.env.PUBLIC_MAINNET_RPC_URL || 'https://mainnet.infura.io/v3/demo',
+  SEPOLIA: import.meta.env.VITE_SEPOLIA_RPC_URL || import.meta.env.PUBLIC_SEPOLIA_RPC_URL || 'https://sepolia.infura.io/v3/demo',
+  BASE: import.meta.env.VITE_BASE_RPC_URL || import.meta.env.PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org',
+  ARBITRUM: import.meta.env.VITE_ARBITRUM_RPC_URL || import.meta.env.PUBLIC_ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc',
 };
 
 // Block Explorer URLs
 export const EXPLORER_URLS = {
-  MAINNET: import.meta.env.PUBLIC_MAINNET_EXPLORER_URL || 'https://etherscan.io',
-  SEPOLIA: import.meta.env.PUBLIC_BLOCK_EXPLORER_URL || 'https://sepolia.etherscan.io',
-  BASE: import.meta.env.PUBLIC_BASE_EXPLORER_URL || 'https://basescan.org',
-  ARBITRUM: import.meta.env.PUBLIC_ARBITRUM_EXPLORER_URL || 'https://arbiscan.io',
+  MAINNET: import.meta.env.VITE_MAINNET_EXPLORER_URL || import.meta.env.PUBLIC_MAINNET_EXPLORER_URL || 'https://etherscan.io',
+  SEPOLIA: import.meta.env.VITE_BLOCK_EXPLORER_URL || import.meta.env.PUBLIC_BLOCK_EXPLORER_URL || 'https://sepolia.etherscan.io',
+  BASE: import.meta.env.VITE_BASE_EXPLORER_URL || import.meta.env.PUBLIC_BASE_EXPLORER_URL || 'https://basescan.org',
+  ARBITRUM: import.meta.env.VITE_ARBITRUM_EXPLORER_URL || import.meta.env.PUBLIC_ARBITRUM_EXPLORER_URL || 'https://arbiscan.io',
 };
 
 // Validation function to check required configuration
 export const validateConfig = () => {
   const required = [
-    'PUBLIC_CONTRACT_ADDRESS',
-    'PUBLIC_SUPABASE_URL',
-    'PUBLIC_SUPABASE_ANON_KEY'
+    { vite: 'VITE_CONTRACT_ADDRESS', public: 'PUBLIC_CONTRACT_ADDRESS' },
+    { vite: 'VITE_SUPABASE_URL', public: 'PUBLIC_SUPABASE_URL' },
+    { vite: 'VITE_SUPABASE_ANON_KEY', public: 'PUBLIC_SUPABASE_ANON_KEY' }
   ];
   
-  const missing = required.filter(key => !import.meta.env[key]);
+  const missing = required.filter(({ vite, public: pub }) =>
+    !import.meta.env[vite] && !import.meta.env[pub]
+  ).map(({ vite, public: pub }) => `${vite} or ${pub}`);
   
   if (missing.length > 0) {
     console.warn(`Missing recommended environment variables: ${missing.join(', ')}`);
