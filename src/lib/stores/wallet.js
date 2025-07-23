@@ -37,55 +37,14 @@ const createWalletStore = () => {
         throw new Error('Failed to load ethers library');
       }
 
-      // Try to load Web3Modal with fallback
-      try {
-        const web3ModalModule = await import('web3modal');
-        Web3Modal = web3ModalModule.default || web3ModalModule;
-      } catch (web3ModalError) {
-        console.warn('Web3Modal not available:', web3ModalError.message);
-        // Continue without Web3Modal - MetaMask can still work
-      }
-
-      // Try to load WalletConnect with fallback
-      try {
-        const walletConnectModule = await import('@walletconnect/web3-provider');
-        WalletConnectProvider = walletConnectModule.default || walletConnectModule;
-      } catch (walletConnectError) {
-        console.warn('WalletConnect not available:', walletConnectError.message);
-        // Continue without WalletConnect
-      }
-
-      // Initialize Web3Modal only if available
-      if (Web3Modal) {
-        const providerOptions = {};
-        
-        // Add WalletConnect only if available
-        if (WalletConnectProvider) {
-          providerOptions.walletconnect = {
-            package: WalletConnectProvider,
-            options: {
-              infuraId: WALLET_CONFIG.INFURA_PROJECT_ID,
-              rpc: {
-                1: RPC_URLS.MAINNET,
-                11155111: RPC_URLS.SEPOLIA,
-              },
-            },
-          };
-        }
-
-        web3Modal = new Web3Modal({
-          network: 'mainnet',
-          cacheProvider: WALLET_CONFIG.WALLETCONNECT_CACHE_PROVIDER,
-          providerOptions,
-          theme: WALLET_CONFIG.WALLETCONNECT_THEME,
-        });
-
-        // Check if user was previously connected
-        if (web3Modal.cachedProvider) {
-          console.log('Previous wallet connection found, ready to reconnect');
-        }
-      } else {
-        console.warn('Web3Modal not available, only MetaMask direct connection will work');
+      // For now, we'll focus on direct MetaMask connection
+      // Web3Modal v1.x has compatibility issues with ethers v6
+      console.log('Using direct wallet connection (MetaMask/injected providers)');
+      
+      // Check if user was previously connected via localStorage
+      const wasConnected = localStorage.getItem('wallet_connected') === 'true';
+      if (wasConnected && window.ethereum) {
+        console.log('Previous wallet connection found, ready to reconnect');
       }
 
     } catch (error) {
@@ -116,23 +75,16 @@ const createWalletStore = () => {
 
       let instance;
 
-      // Try Web3Modal first if available
-      if (web3Modal) {
+      // Check for injected wallet (MetaMask, etc.) - Direct connection
+      if (window.ethereum) {
         try {
-          instance = await web3Modal.connect();
-        } catch (modalError) {
-          console.warn('Web3Modal connection failed, trying MetaMask directly:', modalError);
-          instance = null;
-        }
-      }
-
-      // Fallback to MetaMask direct connection
-      if (!instance && window.ethereum) {
-        try {
-          await window.ethereum.request({ method: 'eth_requestAccounts' });
+          console.log('🔗 Requesting wallet connection...');
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          console.log('✅ Wallet connected:', accounts[0]);
           instance = window.ethereum;
         } catch (metamaskError) {
-          throw new Error('MetaMask connection failed: ' + metamaskError.message);
+          console.error('❌ Wallet connection failed:', metamaskError);
+          throw new Error('Wallet connection failed: ' + metamaskError.message);
         }
       }
 
@@ -140,11 +92,21 @@ const createWalletStore = () => {
         throw new Error('No wallet found. Please install MetaMask or another Web3 wallet.');
       }
 
+      console.log('🔧 Creating provider and signer...');
       provider = new ethers.BrowserProvider(instance);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
       const balance = await provider.getBalance(address);
       const network = await provider.getNetwork();
+
+      console.log('✅ Wallet setup complete:', {
+        address,
+        chainId: Number(network.chainId),
+        balance: ethers.formatEther(balance)
+      });
+
+      // Store connection state
+      localStorage.setItem('wallet_connected', 'true');
 
       update(state => ({
         ...state,
@@ -197,6 +159,9 @@ const createWalletStore = () => {
         await provider.connection.close();
       }
 
+      // Clear localStorage
+      localStorage.removeItem('wallet_connected');
+
       set({
         connected: false,
         address: null,
@@ -207,6 +172,8 @@ const createWalletStore = () => {
         connecting: false,
         error: null,
       });
+
+      console.log('🔌 Wallet disconnected');
     } catch (error) {
       console.error('Failed to disconnect wallet:', error);
     }

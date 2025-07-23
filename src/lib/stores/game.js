@@ -337,41 +337,66 @@ const createGameStore = () => {
 
   // Take a shot at the jackpot
   const takeShot = async () => {
+    console.log('🎯 gameStore.takeShot() called!');
+    
     if (!browser || !ethers) {
+      console.log('❌ Web3 not available');
       toastStore.error('Web3 not available');
       return;
     }
 
     const wallet = get(walletStore);
+    console.log('👛 Wallet state:', {
+      connected: wallet.connected,
+      hasSigner: !!wallet.signer,
+      address: wallet.address
+    });
+    
     if (!wallet.connected || !wallet.signer) {
+      console.log('❌ Wallet not connected or no signer');
       toastStore.error('Please connect your wallet first');
       return;
     }
 
     const currentState = get({ subscribe });
+    console.log('🎮 Game state:', {
+      contractDeployed: currentState.contractDeployed,
+      hasContract: !!contract,
+      contractAddress: currentState.contractAddress
+    });
+    
     if (currentState.contractDeployed === false) {
+      console.log('❌ Contract not deployed');
       toastStore.error('Smart contract not deployed yet. Please deploy the contract first.');
       return;
     }
 
     if (!contract) {
+      console.log('❌ Contract not initialized');
       toastStore.error('Game contract not initialized. Please refresh the page.');
       return;
     }
 
+    console.log('✅ All takeShot checks passed, starting transaction...');
     update(state => ({ ...state, takingShot: true, error: null }));
 
     try {
       // Create contract instance with signer
+      console.log('🔗 Connecting contract with signer...');
       const contractWithSigner = contract.connect(wallet.signer);
+      
+      console.log('💰 Getting shot cost from contract...');
       const shotCost = await contract.SHOT_COST();
+      console.log('💰 Shot cost:', ethers.formatEther(shotCost), 'ETH');
 
       // Send transaction
+      console.log('📤 Sending takeShot transaction...');
       const tx = await contractWithSigner.takeShot({
         value: shotCost,
         gasLimit: 150000 // Set reasonable gas limit
       });
 
+      console.log('✅ Transaction sent:', tx.hash);
       toastStore.info('Shot submitted! Waiting for confirmation...');
 
       // Wait for transaction confirmation

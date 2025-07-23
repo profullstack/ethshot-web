@@ -42,25 +42,35 @@
 
   // Handle taking a shot
   const handleTakeShot = async () => {
+    console.log('🎯 TAKE SHOT BUTTON CLICKED!');
+    
+    console.log('Debug info:', {
+      isConnected: $isConnected,
+      isCorrectNetwork: $isCorrectNetwork,
+      canTakeShot: $canTakeShot,
+      contractDeployed: $contractDeployed,
+      isLoading: $isLoading,
+      gameError: $gameError
+    });
+
     if (!$isConnected) {
+      console.log('❌ Wallet not connected');
       toastStore.error('Please connect your wallet first');
       return;
     }
 
     if (!$isCorrectNetwork) {
+      console.log('❌ Wrong network');
       toastStore.error('Please switch to the correct network');
       return;
     }
 
-    if (!$canTakeShot) {
-      toastStore.warning('Please wait for cooldown to finish');
-      return;
-    }
-
+    console.log('✅ All checks passed, calling gameStore.takeShot()');
     try {
       await gameStore.takeShot();
     } catch (error) {
       console.error('Failed to take shot:', error);
+      toastStore.error('Failed to take shot: ' + error.message);
     }
   };
 
@@ -152,7 +162,7 @@
       <button
         on:click={handleTakeShot}
         class="btn-game btn-primary animate-glow"
-        disabled={!$canTakeShot}
+        disabled={false}
       >
         <span class="text-3xl font-black">TAKE THE SHOT</span>
         <span class="text-sm opacity-90">{formatEth(GAME_CONFIG.SHOT_COST)} ETH • {GAME_CONFIG.WIN_PERCENTAGE}% chance to win</span>
