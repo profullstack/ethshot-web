@@ -73,6 +73,14 @@ export const db = {
     }
 
     try {
+      console.log('🔄 Upserting player to Supabase:', {
+        address: playerData.address.toLowerCase(),
+        total_shots: playerData.totalShots || 0,
+        total_spent: playerData.totalSpent || '0',
+        total_won: playerData.totalWon || '0',
+        last_shot_time: playerData.lastShotTime || null
+      });
+
       const { data, error } = await supabase
         .from(TABLES.PLAYERS)
         .upsert({
@@ -88,10 +96,15 @@ export const db = {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Supabase upsertPlayer error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Player upserted successfully:', data);
       return data;
     } catch (error) {
-      console.error('Error upserting player:', error);
+      console.error('❌ Error upserting player:', error);
       throw error;
     }
   },
@@ -104,6 +117,15 @@ export const db = {
     }
 
     try {
+      console.log('🎯 Recording shot to Supabase:', {
+        player_address: shotData.playerAddress.toLowerCase(),
+        amount: shotData.amount,
+        won: shotData.won || false,
+        tx_hash: shotData.txHash,
+        block_number: shotData.blockNumber,
+        timestamp: shotData.timestamp || new Date().toISOString()
+      });
+
       const { data, error } = await supabase
         .from(TABLES.SHOTS)
         .insert({
@@ -117,10 +139,15 @@ export const db = {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Supabase recordShot error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Shot recorded successfully:', data);
       return data;
     } catch (error) {
-      console.error('Error recording shot:', error);
+      console.error('❌ Error recording shot:', error);
       throw error;
     }
   },

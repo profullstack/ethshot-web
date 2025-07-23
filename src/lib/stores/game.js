@@ -480,7 +480,15 @@ const createGameStore = () => {
 
       // Log transaction to database
       try {
-        await db.recordShot({
+        console.log('📝 Recording shot to database...', {
+          playerAddress: wallet.address,
+          amount: ethers.formatEther(shotCost),
+          won,
+          txHash: receipt.hash,
+          blockNumber: receipt.blockNumber
+        });
+
+        const shotRecord = await db.recordShot({
           playerAddress: wallet.address,
           amount: ethers.formatEther(shotCost),
           won,
@@ -489,35 +497,58 @@ const createGameStore = () => {
           timestamp: new Date().toISOString()
         });
 
+        console.log('✅ Shot recorded successfully:', shotRecord?.id);
+
         if (won) {
+          console.log('🏆 Recording winner to database...');
           // Also record as winner
-          await db.recordWinner({
+          const currentPot = await contract.getCurrentPot();
+          const winnerRecord = await db.recordWinner({
             winnerAddress: wallet.address,
-            amount: ethers.formatEther(await contract.getCurrentPot()),
+            amount: ethers.formatEther(currentPot),
             txHash: receipt.hash,
             blockNumber: receipt.blockNumber,
             timestamp: new Date().toISOString()
           });
+          console.log('✅ Winner recorded successfully:', winnerRecord?.id);
         }
 
         // Update or create player record
+        console.log('👤 Updating player record...');
         const existingPlayer = await db.getPlayer(wallet.address);
+        console.log('👤 Existing player data:', existingPlayer);
+        
         const newTotalShots = (existingPlayer?.total_shots || 0) + 1;
         const newTotalSpent = parseFloat(existingPlayer?.total_spent || '0') + parseFloat(ethers.formatEther(shotCost));
         const newTotalWon = won ?
           parseFloat(existingPlayer?.total_won || '0') + parseFloat(ethers.formatEther(await contract.getCurrentPot())) :
           parseFloat(existingPlayer?.total_won || '0');
 
-        await db.upsertPlayer({
+        const playerData = {
           address: wallet.address,
           totalShots: newTotalShots,
           totalSpent: newTotalSpent.toString(),
           totalWon: newTotalWon.toString(),
           lastShotTime: new Date().toISOString()
-        });
+        };
+
+        console.log('👤 Upserting player with data:', playerData);
+        const playerRecord = await db.upsertPlayer(playerData);
+        console.log('✅ Player record updated successfully:', playerRecord?.address);
+
       } catch (dbError) {
-        console.error('Failed to log transaction to database:', dbError);
-        // Don't fail the whole transaction for database errors
+        console.error('❌ Failed to log transaction to database:', dbError);
+        console.error('❌ Database error details:', {
+          message: dbError.message,
+          code: dbError.code,
+          details: dbError.details,
+          hint: dbError.hint
+        });
+        
+        // Show user-friendly error message
+        toastStore.error('Shot successful but failed to update leaderboard. Please refresh the page.');
+        
+        // Don't fail the whole transaction for database errors, but make it visible
       }
 
       // Refresh game state
