@@ -3,16 +3,16 @@
 
 // Game Configuration
 export const GAME_CONFIG = {
-  SHOT_COST: parseFloat(import.meta.env.PUBLIC_SHOT_COST_ETH || '0.001'),
-  SHOT_COST_ETH: import.meta.env.PUBLIC_SHOT_COST_ETH || '0.001',
-  SPONSOR_COST_ETH: import.meta.env.PUBLIC_SPONSOR_COST_ETH || '0.05',
-  WIN_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_WIN_PERCENTAGE || '1'),
-  WINNER_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_WINNER_PAYOUT_PERCENTAGE || '90'),
-  WINNER_PAYOUT_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_WINNER_PAYOUT_PERCENTAGE || '90'),
-  HOUSE_FEE_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_HOUSE_FEE_PERCENTAGE || '10'),
-  COOLDOWN_HOURS: parseInt(import.meta.env.PUBLIC_COOLDOWN_HOURS || '1'),
-  COOLDOWN_SECONDS: parseInt(import.meta.env.PUBLIC_COOLDOWN_HOURS || '1') * 3600,
-  ETH_USD_PRICE: parseFloat(import.meta.env.PUBLIC_ETH_USD_PRICE || '2500'),
+  SHOT_COST: parseFloat(import.meta.env.PUBLIC_SHOT_COST_ETH || import.meta.env.VITE_SHOT_COST_ETH || '0.001'),
+  SHOT_COST_ETH: import.meta.env.PUBLIC_SHOT_COST_ETH || import.meta.env.VITE_SHOT_COST_ETH || '0.001',
+  SPONSOR_COST_ETH: import.meta.env.PUBLIC_SPONSOR_COST_ETH || import.meta.env.VITE_SPONSOR_COST_ETH || '0.05',
+  WIN_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_WIN_PERCENTAGE || import.meta.env.VITE_WIN_PERCENTAGE || '1'),
+  WINNER_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_WINNER_PAYOUT_PERCENTAGE || import.meta.env.VITE_WINNER_PAYOUT_PERCENTAGE || '90'),
+  WINNER_PAYOUT_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_WINNER_PAYOUT_PERCENTAGE || import.meta.env.VITE_WINNER_PAYOUT_PERCENTAGE || '90'),
+  HOUSE_FEE_PERCENTAGE: parseFloat(import.meta.env.PUBLIC_HOUSE_FEE_PERCENTAGE || import.meta.env.VITE_HOUSE_FEE_PERCENTAGE || '10'),
+  COOLDOWN_HOURS: parseInt(import.meta.env.PUBLIC_COOLDOWN_HOURS || import.meta.env.VITE_COOLDOWN_HOURS || '1'),
+  COOLDOWN_SECONDS: parseInt(import.meta.env.PUBLIC_COOLDOWN_HOURS || import.meta.env.VITE_COOLDOWN_HOURS || '1') * 3600,
+  ETH_USD_PRICE: parseFloat(import.meta.env.PUBLIC_ETH_USD_PRICE || import.meta.env.VITE_ETH_USD_PRICE || '2500'),
 };
 
 // Network Configuration
