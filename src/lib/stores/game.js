@@ -63,6 +63,39 @@ const createGameStore = () => {
   let updateInterval = null;
   let ethers = null;
 
+  // Helper function to create provider with retry logic
+  const createProviderWithRetry = async () => {
+    return await retryWithBackoff(async () => {
+      const provider = new ethers.JsonRpcProvider(NETWORK_CONFIG.RPC_URL);
+      // Test the provider with a simple call
+      await provider.getNetwork();
+      console.log(`Successfully connected to RPC: ${NETWORK_CONFIG.RPC_URL}`);
+      return provider;
+    }, 3, 2000);
+  };
+
+  // Helper function to retry operations with exponential backoff
+  const retryWithBackoff = async (operation, maxRetries = 3, baseDelay = 1000) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // Don't retry on certain errors
+        if (error.message.includes('Too Many Requests') && attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt - 1);
+          console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw error;
+        }
+      }
+    }
+  };
+
   // Initialize game store (browser only)
   const init = async () => {
     if (!browser) {
@@ -94,14 +127,14 @@ const createGameStore = () => {
       const ethersModule = await import('ethers');
       ethers = ethersModule;
 
-      // Create contract instance with read-only provider
-      const provider = new ethers.JsonRpcProvider(NETWORK_CONFIG.RPC_URL);
+      // Create contract instance with read-only provider and retry logic
+      const provider = await createProviderWithRetry();
       
       contract = new ethers.Contract(contractAddress, ETH_SHOT_ABI, provider);
       
       // Check if contract is actually deployed by trying to call a view function
       try {
-        await contract.SHOT_COST();
+        await retryWithBackoff(() => contract.SHOT_COST(), 3, 1000);
         
         update(state => ({
           ...state,
@@ -123,21 +156,35 @@ const createGameStore = () => {
         
       } catch (contractError) {
         console.error('Contract not deployed or not accessible:', contractError);
+        
+        let errorMessage = 'Smart contract not found at the configured address.';
+        if (contractError.message.includes('Too Many Requests')) {
+          errorMessage = 'RPC provider rate limit exceeded. Please try again later or use a different RPC endpoint.';
+        } else if (contractError.message.includes('missing response')) {
+          errorMessage = 'Unable to connect to blockchain network. Please check your internet connection.';
+        }
+        
         update(state => ({
           ...state,
           contractDeployed: false,
           loading: false,
-          error: 'Smart contract not found at the configured address. Please deploy the contract first.'
+          error: errorMessage
         }));
       }
       
     } catch (error) {
       console.error('Failed to initialize game:', error);
+      
+      let errorMessage = `Failed to connect to blockchain: ${error.message}`;
+      if (error.message.includes('Too Many Requests')) {
+        errorMessage = 'RPC provider rate limit exceeded. Please try again later.';
+      }
+      
       update(state => ({
         ...state,
         contractDeployed: false,
         loading: false,
-        error: `Failed to connect to blockchain: ${error.message}`
+        error: errorMessage
       }));
     }
   };
@@ -147,7 +194,7 @@ const createGameStore = () => {
     if (!browser || !contract || !ethers) return;
 
     try {
-      // Load contract data
+      // Load contract data with retry logic
       const [
         currentPot,
         shotCost,
@@ -155,11 +202,11 @@ const createGameStore = () => {
         currentSponsor,
         recentWinners
       ] = await Promise.all([
-        contract.getCurrentPot(),
-        contract.SHOT_COST(),
-        contract.SPONSOR_COST(),
-        contract.getCurrentSponsor(),
-        contract.getRecentWinners()
+        retryWithBackoff(() => contract.getCurrentPot(), 2, 1000),
+        retryWithBackoff(() => contract.SHOT_COST(), 2, 1000),
+        retryWithBackoff(() => contract.SPONSOR_COST(), 2, 1000),
+        retryWithBackoff(() => contract.getCurrentSponsor(), 2, 1000),
+        retryWithBackoff(() => contract.getRecentWinners(), 2, 1000)
       ]);
 
       // Load database data (more comprehensive and faster)

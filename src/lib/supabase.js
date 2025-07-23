@@ -1,15 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { browser } from '$app/environment';
 
-// Supabase configuration
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+// Supabase configuration from centralized config
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
 // Validate required environment variables
 const hasValidConfig = supabaseUrl && supabaseAnonKey;
 
 if (!hasValidConfig) {
-  console.warn('Supabase configuration missing. Please set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY environment variables.');
+  console.warn('Supabase configuration missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
 }
 
 // Create Supabase client only if configuration is valid

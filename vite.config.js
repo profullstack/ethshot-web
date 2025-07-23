@@ -16,7 +16,7 @@ export default defineConfig({
   // Build configuration
   build: {
     target: 'es2022',
-    sourcemap: true,
+    sourcemap: false, // Disable sourcemaps to prevent warnings
     rollupOptions: {
       output: {}
     }
@@ -25,7 +25,16 @@ export default defineConfig({
   // Optimization
   optimizeDeps: {
     include: ['ethers', 'web3modal'],
-    exclude: ['@walletconnect/web3-provider']
+    exclude: [
+      '@walletconnect/web3-provider',
+      '@walletconnect/client',
+      '@walletconnect/core',
+      '@walletconnect/crypto',
+      '@walletconnect/encoding',
+      '@walletconnect/socket-transport',
+      '@walletconnect/browser-utils',
+      '@walletconnect/jsonrpc-utils'
+    ]
   },
   
   // Define global constants
