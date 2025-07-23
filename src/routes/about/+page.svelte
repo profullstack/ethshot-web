@@ -1,3 +1,7 @@
+<script>
+  import { GAME_CONFIG, formatEth, calculateUSDValue } from '$lib/config.js';
+</script>
+
 <svelte:head>
   <title>About - ETH Shot</title>
   <meta name="description" content="Learn about ETH Shot - the viral Ethereum-powered game where you can win ETH jackpots with just one click!" />
@@ -22,13 +26,13 @@
     </h2>
     <div class="space-y-4 text-gray-300 text-lg leading-relaxed">
       <p>
-        ETH Shot is a simple yet thrilling blockchain game built on Ethereum. With just 0.001 ETH (about $2.50), 
-        you can take a shot at winning the entire jackpot pot. Every click has a 1% chance to win, making it 
+        ETH Shot is a simple yet thrilling blockchain game built on Ethereum. With just {formatEth(GAME_CONFIG.SHOT_COST)} ETH (about ${calculateUSDValue(GAME_CONFIG.SHOT_COST)}),
+        you can take a shot at winning the entire jackpot pot. Every click has a {GAME_CONFIG.WIN_PERCENTAGE}% chance to win, making it
         accessible to everyone while keeping the excitement high.
       </p>
       <p>
-        The game operates on a transparent smart contract, ensuring fairness and security. When you win, 
-        you receive 90% of the current pot instantly to your wallet, while 10% goes to maintaining the platform.
+        The game operates on a transparent smart contract, ensuring fairness and security. When you win,
+        you receive {GAME_CONFIG.WINNER_PERCENTAGE}% of the current pot instantly to your wallet, while {GAME_CONFIG.HOUSE_FEE_PERCENTAGE}% goes to maintaining the platform.
       </p>
     </div>
   </div>
@@ -52,7 +56,7 @@
           <div class="bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">2</div>
           <div>
             <h3 class="text-xl font-semibold text-white mb-2">Take Your Shot</h3>
-            <p class="text-gray-300">Pay 0.001 ETH and click the button. Each shot has a 1% chance to win the entire pot!</p>
+            <p class="text-gray-300">Pay {formatEth(GAME_CONFIG.SHOT_COST)} ETH and click the button. Each shot has a {GAME_CONFIG.WIN_PERCENTAGE}% chance to win the entire pot!</p>
           </div>
         </div>
       </div>
@@ -61,7 +65,7 @@
           <div class="bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">3</div>
           <div>
             <h3 class="text-xl font-semibold text-white mb-2">Win or Try Again</h3>
-            <p class="text-gray-300">If you win, 90% of the pot goes directly to your wallet. If not, wait 1 hour and try again!</p>
+            <p class="text-gray-300">If you win, {GAME_CONFIG.WINNER_PERCENTAGE}% of the pot goes directly to your wallet. If not, wait {GAME_CONFIG.COOLDOWN_HOURS} hour and try again!</p>
           </div>
         </div>
         <div class="flex items-start space-x-4">
@@ -78,15 +82,15 @@
   <!-- Game Statistics -->
   <div class="grid md:grid-cols-3 gap-6">
     <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 text-center">
-      <div class="text-3xl font-bold text-yellow-400 mb-2">0.001 ETH</div>
+      <div class="text-3xl font-bold text-yellow-400 mb-2">{formatEth(GAME_CONFIG.SHOT_COST)} ETH</div>
       <div class="text-gray-300">Cost Per Shot</div>
     </div>
     <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 text-center">
-      <div class="text-3xl font-bold text-green-400 mb-2">1%</div>
+      <div class="text-3xl font-bold text-green-400 mb-2">{GAME_CONFIG.WIN_PERCENTAGE}%</div>
       <div class="text-gray-300">Win Chance</div>
     </div>
     <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 text-center">
-      <div class="text-3xl font-bold text-blue-400 mb-2">90%</div>
+      <div class="text-3xl font-bold text-blue-400 mb-2">{GAME_CONFIG.WINNER_PERCENTAGE}%</div>
       <div class="text-gray-300">Winner Payout</div>
     </div>
   </div>
@@ -110,7 +114,7 @@
           <span class="text-green-400 text-xl">✓</span>
           <div>
             <h4 class="text-lg font-semibold text-white">Low Entry Cost</h4>
-            <p class="text-gray-300">At just 0.001 ETH per shot, anyone can afford to play and potentially win big.</p>
+            <p class="text-gray-300">At just {formatEth(GAME_CONFIG.SHOT_COST)} ETH per shot, anyone can afford to play and potentially win big.</p>
           </div>
         </div>
       </div>

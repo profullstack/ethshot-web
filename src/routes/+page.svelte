@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
   import { gameStore, winnerEventStore } from '$lib/stores/game.js';
+  import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatCooldownTime } from '$lib/config.js';
   import GameButton from '$lib/components/GameButton.svelte';
   import PotDisplay from '$lib/components/PotDisplay.svelte';
   import Leaderboard from '$lib/components/Leaderboard.svelte';
@@ -42,7 +43,7 @@
 
 <svelte:head>
   <title>ETH Shot - Take Your Shot at the ETH Jackpot</title>
-  <meta name="description" content="A viral, pay-to-play, Ethereum-powered game where users take a chance to win an ETH jackpot by clicking a single button. 0.001 ETH per shot, 1% chance to win!" />
+  <meta name="description" content="A viral, pay-to-play, Ethereum-powered game where users take a chance to win an ETH jackpot by clicking a single button. {formatEth(GAME_CONFIG.SHOT_COST)} ETH per shot, {GAME_CONFIG.WIN_PERCENTAGE}% chance to win!" />
 </svelte:head>
 
 {#if mounted}
@@ -54,9 +55,9 @@
           ETH SHOT
         </h1>
         <p class="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto">
-          Take your shot at the ETH jackpot! 
-          <span class="text-yellow-400 font-semibold">0.001 ETH</span> per shot, 
-          <span class="text-green-400 font-semibold">1% chance</span> to win the pot.
+          Take your shot at the ETH jackpot!
+          <span class="text-yellow-400 font-semibold">{formatEth(GAME_CONFIG.SHOT_COST)} ETH</span> per shot,
+          <span class="text-green-400 font-semibold">{GAME_CONFIG.WIN_PERCENTAGE}% chance</span> to win the pot.
         </p>
       </div>
 
@@ -91,21 +92,21 @@
               </div>
               <div class="flex items-center space-x-2">
                 <span class="text-green-400">✓</span>
-                <span>Pay 0.001 ETH per shot</span>
+                <span>Pay {formatEth(GAME_CONFIG.SHOT_COST)} ETH per shot</span>
               </div>
               <div class="flex items-center space-x-2">
                 <span class="text-green-400">✓</span>
-                <span>1% chance to win per click</span>
+                <span>{GAME_CONFIG.WIN_PERCENTAGE}% chance to win per click</span>
               </div>
             </div>
             <div class="space-y-2">
               <div class="flex items-center space-x-2">
                 <span class="text-yellow-400">⚡</span>
-                <span>Winner gets 90% of pot</span>
+                <span>Winner gets {GAME_CONFIG.WINNER_PERCENTAGE}% of pot</span>
               </div>
               <div class="flex items-center space-x-2">
                 <span class="text-blue-400">⏰</span>
-                <span>1 hour cooldown per wallet</span>
+                <span>{formatCooldownTime(GAME_CONFIG.COOLDOWN_HOURS)} cooldown per wallet</span>
               </div>
               <div class="flex items-center space-x-2">
                 <span class="text-purple-400">🎪</span>
@@ -176,13 +177,13 @@
     <div class="text-center text-xs text-gray-500 space-y-2">
       <p>
         Smart Contract: 
-        <a 
-          href="https://etherscan.io/address/{$gameStore.contractAddress}" 
-          target="_blank" 
+        <a
+          href="{NETWORK_CONFIG.BLOCK_EXPLORER_URL}/address/{NETWORK_CONFIG.CONTRACT_ADDRESS}"
+          target="_blank"
           rel="noopener noreferrer"
           class="text-blue-400 hover:text-blue-300 font-mono"
         >
-          {$gameStore.contractAddress?.slice(0, 6)}...{$gameStore.contractAddress?.slice(-4)}
+          {NETWORK_CONFIG.CONTRACT_ADDRESS?.slice(0, 6)}...{NETWORK_CONFIG.CONTRACT_ADDRESS?.slice(-4)}
         </a>
       </p>
       <p>All transactions are on-chain and verifiable. Play responsibly.</p>

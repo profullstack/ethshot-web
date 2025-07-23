@@ -1,3 +1,7 @@
+<script>
+  import { GAME_CONFIG, SOCIAL_CONFIG, formatEth, calculateUSDValue, formatCooldownTime } from '$lib/config.js';
+</script>
+
 <svelte:head>
   <title>FAQ - ETH Shot</title>
   <meta name="description" content="Frequently asked questions about ETH Shot - learn how to play, win chances, payouts, and more!" />
@@ -24,7 +28,7 @@
       </h2>
       <div class="text-gray-300 space-y-2">
         <p>1. Connect your Ethereum wallet (MetaMask, WalletConnect, etc.)</p>
-        <p>2. Make sure you have at least 0.001 ETH in your wallet</p>
+        <p>2. Make sure you have at least {formatEth(GAME_CONFIG.SHOT_COST)} ETH in your wallet</p>
         <p>3. Click the "TAKE THE SHOT" button and confirm the transaction</p>
         <p>4. Wait for the transaction to confirm - you'll see if you won!</p>
       </div>
@@ -37,7 +41,7 @@
         <span>What are my chances of winning?</span>
       </h2>
       <div class="text-gray-300 space-y-2">
-        <p>Each shot has exactly a <strong class="text-yellow-400">1% chance</strong> of winning the jackpot.</p>
+        <p>Each shot has exactly a <strong class="text-yellow-400">{GAME_CONFIG.WIN_PERCENTAGE}% chance</strong> of winning the jackpot.</p>
         <p>This means on average, 1 out of every 100 shots will win the pot.</p>
         <p>The odds are the same for every player and every shot - it's completely fair!</p>
       </div>
@@ -50,8 +54,8 @@
         <span>How much can I win?</span>
       </h2>
       <div class="text-gray-300 space-y-2">
-        <p>When you win, you receive <strong class="text-green-400">90% of the current pot</strong> directly to your wallet.</p>
-        <p>The remaining 10% goes to platform maintenance and development.</p>
+        <p>When you win, you receive <strong class="text-green-400">{GAME_CONFIG.WINNER_PERCENTAGE}% of the current pot</strong> directly to your wallet.</p>
+        <p>The remaining {GAME_CONFIG.HOUSE_FEE_PERCENTAGE}% goes to platform maintenance and development.</p>
         <p>The pot grows with every shot taken, so it can get quite large!</p>
       </div>
     </div>
@@ -63,7 +67,7 @@
         <span>Why is there a cooldown period?</span>
       </h2>
       <div class="text-gray-300 space-y-2">
-        <p>There's a <strong class="text-blue-400">1-hour cooldown</strong> between shots from the same wallet.</p>
+        <p>There's a <strong class="text-blue-400">{formatCooldownTime(GAME_CONFIG.COOLDOWN_HOURS)} cooldown</strong> between shots from the same wallet.</p>
         <p>This prevents spam and ensures fair play for all participants.</p>
         <p>You can see your remaining cooldown time on the game page.</p>
       </div>
@@ -90,7 +94,7 @@
         <span>What does it cost to play?</span>
       </h2>
       <div class="text-gray-300 space-y-2">
-        <p>Each shot costs exactly <strong class="text-yellow-400">0.001 ETH</strong> (about $2.50 USD).</p>
+        <p>Each shot costs exactly <strong class="text-yellow-400">{formatEth(GAME_CONFIG.SHOT_COST)} ETH</strong> (about ${calculateUSDValue(GAME_CONFIG.SHOT_COST)} USD).</p>
         <p>You'll also pay standard Ethereum gas fees for the transaction.</p>
         <p>Gas fees vary based on network congestion, typically $1-5.</p>
       </div>
@@ -103,7 +107,7 @@
         <span>What is sponsorship?</span>
       </h2>
       <div class="text-gray-300 space-y-2">
-        <p>Players can sponsor a round for <strong class="text-purple-400">0.05 ETH</strong> to get their name/logo displayed.</p>
+        <p>Players can sponsor a round for <strong class="text-purple-400">{GAME_CONFIG.SPONSOR_COST_ETH} ETH</strong> to get their name/logo displayed.</p>
         <p>Sponsorship adds to the pot and gives you visibility to all players.</p>
         <p>Perfect for promoting your project, brand, or just having fun!</p>
       </div>
@@ -138,8 +142,8 @@
         <span>🎯</span>
         <span>Play Now</span>
       </a>
-      <a 
-        href="https://discord.gg/ethshot" 
+      <a
+        href={SOCIAL_CONFIG.DISCORD_URL}
         target="_blank"
         rel="noopener noreferrer"
         class="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg transition-colors font-semibold"
