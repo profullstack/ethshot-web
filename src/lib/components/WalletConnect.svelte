@@ -6,15 +6,26 @@
 
   let connecting = false;
   let showMobileWallet = false;
+  let isIOS = false;
+  let hasMetaMask = false;
+  let hasPhantom = false;
   
   // Detect if we're on a mobile device after component mounts
   onMount(() => {
     showMobileWallet = isMobile();
+    isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    hasMetaMask = !!window.ethereum?.isMetaMask;
+    hasPhantom = !!window.ethereum?.isPhantom;
+    
     console.log('Device detection:', {
       isMobile: isMobile(),
+      isIOS,
+      hasMetaMask,
+      hasPhantom,
       userAgent: navigator.userAgent,
       screenWidth: window.innerWidth,
-      showMobileWallet
+      showMobileWallet,
+      ethereumProviders: window.ethereum ? Object.keys(window.ethereum) : 'none'
     });
   });
 
@@ -37,8 +48,17 @@
         toString: error.toString()
       });
       
-      // Show specific error message to user
-      const errorMessage = error.message || 'Failed to connect wallet. Please try again.';
+      // Show specific error message to user with iOS guidance
+      let errorMessage = error.message || 'Failed to connect wallet. Please try again.';
+      
+      if (isIOS && !hasMetaMask && !hasPhantom) {
+        if (walletType === 'injected') {
+          errorMessage = 'No wallet app detected. Please install MetaMask or Phantom, then open this page from within the wallet app\'s browser.';
+        } else if (walletType === 'walletconnect') {
+          errorMessage = 'WalletConnect failed. Make sure you have a compatible wallet app installed (MetaMask, Phantom, etc.) and try again.';
+        }
+      }
+      
       toastStore.error(errorMessage);
     } finally {
       connecting = false;
@@ -48,6 +68,32 @@
 
   const handleInjectedConnect = () => handleConnect('injected');
   const handleWalletConnect = () => handleConnect('walletconnect');
+  
+  // Add deep linking for mobile wallets
+  const handleMobileWalletDeepLink = (walletName) => {
+    if (!isIOS) {
+      handleWalletConnect();
+      return;
+    }
+    
+    const currentUrl = encodeURIComponent(window.location.href);
+    let deepLinkUrl = '';
+    
+    switch (walletName) {
+      case 'metamask':
+        deepLinkUrl = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+        break;
+      case 'phantom':
+        deepLinkUrl = `https://phantom.app/ul/browse/${window.location.host}${window.location.pathname}`;
+        break;
+      default:
+        handleWalletConnect();
+        return;
+    }
+    
+    console.log('📱 Opening mobile wallet deep link:', deepLinkUrl);
+    window.open(deepLinkUrl, '_blank');
+  };
 </script>
 
 <div class="wallet-connect">
@@ -62,8 +108,17 @@
     <!-- Connect Message -->
     <div class="connect-message">
       <h3 class="text-2xl font-bold text-white mb-2">Connect Your Wallet</h3>
+      {#if isIOS && !hasMetaMask && !hasPhantom}
+        <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-3 mb-4">
+          <p class="text-blue-300 text-sm font-medium mb-2">📱 iOS Users:</p>
+          <p class="text-blue-200 text-xs">
+            For best results, open this page from within your wallet app's browser (MetaMask, Phantom, etc.)
+            or use the "Mobile Wallet" option below to connect via WalletConnect.
+          </p>
+        </div>
+      {/if}
       <p class="text-gray-400 text-center max-w-md">
-        Connect your Ethereum wallet to start playing ETH Shot. 
+        Connect your Ethereum wallet to start playing ETH Shot.
         We support MetaMask, WalletConnect, and other popular wallets.
       </p>
     </div>
@@ -75,7 +130,7 @@
         on:click={() => handleConnect()}
         disabled={connecting}
         class="connect-button connect-button-primary"
-        style="pointer-events: auto; cursor: pointer; z-index: 1000; position: relative;"
+        style="pointer-events: auto; cursor: pointer;"
       >
         {#if connecting}
           <div class="flex items-center space-x-3">
@@ -90,6 +145,30 @@
       <!-- Specific wallet options -->
       <div class="wallet-options">
         <p class="text-xs text-gray-500 mb-2">Or choose a specific option:</p>
+        
+        {#if isIOS}
+          <!-- iOS-specific options with deep linking -->
+          <div class="grid grid-cols-1 gap-2 mb-3">
+            <button
+              on:click={() => handleMobileWalletDeepLink('metamask')}
+              disabled={connecting}
+              class="connect-button connect-button-secondary flex items-center justify-center space-x-2"
+            >
+              <img src="/icons/metamask.svg" alt="MetaMask" class="w-4 h-4" />
+              <span class="text-sm">Open in MetaMask</span>
+            </button>
+            <button
+              on:click={() => handleMobileWalletDeepLink('phantom')}
+              disabled={connecting}
+              class="connect-button connect-button-secondary flex items-center justify-center space-x-2"
+            >
+              <img src="/icons/phantom.svg" alt="Phantom" class="w-4 h-4" />
+              <span class="text-sm">Open in Phantom</span>
+            </button>
+          </div>
+          <div class="text-xs text-gray-500 mb-2">Or use WalletConnect:</div>
+        {/if}
+        
         <div class="grid {showMobileWallet ? 'grid-cols-2' : 'grid-cols-1'} gap-2">
           <button
             on:click={handleInjectedConnect}
@@ -104,7 +183,7 @@
               disabled={connecting}
               class="connect-button connect-button-secondary"
             >
-              <span class="text-sm">Mobile Wallet</span>
+              <span class="text-sm">WalletConnect</span>
             </button>
           {/if}
         </div>

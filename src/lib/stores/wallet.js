@@ -77,10 +77,47 @@ const createWalletStore = () => {
 
       // Handle different wallet connection types
       if (walletType === 'injected' || walletType === 'auto') {
-        // Check for injected wallet first
+        // Enhanced mobile wallet detection for iOS Safari
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        
+        console.log('🔍 Wallet detection:', {
+          isMobile,
+          isIOS,
+          hasEthereum: !!window.ethereum,
+          userAgent: navigator.userAgent,
+          availableProviders: window.ethereum ? Object.keys(window.ethereum) : 'none'
+        });
+
+        // Check for injected wallet providers
         if (window.ethereum) {
           try {
             console.log('🔗 Requesting injected wallet connection...');
+            
+            // On mobile, try to detect specific wallet providers
+            if (isMobile) {
+              console.log('📱 Mobile wallet detection active');
+              
+              // Check for MetaMask mobile
+              if (window.ethereum.isMetaMask) {
+                console.log('🦊 MetaMask mobile detected');
+              }
+              
+              // Check for Phantom mobile (they inject into window.ethereum too)
+              if (window.ethereum.isPhantom) {
+                console.log('👻 Phantom mobile detected');
+              }
+              
+              // Check for other mobile wallets
+              if (window.ethereum.isCoinbaseWallet) {
+                console.log('🔵 Coinbase Wallet mobile detected');
+              }
+              
+              if (window.ethereum.isTrust) {
+                console.log('🛡️ Trust Wallet mobile detected');
+              }
+            }
+            
             const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
             console.log('✅ Injected wallet connected:', accounts[0]);
             instance = window.ethereum;
@@ -91,6 +128,14 @@ const createWalletStore = () => {
               code: metamaskError.code,
               stack: metamaskError.stack
             });
+            
+            // On mobile, provide more specific error messages
+            if (isMobile && metamaskError.code === 4001) {
+              throw new Error('Connection cancelled. Please try again and approve the connection in your wallet app.');
+            } else if (isMobile && metamaskError.message.includes('No Ethereum provider')) {
+              throw new Error('No wallet app found. Please install MetaMask, Phantom, or another Web3 wallet app.');
+            }
+            
             if (walletType === 'injected') {
               throw new Error('Injected wallet connection failed: ' + metamaskError.message);
             }
@@ -100,12 +145,25 @@ const createWalletStore = () => {
             }
           }
         } else {
-          // No window.ethereum detected
-          if (walletType === 'injected') {
-            throw new Error('No browser wallet found. Please install MetaMask or another Web3 wallet.');
-          } else if (walletType === 'auto') {
-            // Auto mode but no window.ethereum - provide helpful message
-            throw new Error('No browser wallet found. Please install MetaMask or another Web3 wallet.');
+          // No window.ethereum detected - handle mobile case differently
+          if (isMobile) {
+            console.log('📱 No window.ethereum on mobile - this is expected for some wallet apps');
+            
+            if (walletType === 'injected') {
+              throw new Error('No wallet app detected. Please install MetaMask, Phantom, or another Web3 wallet app, then open this page from within the wallet app\'s browser.');
+            } else if (walletType === 'auto') {
+              // On mobile auto mode, suggest using WalletConnect instead
+              console.log('📱 Suggesting WalletConnect for mobile without injected provider');
+              // Don't throw error here, let it fall through to WalletConnect
+            }
+          } else {
+            // Desktop case
+            if (walletType === 'injected') {
+              throw new Error('No browser wallet found. Please install MetaMask or another Web3 wallet.');
+            } else if (walletType === 'auto') {
+              // Auto mode but no window.ethereum - provide helpful message
+              throw new Error('No browser wallet found. Please install MetaMask or another Web3 wallet.');
+            }
           }
         }
       }
