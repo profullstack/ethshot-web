@@ -3,6 +3,7 @@ import { browser } from '$app/environment';
 import { walletStore } from './wallet.js';
 import { toastStore } from './toast.js';
 import { db, formatAddress, formatEther, formatTimeAgo } from '../supabase.js';
+import { GAME_CONFIG, NETWORK_CONFIG, SOCIAL_CONFIG, UI_CONFIG } from '../config.js';
 
 // Winner event store for triggering animations
 export const winnerEventStore = writable(null);
@@ -28,13 +29,13 @@ const ETH_SHOT_ABI = [
 const createGameStore = () => {
   const { subscribe, set, update } = writable({
     // Contract info
-    contractAddress: import.meta.env.PUBLIC_CONTRACT_ADDRESS || '',
+    contractAddress: NETWORK_CONFIG.CONTRACT_ADDRESS,
     contract: null,
-    
+
     // Game state
     currentPot: '0',
-    shotCost: '0.001',
-    sponsorCost: '0.05',
+    shotCost: GAME_CONFIG.SHOT_COST_ETH,
+    sponsorCost: GAME_CONFIG.SPONSOR_COST_ETH,
     
     // Player state
     playerStats: null,
@@ -86,9 +87,7 @@ const createGameStore = () => {
       ethers = ethersModule;
 
       // Create contract instance with read-only provider
-      const provider = new ethers.JsonRpcProvider(
-        import.meta.env.PUBLIC_RPC_URL || 'https://sepolia.infura.io/v3/demo'
-      );
+      const provider = new ethers.JsonRpcProvider(NETWORK_CONFIG.RPC_URL);
       
       contract = new ethers.Contract(contractAddress, ETH_SHOT_ABI, provider);
       
@@ -391,7 +390,7 @@ const createGameStore = () => {
 
     const state = get({ subscribe });
     const text = `I just took a shot at #ETHShot and the pot is now ${state.currentPot} ETH! 🎯 Try your luck:`;
-    const url = 'https://ethshot.io';
+    const url = SOCIAL_CONFIG.APP_URL;
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
     window.open(twitterUrl, '_blank');
   };
@@ -403,7 +402,7 @@ const createGameStore = () => {
     }
 
     try {
-      await navigator.clipboard.writeText('https://ethshot.io');
+      await navigator.clipboard.writeText(SOCIAL_CONFIG.APP_URL);
       toastStore.success('Link copied to clipboard!');
     } catch (error) {
       toastStore.error('Failed to copy link');

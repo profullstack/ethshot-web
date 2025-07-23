@@ -1,5 +1,6 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
+import { NETWORK_CONFIG, WALLET_CONFIG, RPC_URLS, EXPLORER_URLS } from '../config.js';
 
 // Wallet connection state
 const createWalletStore = () => {
@@ -47,10 +48,10 @@ const createWalletStore = () => {
         walletconnect: {
           package: WalletConnectProvider,
           options: {
-            infuraId: import.meta.env.PUBLIC_INFURA_PROJECT_ID || 'demo',
+            infuraId: WALLET_CONFIG.INFURA_PROJECT_ID,
             rpc: {
-              1: 'https://mainnet.infura.io/v3/demo',
-              11155111: 'https://sepolia.infura.io/v3/demo',
+              1: RPC_URLS.MAINNET,
+              11155111: RPC_URLS.SEPOLIA,
             },
           },
         },
@@ -58,9 +59,9 @@ const createWalletStore = () => {
 
       web3Modal = new Web3Modal({
         network: 'mainnet',
-        cacheProvider: true,
+        cacheProvider: WALLET_CONFIG.WALLETCONNECT_CACHE_PROVIDER,
         providerOptions,
-        theme: 'dark',
+        theme: WALLET_CONFIG.WALLETCONNECT_THEME,
       });
 
       if (!web3Modal) {
@@ -307,8 +308,7 @@ export const walletChainId = derived(walletStore, $wallet => $wallet.chainId);
 export const walletSigner = derived(walletStore, $wallet => $wallet.signer);
 
 export const isCorrectNetwork = derived(walletStore, $wallet => {
-  const targetChainId = parseInt(import.meta.env.PUBLIC_CHAIN_ID || '11155111');
-  return $wallet.chainId === targetChainId;
+  return $wallet.chainId === NETWORK_CONFIG.CHAIN_ID;
 });
 
 // Network configurations

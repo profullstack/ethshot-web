@@ -2,6 +2,7 @@
   import { gameStore, canTakeShot, cooldownRemaining, isLoading } from '../stores/game.js';
   import { walletStore, isConnected, isCorrectNetwork } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
+  import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatTime as configFormatTime } from '../config.js';
   import { onMount, onDestroy } from 'svelte';
 
   let cooldownTimer = null;
@@ -65,9 +66,8 @@
 
   // Switch to correct network
   const handleSwitchNetwork = async () => {
-    const targetChainId = parseInt(import.meta.env.PUBLIC_CHAIN_ID || '11155111');
     try {
-      await walletStore.switchNetwork(targetChainId);
+      await walletStore.switchNetwork(NETWORK_CONFIG.CHAIN_ID);
     } catch (error) {
       toastStore.error('Failed to switch network');
     }
@@ -146,7 +146,7 @@
         disabled={!$canTakeShot}
       >
         <span class="text-3xl font-black">TAKE THE SHOT</span>
-        <span class="text-sm opacity-90">0.001 ETH • 1% chance to win</span>
+        <span class="text-sm opacity-90">{formatEth(GAME_CONFIG.SHOT_COST)} ETH • {GAME_CONFIG.WIN_PERCENTAGE}% chance to win</span>
       </button>
     {/if}
 
@@ -159,15 +159,15 @@
   <!-- Game Stats -->
   <div class="grid grid-cols-3 gap-4 text-center">
     <div class="bg-gray-800/50 rounded-lg p-3">
-      <div class="text-lg font-bold text-yellow-400">1%</div>
+      <div class="text-lg font-bold text-yellow-400">{GAME_CONFIG.WIN_PERCENTAGE}%</div>
       <div class="text-xs text-gray-400">Win Chance</div>
     </div>
     <div class="bg-gray-800/50 rounded-lg p-3">
-      <div class="text-lg font-bold text-green-400">90%</div>
+      <div class="text-lg font-bold text-green-400">{GAME_CONFIG.WINNER_PERCENTAGE}%</div>
       <div class="text-xs text-gray-400">Winner Gets</div>
     </div>
     <div class="bg-gray-800/50 rounded-lg p-3">
-      <div class="text-lg font-bold text-blue-400">1h</div>
+      <div class="text-lg font-bold text-blue-400">{configFormatTime(GAME_CONFIG.COOLDOWN_SECONDS)}</div>
       <div class="text-xs text-gray-400">Cooldown</div>
     </div>
   </div>
@@ -175,8 +175,8 @@
   <!-- Risk Warning -->
   <div class="text-center text-xs text-gray-500 max-w-md">
     <p>
-      ⚠️ This is a game of chance. Only play with ETH you can afford to lose. 
-      Each shot has a 1% chance of winning the current pot.
+      ⚠️ This is a game of chance. Only play with ETH you can afford to lose.
+      Each shot has a {GAME_CONFIG.WIN_PERCENTAGE}% chance of winning the current pot.
     </p>
   </div>
 </div>
