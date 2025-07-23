@@ -25,6 +25,31 @@ const ETH_SHOT_ABI = [
   'event SponsorshipActivated(address indexed sponsor, string name, string logoUrl)',
 ];
 
+// Cache for reducing RPC calls
+const rpcCache = {
+  data: new Map(),
+  timestamps: new Map(),
+  TTL: 30000, // 30 seconds cache
+  
+  get(key) {
+    const timestamp = this.timestamps.get(key);
+    if (timestamp && Date.now() - timestamp < this.TTL) {
+      return this.data.get(key);
+    }
+    return null;
+  },
+  
+  set(key, value) {
+    this.data.set(key, value);
+    this.timestamps.set(key, Date.now());
+  },
+  
+  clear() {
+    this.data.clear();
+    this.timestamps.clear();
+  }
+};
+
 // Game state store
 const createGameStore = () => {
   const { subscribe, set, update } = writable({
@@ -194,22 +219,55 @@ const createGameStore = () => {
     if (!browser || !contract || !ethers) return;
 
     try {
-      // Load contract data with retry logic
-      const [
-        currentPot,
-        shotCost,
-        sponsorCost,
-        currentSponsor,
-        recentWinners
-      ] = await Promise.all([
-        retryWithBackoff(() => contract.getCurrentPot(), 2, 1000),
-        retryWithBackoff(() => contract.SHOT_COST(), 2, 1000),
-        retryWithBackoff(() => contract.SPONSOR_COST(), 2, 1000),
-        retryWithBackoff(() => contract.getCurrentSponsor(), 2, 1000),
-        retryWithBackoff(() => contract.getRecentWinners(), 2, 1000)
-      ]);
+      // Check cache first for contract data
+      let currentPot = rpcCache.get('currentPot');
+      let shotCost = rpcCache.get('shotCost');
+      let sponsorCost = rpcCache.get('sponsorCost');
+      let currentSponsor = rpcCache.get('currentSponsor');
+      let recentWinners = rpcCache.get('recentWinners');
 
-      // Load database data (more comprehensive and faster)
+      // Only fetch from contract if not cached
+      const contractCalls = [];
+      if (!currentPot) contractCalls.push(['currentPot', () => contract.getCurrentPot()]);
+      if (!shotCost) contractCalls.push(['shotCost', () => contract.SHOT_COST()]);
+      if (!sponsorCost) contractCalls.push(['sponsorCost', () => contract.SPONSOR_COST()]);
+      if (!currentSponsor) contractCalls.push(['currentSponsor', () => contract.getCurrentSponsor()]);
+      if (!recentWinners) contractCalls.push(['recentWinners', () => contract.getRecentWinners()]);
+
+      // Execute only necessary contract calls with longer delays
+      if (contractCalls.length > 0) {
+        console.log(`Making ${contractCalls.length} RPC calls (${5 - contractCalls.length} cached)`);
+        
+        // Execute calls sequentially to avoid rate limiting
+        for (const [key, call] of contractCalls) {
+          try {
+            const result = await retryWithBackoff(call, 2, 2000);
+            rpcCache.set(key, result);
+            
+            // Assign to variables
+            if (key === 'currentPot') currentPot = result;
+            else if (key === 'shotCost') shotCost = result;
+            else if (key === 'sponsorCost') sponsorCost = result;
+            else if (key === 'currentSponsor') currentSponsor = result;
+            else if (key === 'recentWinners') recentWinners = result;
+            
+            // Add delay between calls to avoid rate limiting
+            if (contractCalls.indexOf([key, call]) < contractCalls.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch ${key}, using cached or default value:`, error.message);
+            // Use cached values or defaults
+            if (key === 'currentPot') currentPot = currentPot || '0';
+            else if (key === 'shotCost') shotCost = shotCost || ethers.parseEther('0.001');
+            else if (key === 'sponsorCost') sponsorCost = sponsorCost || ethers.parseEther('0.001');
+            else if (key === 'currentSponsor') currentSponsor = currentSponsor || { active: false };
+            else if (key === 'recentWinners') recentWinners = recentWinners || [];
+          }
+        }
+      }
+
+      // Load database data (prioritize this over contract data)
       const [dbWinners, dbStats, dbSponsors, topPlayers] = await Promise.all([
         db.getRecentWinners(10),
         db.getGameStats(),
@@ -218,19 +276,19 @@ const createGameStore = () => {
       ]);
 
       // Use database data when available, fallback to contract data
-      const winners = dbWinners.length > 0 ? dbWinners : recentWinners.map(winner => ({
+      const winners = dbWinners.length > 0 ? dbWinners : (recentWinners || []).map(winner => ({
         ...winner,
         amount: ethers.formatEther(winner.amount),
         timestamp: new Date(Number(winner.timestamp) * 1000).toISOString()
       }));
 
-      const sponsor = dbSponsors || (currentSponsor.active ? currentSponsor : null);
+      const sponsor = dbSponsors || (currentSponsor?.active ? currentSponsor : null);
 
       update(state => ({
         ...state,
-        currentPot: ethers.formatEther(currentPot),
-        shotCost: ethers.formatEther(shotCost),
-        sponsorCost: ethers.formatEther(sponsorCost),
+        currentPot: ethers.formatEther(currentPot || '0'),
+        shotCost: ethers.formatEther(shotCost || ethers.parseEther('0.001')),
+        sponsorCost: ethers.formatEther(sponsorCost || ethers.parseEther('0.001')),
         currentSponsor: sponsor,
         recentWinners: winners,
         topPlayers: topPlayers || [],
@@ -534,7 +592,7 @@ const createGameStore = () => {
       }));
     });
 
-    // Update every 30 seconds as fallback
+    // Update every 60 seconds as fallback (reduced frequency to avoid rate limiting)
     updateInterval = setInterval(async () => {
       await loadGameState();
       
@@ -542,7 +600,7 @@ const createGameStore = () => {
       if (wallet.connected && wallet.address) {
         await loadPlayerData(wallet.address);
       }
-    }, 30000);
+    }, 60000);
 
     // Listen for wallet connection changes
     walletStore.subscribe(async (wallet) => {

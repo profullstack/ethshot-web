@@ -24,7 +24,7 @@ export default defineConfig({
   
   // Optimization
   optimizeDeps: {
-    include: ['ethers', 'web3modal'],
+    include: ['ethers', 'web3modal', 'is-typedarray'],
     exclude: [
       '@walletconnect/web3-provider',
       '@walletconnect/client',
