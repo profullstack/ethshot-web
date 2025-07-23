@@ -168,7 +168,7 @@
   }
 
   .sponsor-logo {
-    @apply w-12 h-12 rounded-lg object-cover;
+    @apply w-12 h-12 rounded-lg object-contain;
     @apply border-2 border-white/20 shadow-lg;
     @apply transition-transform duration-200;
   }
