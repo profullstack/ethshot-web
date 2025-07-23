@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title EthShot
@@ -11,13 +11,13 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  * @author ETH Shot Team
  */
 contract EthShot is Ownable, Pausable, ReentrancyGuard {
-    // Constants
-    uint256 public constant SHOT_COST = 0.001 ether;
-    uint256 public constant SPONSOR_COST = 0.05 ether;
-    uint256 public constant COOLDOWN_PERIOD = 1 hours;
-    uint256 public constant WIN_PERCENTAGE = 90;
-    uint256 public constant HOUSE_PERCENTAGE = 10;
-    uint256 public constant WIN_CHANCE = 1; // 1% chance (1 out of 100)
+    // Configurable parameters (set in constructor)
+    uint256 public immutable SHOT_COST;
+    uint256 public immutable SPONSOR_COST;
+    uint256 public immutable COOLDOWN_PERIOD;
+    uint256 public immutable WIN_PERCENTAGE;
+    uint256 public immutable HOUSE_PERCENTAGE;
+    uint256 public immutable WIN_CHANCE;
     
     // State variables
     uint256 private currentPot;
@@ -69,7 +69,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     event HouseFundsWithdrawn(address indexed owner, uint256 amount);
     
     // Modifiers
-    modifier canTakeShot(address player) {
+    modifier canShoot(address player) {
         require(
             block.timestamp >= lastShotTime[player] + COOLDOWN_PERIOD,
             "Cooldown period not elapsed"
@@ -87,7 +87,33 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         _;
     }
     
-    constructor(address initialOwner) Ownable(initialOwner) {
+    constructor(
+        address initialOwner,
+        uint256 _shotCost,
+        uint256 _sponsorCost,
+        uint256 _cooldownPeriod,
+        uint256 _winPercentage,
+        uint256 _housePercentage,
+        uint256 _winChance
+    ) Ownable(initialOwner) {
+        // Validate parameters
+        require(_shotCost > 0, "Shot cost must be greater than 0");
+        require(_sponsorCost > 0, "Sponsor cost must be greater than 0");
+        require(_cooldownPeriod > 0, "Cooldown period must be greater than 0");
+        require(_winPercentage > 0 && _winPercentage <= 100, "Win percentage must be between 1-100");
+        require(_housePercentage > 0 && _housePercentage <= 100, "House percentage must be between 1-100");
+        require(_winPercentage + _housePercentage == 100, "Win and house percentages must sum to 100");
+        require(_winChance > 0 && _winChance <= 100, "Win chance must be between 1-100");
+        
+        // Set immutable parameters
+        SHOT_COST = _shotCost;
+        SPONSOR_COST = _sponsorCost;
+        COOLDOWN_PERIOD = _cooldownPeriod;
+        WIN_PERCENTAGE = _winPercentage;
+        HOUSE_PERCENTAGE = _housePercentage;
+        WIN_CHANCE = _winChance;
+        
+        // Initialize state
         currentPot = 0;
         houseFunds = 0;
         nonce = 0;
@@ -102,7 +128,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         payable 
         whenNotPaused 
         nonReentrant 
-        canTakeShot(msg.sender)
+        canShoot(msg.sender)
         correctPayment(SHOT_COST)
     {
         // Update player stats
@@ -286,7 +312,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
             keccak256(
                 abi.encodePacked(
                     block.timestamp,
-                    block.difficulty,
+                    block.prevrandao,
                     msg.sender,
                     nonce,
                     blockhash(block.number - 1)

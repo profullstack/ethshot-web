@@ -1,0 +1,37 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "contractAddress": "0xa6F8E4091D9D56A61101B1B2604451B85Eb69Dc7",
+  "transactionHash": "0x7cae07c3ef422281efcf25b3a3d44cd038e101d48e4faeec4b573aabaf0c9b65",
+  "deploymentTime": "2025-07-23T14:06:37.815Z",
+  "deployer": "0x6eE8FbD7b699D3dA2942562Ffa526920CE784D8A",
+  "deployerBalance": "0.15243477326442937",
+  "etherscanUrl": "https://sepolia.etherscan.io/address/0xa6F8E4091D9D56A61101B1B2604451B85Eb69Dc7",
+  "contractConfig": {
+    "shotCost": "0.0005",
+    "sponsorCost": "0.001",
+    "cooldownPeriod": 3600,
+    "winChance": 1,
+    "winPercentage": 90,
+    "housePercentage": 10,
+    "currentPot": "0.0"
+  },
+  "deploymentConfig": {
+    "shotCostEth": "0.0005",
+    "sponsorCostEth": "0.001",
+    "winChancePercent": 1,
+    "winnerPayoutPercent": 90,
+    "houseFeePercent": 10,
+    "cooldownHours": 1
+  },
+  "constructorArgs": [
+    "0x6eE8FbD7b699D3dA2942562Ffa526920CE784D8A",
+    "500000000000000",
+    "1000000000000000",
+    3600,
+    90,
+    10,
+    1
+  ],
+  "rpcUrl": "https://sepolia.infura.io/v3/9ffe04da38034641bbbaa5883cec1a01"
+}

@@ -1,4 +1,5 @@
-import { ethers } from 'hardhat';
+import pkg from 'hardhat';
+const { ethers } = pkg;
 import 'dotenv/config';
 
 async function main() {

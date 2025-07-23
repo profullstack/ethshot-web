@@ -1,4 +1,5 @@
-import { ethers } from 'hardhat';
+import pkg from 'hardhat';
+const { ethers } = pkg;
 import fs from 'fs';
 import path from 'path';
 
@@ -10,7 +11,8 @@ async function main() {
   
   // Deploy the contract
   console.log('📝 Deploying contract...');
-  const ethShot = await EthShot.deploy();
+  const [signer] = await ethers.getSigners();
+  const ethShot = await EthShot.deploy(signer.address);
   
   // Wait for deployment to complete
   await ethShot.waitForDeployment();
