@@ -5,22 +5,27 @@ import { browser } from '$app/environment';
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+// Validate required environment variables
+const hasValidConfig = supabaseUrl && supabaseAnonKey;
+
+if (!hasValidConfig) {
   console.warn('Supabase configuration missing. Please set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY environment variables.');
 }
 
-// Create Supabase client
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
-  auth: {
-    persistSession: browser,
-    autoRefreshToken: browser,
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
-    },
-  },
-});
+// Create Supabase client only if configuration is valid
+export const supabase = hasValidConfig
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: browser,
+        autoRefreshToken: browser,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
+    })
+  : null;
 
 // Database table names
 export const TABLES = {
@@ -35,6 +40,11 @@ export const TABLES = {
 export const db = {
   // Player operations
   async getPlayer(address) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for getPlayer');
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.PLAYERS)
@@ -54,6 +64,11 @@ export const db = {
   },
 
   async upsertPlayer(playerData) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for upsertPlayer');
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.PLAYERS)
@@ -80,6 +95,11 @@ export const db = {
 
   // Shot operations
   async recordShot(shotData) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for recordShot');
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.SHOTS)
@@ -103,6 +123,11 @@ export const db = {
   },
 
   async getRecentShots(limit = 50) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning empty array for getRecentShots');
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.SHOTS)
@@ -120,6 +145,11 @@ export const db = {
 
   // Winner operations
   async recordWinner(winnerData) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for recordWinner');
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.WINNERS)
@@ -142,6 +172,11 @@ export const db = {
   },
 
   async getRecentWinners(limit = 10) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning empty array for getRecentWinners');
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.WINNERS)
@@ -159,6 +194,11 @@ export const db = {
 
   // Leaderboard operations
   async getTopPlayers(limit = 10, orderBy = 'total_shots') {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning empty array for getTopPlayers');
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.PLAYERS)
@@ -176,6 +216,11 @@ export const db = {
 
   // Sponsor operations
   async recordSponsor(sponsorData) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for recordSponsor');
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.SPONSORS)
@@ -200,6 +245,11 @@ export const db = {
   },
 
   async getCurrentSponsor() {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for getCurrentSponsor');
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.SPONSORS)
@@ -221,6 +271,11 @@ export const db = {
   },
 
   async deactivateCurrentSponsor() {
+    if (!supabase) {
+      console.warn('Supabase not configured - skipping deactivateCurrentSponsor');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from(TABLES.SPONSORS)
@@ -236,6 +291,11 @@ export const db = {
 
   // Game statistics
   async updateGameStats(stats) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for updateGameStats');
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.GAME_STATS)
@@ -263,6 +323,11 @@ export const db = {
   },
 
   async getGameStats() {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for getGameStats');
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from(TABLES.GAME_STATS)
@@ -283,6 +348,11 @@ export const db = {
 
   // Real-time subscriptions
   subscribeToWinners(callback) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for subscribeToWinners');
+      return null;
+    }
+
     return supabase
       .channel('winners')
       .on('postgres_changes', {
@@ -294,6 +364,11 @@ export const db = {
   },
 
   subscribeToShots(callback) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for subscribeToShots');
+      return null;
+    }
+
     return supabase
       .channel('shots')
       .on('postgres_changes', {
@@ -305,6 +380,11 @@ export const db = {
   },
 
   subscribeToSponsors(callback) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for subscribeToSponsors');
+      return null;
+    }
+
     return supabase
       .channel('sponsors')
       .on('postgres_changes', {
