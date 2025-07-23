@@ -8,6 +8,7 @@
 
   let sponsorName = '';
   let sponsorLogoUrl = '';
+  let sponsorUrl = '';
   let submitting = false;
   let previewMode = false;
 
@@ -33,7 +34,7 @@
       return;
     }
 
-    // Validate URL format
+    // Validate logo URL format
     try {
       new URL(sponsorLogoUrl);
     } catch {
@@ -41,13 +42,28 @@
       return;
     }
 
+    // Validate sponsor URL format if provided
+    if (sponsorUrl.trim()) {
+      try {
+        new URL(sponsorUrl);
+      } catch {
+        toastStore.error('Please enter a valid sponsor website URL');
+        return;
+      }
+    }
+
     submitting = true;
     try {
-      await gameStore.sponsorRound(sponsorName.trim(), sponsorLogoUrl.trim());
+      await gameStore.sponsorRound(
+        sponsorName.trim(),
+        sponsorLogoUrl.trim(),
+        sponsorUrl.trim() || null
+      );
       
       // Reset form on success
       sponsorName = '';
       sponsorLogoUrl = '';
+      sponsorUrl = '';
       previewMode = false;
       
       // Redirect to main game page to see the sponsorship
@@ -131,6 +147,7 @@
         <ul class="text-left max-w-md mx-auto space-y-2">
           <li>• Display your name/brand to all players</li>
           <li>• Show your logo on the game page</li>
+          <li>• Drive traffic to your website (optional)</li>
           <li>• Add your contribution to the jackpot pot</li>
           <li>• Get visibility in our community</li>
         </ul>
@@ -169,6 +186,23 @@
           />
           <p class="text-xs text-gray-500 mt-1">
             Recommended: Square image, 200x200px or larger, PNG/JPG format
+          </p>
+        </div>
+
+        <!-- Sponsor Website URL -->
+        <div>
+          <label for="sponsorUrl" class="block text-sm font-medium text-gray-300 mb-2">
+            Website URL (Optional)
+          </label>
+          <input
+            id="sponsorUrl"
+            type="url"
+            bind:value={sponsorUrl}
+            placeholder="https://yourwebsite.com"
+            class="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+          />
+          <p class="text-xs text-gray-500 mt-1">
+            Add your website URL to drive traffic and get more value from your sponsorship
           </p>
         </div>
 

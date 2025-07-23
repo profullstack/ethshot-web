@@ -34,19 +34,45 @@
 
       <!-- Sponsor Info -->
       <div class="sponsor-info">
-        {#if sponsor.logoUrl}
-          <img 
-            src={sponsor.logoUrl} 
-            alt="{sponsor.name} logo" 
-            class="sponsor-logo"
-            on:error={(e) => e.target.style.display = 'none'}
-          />
+        {#if sponsor.sponsor_url}
+          <!-- Clickable sponsor with URL -->
+          <a
+            href={sponsor.sponsor_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="sponsor-link"
+            title="Visit {sponsor.name}"
+          >
+            {#if sponsor.logoUrl}
+              <img
+                src={sponsor.logoUrl}
+                alt="{sponsor.name} logo"
+                class="sponsor-logo clickable"
+                on:error={(e) => e.target.style.display = 'none'}
+              />
+            {/if}
+            
+            <div class="sponsor-details">
+              <h4 class="sponsor-name clickable">{sponsor.name}</h4>
+              <p class="sponsor-tagline">Sponsoring this round • Click to visit</p>
+            </div>
+          </a>
+        {:else}
+          <!-- Non-clickable sponsor without URL -->
+          {#if sponsor.logoUrl}
+            <img
+              src={sponsor.logoUrl}
+              alt="{sponsor.name} logo"
+              class="sponsor-logo"
+              on:error={(e) => e.target.style.display = 'none'}
+            />
+          {/if}
+          
+          <div class="sponsor-details">
+            <h4 class="sponsor-name">{sponsor.name}</h4>
+            <p class="sponsor-tagline">Sponsoring this round</p>
+          </div>
         {/if}
-        
-        <div class="sponsor-details">
-          <h4 class="sponsor-name">{sponsor.name}</h4>
-          <p class="sponsor-tagline">Sponsoring this round</p>
-        </div>
       </div>
 
       <!-- Sponsor Meta -->
@@ -113,9 +139,22 @@
     @apply flex items-center space-x-4 flex-1;
   }
 
+  .sponsor-link {
+    @apply flex items-center space-x-4 flex-1;
+    @apply transition-all duration-200 rounded-lg p-2 -m-2;
+    @apply hover:bg-white/10 hover:backdrop-blur-sm;
+    @apply focus:outline-none focus:ring-2 focus:ring-purple-400/50;
+    text-decoration: none;
+  }
+
   .sponsor-logo {
     @apply w-12 h-12 rounded-lg object-cover;
     @apply border-2 border-white/20 shadow-lg;
+    @apply transition-transform duration-200;
+  }
+
+  .sponsor-logo.clickable {
+    @apply hover:scale-105 hover:border-purple-300/50;
   }
 
   .sponsor-details {
@@ -124,6 +163,11 @@
 
   .sponsor-name {
     @apply text-xl font-bold text-white;
+    @apply transition-colors duration-200;
+  }
+
+  .sponsor-name.clickable {
+    @apply hover:text-purple-200;
   }
 
   .sponsor-tagline {
