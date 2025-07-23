@@ -54,7 +54,7 @@
         <span>How much can I win?</span>
       </h2>
       <div class="text-gray-300 space-y-2">
-        <p>When you win, you receive <strong class="text-green-400">{GAME_CONFIG.WINNER_PERCENTAGE}% of the current pot</strong> directly to your wallet.</p>
+        <p>When you win, you receive <strong class="text-green-400">{GAME_CONFIG.WINNER_PAYOUT_PERCENTAGE}% of the current pot</strong> directly to your wallet.</p>
         <p>The remaining {GAME_CONFIG.HOUSE_FEE_PERCENTAGE}% goes to platform maintenance and development.</p>
         <p>The pot grows with every shot taken, so it can get quite large!</p>
       </div>
@@ -96,7 +96,7 @@
       <div class="text-gray-300 space-y-2">
         <p>Each shot costs exactly <strong class="text-yellow-400">{formatEth(GAME_CONFIG.SHOT_COST)} ETH</strong> (about ${calculateUSDValue(GAME_CONFIG.SHOT_COST)} USD).</p>
         <p>You'll also pay standard Ethereum gas fees for the transaction.</p>
-        <p>Gas fees vary based on network congestion, typically $1-5.</p>
+        <p>Gas fees vary based on network congestion, typically .20-.75 USD.</p>
       </div>
     </div>
 
@@ -107,7 +107,7 @@
         <span>What is sponsorship?</span>
       </h2>
       <div class="text-gray-300 space-y-2">
-        <p>Players can sponsor a round for <strong class="text-purple-400">{GAME_CONFIG.SPONSOR_COST_ETH} ETH</strong> to get their name/logo displayed.</p>
+        <p>Players can sponsor a round for <strong class="text-purple-400">{formatEth(GAME_CONFIG.SPONSOR_COST_ETH)} ETH</strong> to get their name/logo displayed.</p>
         <p>Sponsorship adds to the pot and gives you visibility to all players.</p>
         <p>Perfect for promoting your project, brand, or just having fun!</p>
       </div>

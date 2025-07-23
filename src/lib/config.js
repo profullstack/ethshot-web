@@ -29,7 +29,7 @@ export const SOCIAL_CONFIG = {
   APP_URL: import.meta.env.PUBLIC_APP_URL || 'https://ethshot.io',
   TWITTER_URL: import.meta.env.PUBLIC_TWITTER_URL || 'https://twitter.com/ethshot',
   GITHUB_URL: import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/ethshot/ethshot-web',
-  DISCORD_URL: import.meta.env.PUBLIC_DISCORD_URL || 'https://discord.gg/ethshot',
+  DISCORD_URL: import.meta.env.PUBLIC_DISCORD_INVITE || import.meta.env.PUBLIC_DISCORD_URL || 'https://discord.gg/ethshot',
 };
 
 // UI Configuration
