@@ -132,10 +132,10 @@
   <div class="referral-header">
     <h2 class="referral-title">
       <span class="title-icon">🚀</span>
-      Invite Friends & Earn Bonus Shots
+      Invite Friends & Earn Discounts
     </h2>
     <p class="referral-subtitle">
-      Get a free bonus shot for every friend who joins and takes their first shot!
+      Get a 20% discount for every friend who joins and takes their first shot!
     </p>
   </div>
 
@@ -154,8 +154,8 @@
     <div class="stats-container">
       <!-- Primary stat - full width on mobile -->
       <div class="stat-card primary large">
-        <div class="stat-value">{formattedStats.bonusShotsAvailable}</div>
-        <div class="stat-label">Bonus Shots Available</div>
+        <div class="stat-value">{formattedStats.availableDiscounts || 0}</div>
+        <div class="stat-label">Discounts Available</div>
         <div class="stat-icon">🎯</div>
       </div>
       
@@ -174,8 +174,8 @@
         </div>
         
         <div class="stat-card">
-          <div class="stat-value">{formattedStats.totalBonusShotsEarned}</div>
-          <div class="stat-label">Total Bonus Shots Earned</div>
+          <div class="stat-value">{formattedStats.totalDiscountsEarned || 0}</div>
+          <div class="stat-label">Total Discounts Earned</div>
           <div class="stat-icon">🏆</div>
         </div>
       </div>
@@ -234,15 +234,15 @@
       <h3 class="benefits-title">🎁 Referral Rewards</h3>
       <div class="benefits-grid">
         <div class="benefit-card">
-          <div class="benefit-icon">🎯</div>
-          <div class="benefit-title">Free Bonus Shot</div>
-          <div class="benefit-desc">Your friend gets a free shot when they join</div>
+          <div class="benefit-icon">💰</div>
+          <div class="benefit-title">20% Discount</div>
+          <div class="benefit-desc">Your friend gets a 20% discount when they join</div>
         </div>
         
         <div class="benefit-card">
           <div class="benefit-icon">🚀</div>
           <div class="benefit-title">Referral Reward</div>
-          <div class="benefit-desc">You get a bonus shot when they take their first shot</div>
+          <div class="benefit-desc">You get a 20% discount when they take their first shot</div>
         </div>
         
         <div class="benefit-card">

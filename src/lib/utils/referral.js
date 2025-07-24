@@ -2,7 +2,7 @@
  * Referral System Utility
  * 
  * Handles referral code generation, validation, and URL management
- * for the viral referral system that gives bonus shots to users
+ * for the viral referral system that gives discounts to users
  */
 
 import { browser } from '$app/environment';
@@ -123,7 +123,7 @@ export const generateReferralShareText = (referralCode, currentPot = null) => {
     `The current jackpot is ${currentPot} ETH!` : 
     'The jackpot is growing!';
   
-  return `🎯 Join me on ETH Shot and get a FREE bonus shot! ${potText} Use my referral code: ${referralCode} 🚀`;
+  return `🎯 Join me on ETH Shot and get a 20% discount! ${potText} Use my referral code: ${referralCode} 🚀`;
 };
 
 /**
@@ -158,7 +158,7 @@ export const shareReferralURL = async (referralCode, currentPot = null) => {
     const text = generateReferralShareText(referralCode, currentPot);
     
     await navigator.share({
-      title: 'ETH Shot - Get Your Free Bonus Shot!',
+      title: 'ETH Shot - Get Your 20% Discount!',
       text: text,
       url: url
     });
@@ -239,8 +239,8 @@ export const formatReferralStats = (stats) => {
       referralCode: null,
       totalReferrals: 0,
       successfulReferrals: 0,
-      bonusShotsAvailable: 0,
-      totalBonusShotsEarned: 0,
+      availableDiscounts: 0,
+      totalDiscountsEarned: 0,
       referredBy: null,
       successRate: 0
     };
@@ -253,8 +253,8 @@ export const formatReferralStats = (stats) => {
     referralCode: stats.referral_code,
     totalReferrals: stats.total_referrals || 0,
     successfulReferrals: stats.successful_referrals || 0,
-    bonusShotsAvailable: stats.bonus_shots_available || 0,
-    totalBonusShotsEarned: stats.total_bonus_shots_earned || 0,
+    availableDiscounts: stats.available_discounts || 0,
+    totalDiscountsEarned: stats.total_discounts_earned || 0,
     referredBy: stats.referred_by,
     successRate
   };

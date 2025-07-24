@@ -37,7 +37,7 @@ export const TABLES = {
   LEADERBOARD: 'leaderboard',
   REFERRAL_CODES: 'referral_codes',
   REFERRALS: 'referrals',
-  BONUS_SHOTS: 'bonus_shots',
+  REFERRAL_DISCOUNTS: 'referral_discounts',
 };
 
 // Database functions for ETH Shot game
@@ -509,50 +509,78 @@ export const db = {
     }
   },
 
-  async getBonusShots(playerAddress) {
+  async getUserDiscounts(userId) {
     if (!supabase) {
-      console.warn('Supabase not configured - returning 0 for getBonusShots');
-      return 0;
+      console.warn('Supabase not configured - returning empty array for getUserDiscounts');
+      return [];
     }
 
     try {
-      const { data, error } = await supabase.rpc('get_bonus_shots', {
-        player_addr: playerAddress.toLowerCase()
+      const { data, error } = await supabase.rpc('get_user_discounts', {
+        p_user_id: userId
       });
 
       if (error) {
-        console.error('Error getting bonus shots:', error);
-        return 0;
+        console.error('Error getting user discounts:', error);
+        return [];
       }
 
-      return data || 0;
+      console.log('✅ User discounts retrieved:', data);
+      return data || [];
     } catch (error) {
-      console.error('Error getting bonus shots:', error);
-      return 0;
+      console.error('Error getting user discounts:', error);
+      return [];
     }
   },
 
-  async useBonusShot(playerAddress) {
+  async useReferralDiscount(discountId, userId) {
     if (!supabase) {
-      console.warn('Supabase not configured - returning false for useBonusShot');
-      return false;
+      console.warn('Supabase not configured - returning null for useReferralDiscount');
+      return null;
     }
 
     try {
-      const { data, error } = await supabase.rpc('use_bonus_shot', {
-        player_addr: playerAddress.toLowerCase()
+      const { data, error } = await supabase.rpc('use_referral_discount', {
+        p_discount_id: discountId,
+        p_user_id: userId
       });
 
       if (error) {
-        console.error('Error using bonus shot:', error);
-        return false;
+        console.error('Error using referral discount:', error);
+        return null;
       }
 
-      console.log('✅ Bonus shot used:', data);
+      console.log('✅ Referral discount used:', data);
       return data;
     } catch (error) {
-      console.error('Error using bonus shot:', error);
-      return false;
+      console.error('Error using referral discount:', error);
+      return null;
+    }
+  },
+
+  async getAvailableDiscountCount(userId) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning 0 for getAvailableDiscountCount');
+      return 0;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.REFERRAL_DISCOUNTS)
+        .select('id', { count: 'exact' })
+        .eq('user_id', userId)
+        .eq('is_used', false)
+        .gt('expires_at', new Date().toISOString());
+
+      if (error) {
+        console.error('Error getting available discount count:', error);
+        return 0;
+      }
+
+      return data?.length || 0;
+    } catch (error) {
+      console.error('Error getting available discount count:', error);
+      return 0;
     }
   },
 
@@ -677,15 +705,16 @@ export const db = {
 
           const { data: referrals, error: referralsError } = await referralsQuery;
 
-          // Get bonus shots earned
-          const { data: bonusShots, error: bonusError } = await supabase
-            .from(TABLES.BONUS_SHOTS)
-            .select('amount')
-            .eq('player_address', code.referrer_address)
-            .in('bonus_type', ['referral_reward', 'referral_signup']);
+          // Get discounts earned (both used and unused)
+          const { data: discounts, error: discountsError } = await supabase
+            .from(TABLES.REFERRAL_DISCOUNTS)
+            .select('discount_percentage, is_used')
+            .eq('user_id', code.referrer_address)
+            .eq('discount_type', 'referrer');
 
           const successfulReferrals = referralsError ? 0 : (referrals || []).length;
-          const totalBonusShots = bonusError ? 0 : (bonusShots || []).reduce((sum, shot) => sum + shot.amount, 0);
+          const totalDiscountsEarned = discountsError ? 0 : (discounts || []).length;
+          const usedDiscounts = discountsError ? 0 : (discounts || []).filter(d => d.is_used).length;
           
           // Calculate success rate based on time filter
           let totalReferralsForRate = code.total_uses;
@@ -701,7 +730,9 @@ export const db = {
             total_referrals: code.total_uses,
             successful_referrals: successfulReferrals,
             success_rate: successRate,
-            total_bonus_shots_earned: totalBonusShots,
+            total_discounts_earned: totalDiscountsEarned,
+            used_discounts: usedDiscounts,
+            available_discounts: totalDiscountsEarned - usedDiscounts,
             created_at: code.created_at
           };
         })
@@ -744,18 +775,18 @@ export const db = {
       .subscribe();
   },
 
-  subscribeToBonusShots(callback) {
+  subscribeToReferralDiscounts(callback) {
     if (!supabase) {
-      console.warn('Supabase not configured - returning null for subscribeToBonusShots');
+      console.warn('Supabase not configured - returning null for subscribeToReferralDiscounts');
       return null;
     }
 
     return supabase
-      .channel('bonus_shots')
+      .channel('referral_discounts')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: TABLES.BONUS_SHOTS,
+        table: TABLES.REFERRAL_DISCOUNTS,
       }, callback)
       .subscribe();
   },
@@ -782,7 +813,7 @@ export const db = {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: TABLES.BONUS_SHOTS,
+        table: TABLES.REFERRAL_DISCOUNTS,
       }, callback)
       .subscribe();
   },

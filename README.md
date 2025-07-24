@@ -1,10 +1,10 @@
 # ETH Shot 🎯
 
-A viral Ethereum-powered game where users pay 0.001 ETH per shot for a 1% chance to win the jackpot.
+A viral Ethereum-powered game where users pay 0.0005 ETH per shot for a 1% chance to win the jackpot.
 
 ## 🎮 Game Overview
 
-ETH Shot is a decentralized gambling game built on Ethereum where players take shots at winning the jackpot. Each shot costs 0.001 ETH with a 1% chance of winning the entire pot. The game features real-time updates, social sharing, and sponsor integration.
+ETH Shot is a decentralized gambling game built on Ethereum where players take shots at winning the jackpot. Each shot costs 0.0005 ETH with a 1% chance of winning the entire pot. The game features real-time updates, social sharing, sponsor integration, and a viral referral system with discount rewards.
 
 ## ✨ Features
 
@@ -14,8 +14,8 @@ ETH Shot is a decentralized gambling game built on Ethereum where players take s
 - **⚡ Real-time Updates**: Live pot updates and winner announcements via Supabase
 - **⏰ Cooldown System**: 1-hour cooldown between shots per wallet address
 - **🎪 Sponsor Rounds**: Businesses can sponsor rounds for 0.001 ETH with custom branding
-- **🎯 Referral System**: Invite friends and earn bonus shots for viral growth
-- **🎁 Bonus Shots**: Free shots earned through referrals with 30-day expiration
+- **🎯 Referral System**: Invite friends and earn discount rewards for viral growth
+- **💰 Discount Rewards**: 20% discounts on shots earned through referrals with 30-day expiration
 - **📱 Social Sharing**: Share wins and referral links on Twitter
 - **🎨 Winner Animations**: Confetti and celebration effects for jackpot wins
 - **📊 Leaderboards**: Track top players, recent winners, and referral champions
@@ -105,11 +105,12 @@ pnpm dev
 The game is powered by a Solidity smart contract with the following specifications:
 
 ### Game Mechanics
-- **Shot Cost**: 0.001 ETH per shot
+- **Shot Cost**: 0.0005 ETH per shot (0.0004 ETH with 20% referral discount)
 - **Win Probability**: 1% chance to win the jackpot
 - **Payout Split**: 90% to winner, 10% to contract owner
 - **Cooldown Period**: 1 hour (3600 seconds) between shots per wallet
-- **Sponsor Cost**: 0.05 ETH to sponsor a round with custom branding
+- **Sponsor Cost**: 0.001 ETH to sponsor a round with custom branding
+- **Referral Discounts**: 20% discount for both referrer and referee
 
 ### Key Functions
 - `takeShot()`: Take a shot at the jackpot (payable)
@@ -193,10 +194,13 @@ vercel --prod
 
 The application uses Supabase PostgreSQL with the following tables:
 
-- **shots**: Records all shot attempts
+- **shots**: Records all shot attempts with discount tracking
 - **winners**: Tracks jackpot winners
 - **sponsors**: Manages sponsorship rounds
 - **players**: Player statistics and rankings
+- **referral_codes**: User referral codes for viral growth
+- **referrals**: Tracks referral relationships
+- **referral_discounts**: Manages discount rewards and usage
 
 Real-time subscriptions provide live updates for:
 - New winners
@@ -213,6 +217,9 @@ Real-time subscriptions provide live updates for:
 - **Leaderboard**: Top players and statistics
 - **RecentWinners**: Live winner feed
 - **SponsorBanner**: Sponsor branding display
+- **ReferralSystem**: Referral code management and sharing
+- **DiscountButton**: Apply referral discounts to shots
+- **ReferralLeaderboard**: Top referrers and statistics
 
 ### Stores (State Management)
 - **gameStore**: Game state, contract interactions, database integration
@@ -318,7 +325,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Mobile app development
 - [ ] Advanced analytics dashboard
 - [ ] NFT rewards for winners
-- [ ] Referral system
+- [x] Referral system with discount rewards
 - [ ] Multiple game modes
 
 ### Phase 3 (Future)

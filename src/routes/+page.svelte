@@ -13,7 +13,7 @@
   import NotificationPermission from '$lib/components/NotificationPermission.svelte';
   import MetaTags from '$lib/components/MetaTags.svelte';
   import ReferralSystem from '$lib/components/ReferralSystem.svelte';
-  import BonusShotButton from '$lib/components/BonusShotButton.svelte';
+  import DiscountButton from '$lib/components/DiscountButton.svelte';
 
   let mounted = false;
   let showWinnerAnimation = false;
@@ -89,8 +89,8 @@
         <div class="flex justify-center space-x-4">
           {#if $walletStore.connected}
             <GameButton />
-            {#if $gameStore.bonusShotsAvailable > 0}
-              <BonusShotButton />
+            {#if $gameStore.availableDiscounts?.length > 0}
+              <DiscountButton />
             {/if}
           {:else}
             <WalletConnect />
