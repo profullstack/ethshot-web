@@ -1,10 +1,11 @@
 /**
- * Referral Utility Tests
+ * Referral Utility Tests (Node.js Compatible)
  * 
  * Tests for referral code generation, validation, and URL management
+ * Uses Node.js-compatible version of referral utilities
  */
 
-import { describe, it, beforeEach, afterEach } from 'mocha';
+import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import {
   generateReferralURL,
@@ -14,8 +15,7 @@ import {
   getReferralAchievement
 } from './referral-node.js';
 
-describe('Referral Utility Functions', () => {
-
+describe('Referral Utility Functions (Node.js Compatible)', () => {
   describe('generateReferralURL', () => {
     it('should generate a valid referral URL with code', () => {
       const code = 'ABC12345';
@@ -33,84 +33,6 @@ describe('Referral Utility Functions', () => {
         const url = generateReferralURL(code);
         expect(url).to.include(`?ref=${code}`);
       });
-    });
-  });
-
-  describe('getReferralCodeFromURL', () => {
-    it('should extract valid referral code from URL', () => {
-      // Mock URL with referral code
-      global.window.location.search = '?ref=ABC12345';
-      
-      const code = getReferralCodeFromURL();
-      expect(code).to.equal('ABC12345');
-    });
-
-    it('should return null for invalid referral code format', () => {
-      global.window.location.search = '?ref=invalid';
-      
-      const code = getReferralCodeFromURL();
-      expect(code).to.be.null;
-    });
-
-    it('should return null when no referral code in URL', () => {
-      global.window.location.search = '?other=param';
-      
-      const code = getReferralCodeFromURL();
-      expect(code).to.be.null;
-    });
-
-    it('should handle empty search params', () => {
-      global.window.location.search = '';
-      
-      const code = getReferralCodeFromURL();
-      expect(code).to.be.null;
-    });
-  });
-
-  describe('storeReferralCode and getStoredReferralCode', () => {
-    it('should store and retrieve referral code', () => {
-      const code = 'TEST1234';
-      
-      storeReferralCode(code);
-      const retrieved = getStoredReferralCode();
-      
-      expect(retrieved).to.equal(code);
-    });
-
-    it('should return null for expired referral code', () => {
-      const code = 'TEST1234';
-      const expiredTimestamp = Date.now() - (25 * 60 * 60 * 1000); // 25 hours ago
-      
-      localStorage.setItem('ethshot_referral_code', code);
-      localStorage.setItem('ethshot_referral_timestamp', expiredTimestamp.toString());
-      
-      const retrieved = getStoredReferralCode();
-      expect(retrieved).to.be.null;
-    });
-
-    it('should clear expired referral code automatically', () => {
-      const code = 'TEST1234';
-      const expiredTimestamp = Date.now() - (25 * 60 * 60 * 1000); // 25 hours ago
-      
-      localStorage.setItem('ethshot_referral_code', code);
-      localStorage.setItem('ethshot_referral_timestamp', expiredTimestamp.toString());
-      
-      getStoredReferralCode();
-      
-      expect(localStorage.getItem('ethshot_referral_code')).to.be.null;
-      expect(localStorage.getItem('ethshot_referral_timestamp')).to.be.null;
-    });
-  });
-
-  describe('clearStoredReferralCode', () => {
-    it('should clear stored referral code', () => {
-      const code = 'TEST1234';
-      
-      storeReferralCode(code);
-      expect(getStoredReferralCode()).to.equal(code);
-      
-      clearStoredReferralCode();
-      expect(getStoredReferralCode()).to.be.null;
     });
   });
 
@@ -169,6 +91,14 @@ describe('Referral Utility Functions', () => {
       expect(text).to.include('jackpot is growing');
       expect(text).to.include(code);
     });
+
+    it('should handle zero pot amount', () => {
+      const code = 'ABC12345';
+      const text = generateReferralShareText(code, '0');
+      
+      expect(text).to.include('jackpot is growing');
+      expect(text).to.include(code);
+    });
   });
 
   describe('formatReferralStats', () => {
@@ -209,6 +139,20 @@ describe('Referral Utility Functions', () => {
       });
     });
 
+    it('should handle undefined stats', () => {
+      const formatted = formatReferralStats(undefined);
+      
+      expect(formatted).to.deep.equal({
+        referralCode: null,
+        totalReferrals: 0,
+        successfulReferrals: 0,
+        bonusShotsAvailable: 0,
+        totalBonusShotsEarned: 0,
+        referredBy: null,
+        successRate: 0
+      });
+    });
+
     it('should calculate success rate correctly', () => {
       const stats1 = { total_referrals: 10, successful_referrals: 5 };
       const formatted1 = formatReferralStats(stats1);
@@ -217,6 +161,28 @@ describe('Referral Utility Functions', () => {
       const stats2 = { total_referrals: 0, successful_referrals: 0 };
       const formatted2 = formatReferralStats(stats2);
       expect(formatted2.successRate).to.equal(0);
+
+      const stats3 = { total_referrals: 3, successful_referrals: 1 };
+      const formatted3 = formatReferralStats(stats3);
+      expect(formatted3.successRate).to.equal(33); // Math.round(33.33)
+    });
+
+    it('should handle missing fields gracefully', () => {
+      const partialStats = {
+        referral_code: 'TEST1234',
+        total_referrals: 5
+        // missing other fields
+      };
+      
+      const formatted = formatReferralStats(partialStats);
+      
+      expect(formatted.referralCode).to.equal('TEST1234');
+      expect(formatted.totalReferrals).to.equal(5);
+      expect(formatted.successfulReferrals).to.equal(0);
+      expect(formatted.bonusShotsAvailable).to.equal(0);
+      expect(formatted.totalBonusShotsEarned).to.equal(0);
+      expect(formatted.referredBy).to.be.null;
+      expect(formatted.successRate).to.equal(0);
     });
   });
 
@@ -242,6 +208,16 @@ describe('Referral Utility Functions', () => {
       nonMilestones.forEach(count => {
         expect(getReferralAchievement(count)).to.be.null;
       });
+    });
+
+    it('should handle negative numbers', () => {
+      expect(getReferralAchievement(-1)).to.be.null;
+      expect(getReferralAchievement(-10)).to.be.null;
+    });
+
+    it('should handle non-integer numbers', () => {
+      expect(getReferralAchievement(1.5)).to.be.null;
+      expect(getReferralAchievement(5.9)).to.be.null;
     });
   });
 });

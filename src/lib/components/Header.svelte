@@ -57,20 +57,26 @@
       <div class="flex items-center space-x-4">
         <!-- Navigation Links -->
         <nav class="hidden md:flex items-center space-x-6">
-          <a 
-            href="/" 
+          <a
+            href="/"
             class="text-gray-300 hover:text-white transition-colors"
           >
             Game
           </a>
-          <a 
-            href="/leaderboard" 
+          <a
+            href="/referrals"
+            class="text-gray-300 hover:text-purple-400 transition-colors font-semibold"
+          >
+            🎯 Referrals
+          </a>
+          <a
+            href="/leaderboard"
             class="text-gray-300 hover:text-white transition-colors"
           >
             Leaderboard
           </a>
-          <a 
-            href="/about" 
+          <a
+            href="/about"
             class="text-gray-300 hover:text-white transition-colors"
           >
             About

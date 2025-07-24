@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
-  import { gameStore, winnerEventStore } from '$lib/stores/game.js';
+  import { gameStore, winnerEventStore } from '$lib/stores/game-unified.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatCooldownTime } from '$lib/config.js';
   import GameButton from '$lib/components/GameButton.svelte';
   import PotDisplay from '$lib/components/PotDisplay.svelte';
@@ -12,6 +12,8 @@
   import WinnerAnimation from '$lib/components/WinnerAnimation.svelte';
   import NotificationPermission from '$lib/components/NotificationPermission.svelte';
   import MetaTags from '$lib/components/MetaTags.svelte';
+  import ReferralSystem from '$lib/components/ReferralSystem.svelte';
+  import BonusShotButton from '$lib/components/BonusShotButton.svelte';
 
   let mounted = false;
   let showWinnerAnimation = false;
@@ -42,6 +44,8 @@
     mounted = true;
     // Initialize game store for real-time updates
     gameStore.init();
+    // Process any referral code from URL
+    gameStore.processReferralOnLoad();
   });
 </script>
 
@@ -82,9 +86,12 @@
         <PotDisplay />
         
         <!-- Game Button -->
-        <div class="flex justify-center">
+        <div class="flex justify-center space-x-4">
           {#if $walletStore.connected}
             <GameButton />
+            {#if $gameStore.bonusShotsAvailable > 0}
+              <BonusShotButton />
+            {/if}
           {:else}
             <WalletConnect />
           {/if}
@@ -151,6 +158,18 @@
                 <span class="text-gray-400">Total Won:</span>
                 <span class="font-mono text-green-400">{$gameStore.playerStats?.totalWon || '0.000'} ETH</span>
               </div>
+              {#if $gameStore.bonusShotsAvailable > 0}
+                <div class="flex justify-between">
+                  <span class="text-gray-400">Bonus Shots:</span>
+                  <span class="font-mono text-purple-400">{$gameStore.bonusShotsAvailable}</span>
+                </div>
+              {/if}
+              {#if $gameStore.referralStats?.totalReferrals > 0}
+                <div class="flex justify-between">
+                  <span class="text-gray-400">Referrals:</span>
+                  <span class="font-mono text-blue-400">{$gameStore.referralStats.totalReferrals}</span>
+                </div>
+              {/if}
               {#if $gameStore.cooldownRemaining > 0}
                 <div class="flex justify-between">
                   <span class="text-gray-400">Next Shot:</span>
@@ -159,6 +178,11 @@
               {/if}
             </div>
           </div>
+        {/if}
+
+        <!-- Referral System -->
+        {#if $walletStore.connected}
+          <ReferralSystem />
         {/if}
 
         <!-- Social Sharing -->
@@ -171,7 +195,7 @@
             >
               Share on 𝕏
             </button>
-            <button 
+            <button
               class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors text-sm"
               on:click={() => gameStore.copyLink()}
             >
