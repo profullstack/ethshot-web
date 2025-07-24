@@ -13,10 +13,12 @@ ETH Shot is a decentralized gambling game built on Ethereum where players take s
 - **🔒 Wallet Integration**: Connect with MetaMask, WalletConnect, and other Web3 wallets
 - **⚡ Real-time Updates**: Live pot updates and winner announcements via Supabase
 - **⏰ Cooldown System**: 1-hour cooldown between shots per wallet address
-- **🎪 Sponsor Rounds**: Businesses can sponsor rounds for 0.05 ETH with custom branding
-- **📱 Social Sharing**: Share wins and game stats on Twitter
+- **🎪 Sponsor Rounds**: Businesses can sponsor rounds for 0.001 ETH with custom branding
+- **🎯 Referral System**: Invite friends and earn bonus shots for viral growth
+- **🎁 Bonus Shots**: Free shots earned through referrals with 30-day expiration
+- **📱 Social Sharing**: Share wins and referral links on Twitter
 - **🎨 Winner Animations**: Confetti and celebration effects for jackpot wins
-- **📊 Leaderboards**: Track top players and recent winners
+- **📊 Leaderboards**: Track top players, recent winners, and referral champions
 - **📱 Responsive Design**: Optimized for desktop and mobile devices
 
 ## 🛠 Tech Stack

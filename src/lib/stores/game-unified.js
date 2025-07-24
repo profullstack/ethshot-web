@@ -641,11 +641,32 @@ const createUnifiedGameStore = () => {
       // Also load player data from database for additional stats
       const dbPlayerStats = await db.getPlayer(address);
 
-      // Load referral data
+      // Load referral data and ensure user has a referral code
       const [bonusShotsAvailable, referralStats] = await Promise.all([
         db.getBonusShots(address),
         db.getReferralStats(address)
       ]);
+
+      // Create referral code if user doesn't have one
+      if (!referralStats || !referralStats.referral_code) {
+        try {
+          console.log('🔗 Creating referral code for new user:', address);
+          await db.createReferralCode(address);
+          
+          // Reload referral stats after creating code
+          const updatedReferralStats = await db.getReferralStats(address);
+          
+          update(state => ({
+            ...state,
+            referralStats: updatedReferralStats
+          }));
+          
+          console.log('✅ Referral code created successfully');
+        } catch (error) {
+          console.error('❌ Failed to create referral code:', error);
+          // Don't throw error, just log it - referral system is optional
+        }
+      }
 
       // Process referral code if this is a new connection and not already processed
       if (!state.referralProcessed) {
@@ -682,25 +703,44 @@ const createUnifiedGameStore = () => {
     if (!browser || !address) return;
 
     try {
-      // Process any stored referral code
-      const success = await processReferralOnLoad();
+      // Get stored referral code from localStorage
+      const storedReferralCode = localStorage.getItem('ethshot_referral_code');
       
-      if (success) {
-        console.log('✅ Referral processed successfully for:', address);
-        toastStore.success('Welcome! You\'ve received a bonus shot from your referral!');
+      if (storedReferralCode) {
+        console.log('🔗 Processing referral signup with code:', storedReferralCode);
         
-        // Reload bonus shots after processing referral
-        const bonusShotsAvailable = await db.getBonusShots(address);
-        const referralStats = await db.getReferralStats(address);
+        // Process the referral signup
+        const success = await db.processReferralSignup(storedReferralCode, address);
         
-        update(state => ({
-          ...state,
-          bonusShotsAvailable,
-          referralStats,
-          referralProcessed: true
-        }));
+        if (success) {
+          console.log('✅ Referral processed successfully for:', address);
+          toastStore.success('Welcome! You\'ve received a bonus shot from your referral!');
+          
+          // Clear the stored referral code
+          clearStoredReferralCode();
+          
+          // Reload bonus shots and referral stats after processing referral
+          const [bonusShotsAvailable, referralStats] = await Promise.all([
+            db.getBonusShots(address),
+            db.getReferralStats(address)
+          ]);
+          
+          update(state => ({
+            ...state,
+            bonusShotsAvailable,
+            referralStats,
+            referralProcessed: true
+          }));
+        } else {
+          console.log('❌ Referral processing failed - code may be invalid or expired');
+          clearStoredReferralCode();
+          update(state => ({
+            ...state,
+            referralProcessed: true
+          }));
+        }
       } else {
-        // Mark as processed even if no referral code was found
+        // No referral code found, just mark as processed
         update(state => ({
           ...state,
           referralProcessed: true
@@ -708,6 +748,7 @@ const createUnifiedGameStore = () => {
       }
     } catch (error) {
       console.error('Failed to process referral signup:', error);
+      clearStoredReferralCode();
       update(state => ({
         ...state,
         referralProcessed: true
@@ -1259,6 +1300,9 @@ const createUnifiedGameStore = () => {
     copyLink,
     formatTimeRemaining,
     stopRealTimeUpdates,
+    // Referral system functions
+    processReferralOnLoad: () => processReferralOnLoad(),
+    processReferralSignup,
     // Notification management
     requestNotificationPermission: () => notificationManager.requestPermission(),
     getNotificationPermissionStatus: () => notificationManager.getPermissionStatus(),
