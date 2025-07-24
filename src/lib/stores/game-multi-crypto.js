@@ -594,7 +594,7 @@ const createMultiCryptoGameStore = () => {
     }
   };
 
-  // Share on Twitter
+  // Share on X (formerly Twitter)
   const shareOnTwitter = () => {
     if (!browser) return;
 
@@ -605,7 +605,7 @@ const createMultiCryptoGameStore = () => {
     const text = `I just took a shot at #${cryptoSymbol}Shot and the pot is now ${potValue}! 🎯 Try your luck:`;
     const url = 'https://ethshot.io'; // TODO: Make this configurable
     
-    console.log('🐦 Sharing on Twitter:', { currentPot: state.currentPot, cryptoSymbol, potValue, text });
+    console.log('🐦 Sharing on X:', { currentPot: state.currentPot, cryptoSymbol, potValue, text });
     
     // Use the external links utility to properly handle webviews
     shareOnTwitterExternal(text, url);

@@ -158,11 +158,11 @@
         <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
           <h3 class="text-lg font-bold mb-4">📱 Share ETH Shot</h3>
           <div class="space-y-3">
-            <button 
-              class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors text-sm"
+            <button
+              class="w-full bg-black hover:bg-gray-900 text-white py-2 px-4 rounded-lg transition-colors text-sm border border-gray-700"
               on:click={() => gameStore.shareOnTwitter()}
             >
-              Share on Twitter
+              Share on 𝕏
             </button>
             <button 
               class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors text-sm"

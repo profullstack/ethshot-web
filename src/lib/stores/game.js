@@ -803,7 +803,7 @@ const createGameStore = () => {
     }
   };
 
-  // Share on Twitter
+  // Share on X (formerly Twitter)
   const shareOnTwitter = () => {
     if (!browser) {
       return;
@@ -815,7 +815,7 @@ const createGameStore = () => {
     const text = `I just took a shot at #ETHShot and the pot is now ${potValue}! 🎯 Try your luck:`;
     const url = SOCIAL_CONFIG.APP_URL;
     
-    console.log('🐦 Sharing on Twitter:', { currentPot: state.currentPot, potValue, text });
+    console.log('🐦 Sharing on X:', { currentPot: state.currentPot, potValue, text });
     
     // Use the external links utility to properly handle webviews
     shareOnTwitterExternal(text, url);

@@ -71,10 +71,10 @@ export const isInWebview = () => {
 };
 
 /**
- * Creates a Twitter share URL with the given text and optional URL
+ * Creates an X (formerly Twitter) share URL with the given text and optional URL
  * @param {string} text - The text to share
- * @param {string} [url] - Optional URL to include in the tweet
- * @returns {string} The Twitter intent URL
+ * @param {string} [url] - Optional URL to include in the post
+ * @returns {string} The X/Twitter intent URL
  */
 export const createTwitterShareUrl = (text, url = null) => {
   const baseUrl = 'https://twitter.com/intent/tweet';
@@ -135,11 +135,11 @@ export const openExternalLink = (url) => {
 };
 
 /**
- * Opens a Twitter share dialog with the given text and URL
+ * Opens an X (formerly Twitter) share dialog with the given text and URL
  * Uses the appropriate method for the current environment
- * 
+ *
  * @param {string} text - The text to share
- * @param {string} [url] - Optional URL to include in the tweet
+ * @param {string} [url] - Optional URL to include in the post
  */
 export const shareOnTwitter = (text, url = null) => {
   const twitterUrl = createTwitterShareUrl(text, url);
