@@ -300,7 +300,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Documentation**: Check this README and inline code comments
 - **Issues**: Report bugs via GitHub Issues
 - **Discussions**: Join discussions in GitHub Discussions
-- **Community**: Follow updates on Twitter [@ethshot](https://twitter.com/ethshot)
+- **Community**: Follow updates on Twitter [@profullstackinc](https://twitter.com/profullstackinc)
+- **Discord**: Join our community on [Discord](https://discord.gg/w5nHdzpQ29)
 
 ## 🎯 Roadmap
 

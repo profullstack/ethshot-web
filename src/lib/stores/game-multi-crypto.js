@@ -602,7 +602,7 @@ const createMultiCryptoGameStore = () => {
     const cryptoSymbol = state.activeCrypto || 'ETH';
     // Ensure we have a valid pot value, fallback to "the current pot" if not loaded
     const potValue = state.currentPot && state.currentPot !== '0' ? `${state.currentPot} ${cryptoSymbol}` : 'the current pot';
-    const text = `I just took a shot at #${cryptoSymbol}Shot and the pot is now ${potValue}! 🎯 Try your luck:`;
+    const text = `I just took a shot at #${cryptoSymbol}Shot and the pot is now ${potValue}! 🎯 Try your luck: #${cryptoSymbol.toLowerCase()}`;
     const url = 'https://ethshot.io'; // TODO: Make this configurable
     
     console.log('🐦 Sharing on X:', { currentPot: state.currentPot, cryptoSymbol, potValue, text });

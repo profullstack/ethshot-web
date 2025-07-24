@@ -847,10 +847,11 @@ const createGameStore = () => {
     }
 
     const state = get({ subscribe });
+    const cryptoSymbol = 'ETH';
     // Ensure we have a valid pot value, fallback to "the current pot" if not loaded
     const potValue = state.currentPot && state.currentPot !== '0' && state.currentPot !== '0.0' ?
-      `${parseFloat(state.currentPot).toFixed(4)} ETH` : 'getting larger';
-    const text = `I just took a shot at #ETHShot and the pot is now ${potValue}! 🎯 Try your luck:`;
+      `${parseFloat(state.currentPot).toFixed(4)} ${cryptoSymbol}` : 'getting larger';
+    const text = `I just took a shot at #${cryptoSymbol}Shot and the pot is now ${potValue}! 🎯 Try your luck: #${cryptoSymbol.toLowerCase()}`;
     const url = SOCIAL_CONFIG.APP_URL;
     
     console.log('🐦 Sharing on X:', { currentPot: state.currentPot, potValue, text });
