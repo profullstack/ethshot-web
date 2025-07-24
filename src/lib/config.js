@@ -1,6 +1,13 @@
 // Centralized configuration for ETH Shot
 // All hardcoded values should be moved here and made configurable via environment variables
 
+// Debug environment variables in development and production
+if (typeof window !== 'undefined') {
+  import('./utils/env-debug.js').then(({ debugEnvironmentVariables }) => {
+    debugEnvironmentVariables();
+  }).catch(err => console.warn('Failed to load env debug:', err));
+}
+
 // Game Configuration
 export const GAME_CONFIG = {
   SHOT_COST: parseFloat(import.meta.env.VITE_SHOT_COST_ETH || import.meta.env.PUBLIC_SHOT_COST_ETH || '0.0010'),
