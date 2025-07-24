@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { db } from '$lib/supabase.js';
   import { formatAddress, formatEther } from '$lib/supabase.js';
+  import MetaTags from '$lib/components/MetaTags.svelte';
 
   let topPlayers = [];
   let loading = true;
@@ -37,10 +38,12 @@
   };
 </script>
 
-<svelte:head>
-  <title>Leaderboard - ETH Shot</title>
-  <meta name="description" content="View the top players and winners in ETH Shot. See who's taken the most shots and won the biggest jackpots!" />
-</svelte:head>
+<MetaTags
+  title="Leaderboard - ETH Shot Top Players & Winners"
+  description="View the top players and winners in ETH Shot. See who's taken the most shots and won the biggest jackpots! Compete for the top spot on the leaderboard."
+  keywords="ethereum, eth, jackpot, leaderboard, top players, winners, rankings, competition"
+  type="website"
+/>
 
 <div class="max-w-4xl mx-auto space-y-8">
   <!-- Header -->

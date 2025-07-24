@@ -1,11 +1,14 @@
 <script>
   import { GAME_CONFIG, formatEth, calculateUSDValue } from '$lib/config.js';
+  import MetaTags from '$lib/components/MetaTags.svelte';
 </script>
 
-<svelte:head>
-  <title>About - ETH Shot</title>
-  <meta name="description" content="Learn about ETH Shot - the viral Ethereum-powered game where you can win ETH jackpots with just one click!" />
-</svelte:head>
+<MetaTags
+  title="About ETH Shot - Learn How to Win ETH Jackpots"
+  description="Learn about ETH Shot - the viral Ethereum-powered game where you can win ETH jackpots with just one click! Transparent, fair, and instant payouts."
+  keywords="ethereum, eth, jackpot, game, crypto, blockchain, about, how it works, transparent, fair"
+  type="website"
+/>
 
 <div class="max-w-4xl mx-auto space-y-12">
   <!-- Header -->

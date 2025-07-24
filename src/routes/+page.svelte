@@ -11,6 +11,7 @@
   import WalletConnect from '$lib/components/WalletConnect.svelte';
   import WinnerAnimation from '$lib/components/WinnerAnimation.svelte';
   import NotificationPermission from '$lib/components/NotificationPermission.svelte';
+  import MetaTags from '$lib/components/MetaTags.svelte';
 
   let mounted = false;
   let showWinnerAnimation = false;
@@ -44,10 +45,15 @@
   });
 </script>
 
-<svelte:head>
-  <title>ETH Shot - Take Your Shot at the ETH Jackpot</title>
-  <meta name="description" content="A viral, pay-to-play, Ethereum-powered game where users take a chance to win an ETH jackpot by clicking a single button. {formatEth(GAME_CONFIG.SHOT_COST)} ETH per shot, {GAME_CONFIG.WIN_PERCENTAGE}% chance to win!" />
-</svelte:head>
+<MetaTags
+  title="ETH Shot - Take Your Shot at the ETH Jackpot"
+  description="A viral, pay-to-play, Ethereum-powered game where users take a chance to win an ETH jackpot by clicking a single button. {formatEth(GAME_CONFIG.SHOT_COST)} ETH per shot, {GAME_CONFIG.WIN_PERCENTAGE}% chance to win!"
+  keywords="ethereum, eth, jackpot, game, crypto, blockchain, gambling, web3, defi, shot, viral, pay-to-play"
+  image="/favicon-32x32.png"
+  imageAlt="ETH Shot - Take your shot at the ETH jackpot"
+  type="website"
+  twitterCard="summary_large_image"
+/>
 
 {#if mounted}
   <div class="max-w-6xl mx-auto space-y-8">
