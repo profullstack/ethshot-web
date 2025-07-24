@@ -2,6 +2,8 @@
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
   import { isMobile } from '../utils/device-detection.js';
+  import { isCorrectNetwork } from '../utils/network-detection.js';
+  import NetworkSwitchPrompt from './NetworkSwitchPrompt.svelte';
   import { onMount } from 'svelte';
 
   let connecting = false;
@@ -9,6 +11,11 @@
   let isIOS = false;
   let hasMetaMask = false;
   let hasPhantom = false;
+  let showNetworkPrompt = false;
+  let walletConnected = false;
+  
+  // Subscribe to wallet store to detect connection status
+  $: walletConnected = $walletStore.isConnected;
   
   // Detect if we're on a mobile device after component mounts
   onMount(() => {
@@ -28,6 +35,32 @@
       ethereumProviders: window.ethereum ? Object.keys(window.ethereum) : 'none'
     });
   });
+
+  // Check network after wallet connection
+  const checkNetworkAfterConnection = async () => {
+    if (walletConnected) {
+      try {
+        const isCorrect = await isCorrectNetwork();
+        if (!isCorrect) {
+          showNetworkPrompt = true;
+          toastStore.warning('Please switch to Sepolia Testnet to see the current pot and play the game.');
+        }
+      } catch (error) {
+        console.warn('Failed to check network after connection:', error);
+      }
+    }
+  };
+
+  // Watch for wallet connection changes
+  $: if (walletConnected) {
+    checkNetworkAfterConnection();
+  }
+
+  // Handle successful network switch
+  const handleNetworkSwitched = () => {
+    showNetworkPrompt = false;
+    toastStore.success('Network switched successfully! You can now see the current pot.');
+  };
 
   const handleConnect = async (walletType = 'auto') => {
     console.log('🔗 WalletConnect handleConnect called with type:', walletType);
@@ -118,9 +151,16 @@
         </div>
       {/if}
       <p class="text-gray-400 text-center max-w-md">
-        Connect your Ethereum wallet to start playing ETH Shot.
+        Connect your Ethereum wallet to start playing ETH Shot on Sepolia Testnet.
         We support MetaMask, WalletConnect, and other popular wallets.
       </p>
+      <div class="bg-yellow-900/30 border border-yellow-500/30 rounded-lg p-3 mt-3">
+        <p class="text-yellow-300 text-sm font-medium mb-1">🧪 Testnet Notice</p>
+        <p class="text-yellow-200 text-xs">
+          ETH Shot runs on Sepolia Testnet. You'll need testnet ETH to play (free from faucets).
+          After connecting, we'll help you switch to the correct network if needed.
+        </p>
+      </div>
     </div>
 
     <!-- Connect Buttons -->
@@ -189,6 +229,12 @@
         </div>
       </div>
     </div>
+    
+    <!-- Network Switch Prompt Modal -->
+    <NetworkSwitchPrompt
+      bind:show={showNetworkPrompt}
+      onNetworkSwitched={handleNetworkSwitched}
+    />
 
     <!-- Supported Wallets -->
     <div class="supported-wallets">
