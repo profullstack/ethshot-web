@@ -79,8 +79,8 @@ describe('Game Store', () => {
     global.import = {
       meta: {
         env: {
-          PUBLIC_CONTRACT_ADDRESS: '0xcontract123',
-          PUBLIC_RPC_URL: 'https://sepolia.infura.io/v3/demo'
+          VITE_CONTRACT_ADDRESS: '0xcontract123',
+          VITE_RPC_URL: 'https://sepolia.infura.io/v3/demo'
         }
       }
     };
@@ -105,7 +105,7 @@ describe('Game Store', () => {
     });
 
     it('should handle missing contract address gracefully', async () => {
-      global.import.meta.env.PUBLIC_CONTRACT_ADDRESS = '';
+      global.import.meta.env.VITE_CONTRACT_ADDRESS = '';
       
       await gameStore.init();
       

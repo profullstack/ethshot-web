@@ -53,17 +53,17 @@ async function main() {
 # Generated on ${new Date().toISOString()}
 
 # Smart Contract Configuration
-PUBLIC_CONTRACT_ADDRESS=${contractAddress}
-PUBLIC_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_KEY
-PUBLIC_NETWORK_NAME=Sepolia Testnet
-PUBLIC_CHAIN_ID=11155111
+VITE_CONTRACT_ADDRESS=${contractAddress}
+VITE_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_KEY
+VITE_NETWORK_NAME=Sepolia Testnet
+VITE_CHAIN_ID=11155111
 
 # Supabase Configuration (Update with your values)
-PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 
 # Application Configuration
-PUBLIC_APP_URL=https://ethshot.io
+VITE_APP_URL=https://ethshot.io
 NODE_ENV=production
 `;
 

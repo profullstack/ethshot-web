@@ -78,17 +78,17 @@ cp .env.example .env
 Edit `.env` with your configuration:
 ```env
 # Smart Contract Configuration
-PUBLIC_CONTRACT_ADDRESS=0x1234567890123456789012345678901234567890
-PUBLIC_RPC_URL=https://sepolia.infura.io/v3/your-infura-key
+VITE_CONTRACT_ADDRESS=0x1234567890123456789012345678901234567890
+VITE_RPC_URL=https://sepolia.infura.io/v3/your-infura-key
 
 # Supabase Configuration
-PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 
 # Application Configuration
-PUBLIC_APP_URL=https://ethshot.io
-PUBLIC_NETWORK_NAME=Sepolia Testnet
-PUBLIC_CHAIN_ID=11155111
+VITE_APP_URL=https://ethshot.io
+VITE_NETWORK_NAME=Sepolia Testnet
+VITE_CHAIN_ID=11155111
 ```
 
 4. **Start the development server:**
@@ -179,13 +179,13 @@ vercel --prod
 ```
 
 **Environment Variables in Vercel:**
-- `PUBLIC_CONTRACT_ADDRESS`
-- `PUBLIC_RPC_URL`
-- `PUBLIC_SUPABASE_URL`
-- `PUBLIC_SUPABASE_ANON_KEY`
-- `PUBLIC_APP_URL`
-- `PUBLIC_NETWORK_NAME`
-- `PUBLIC_CHAIN_ID`
+- `VITE_CONTRACT_ADDRESS`
+- `VITE_RPC_URL`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_APP_URL`
+- `VITE_NETWORK_NAME`
+- `VITE_CHAIN_ID`
 
 ## 📊 Database Schema
 
