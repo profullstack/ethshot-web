@@ -23,6 +23,10 @@ import {
   notifyPotMilestone,
   scheduleCooldownNotification
 } from '../utils/notifications.js';
+import {
+  processReferralOnLoad,
+  clearStoredReferralCode
+} from '../utils/referral.js';
 
 // Winner event store for triggering animations
 export const winnerEventStore = writable(null);
@@ -120,6 +124,11 @@ const createUnifiedGameStore = () => {
     activeCrypto: 'ETH', // Default to ETH for backward compatibility
     gameConfig: null,
     isMultiCryptoMode: false, // Flag to determine which wallet store to use
+    
+    // Referral system state
+    bonusShotsAvailable: 0,
+    referralStats: null,
+    referralProcessed: false,
     
     // Real-time updates
     lastUpdate: null,
@@ -632,6 +641,17 @@ const createUnifiedGameStore = () => {
       // Also load player data from database for additional stats
       const dbPlayerStats = await db.getPlayer(address);
 
+      // Load referral data
+      const [bonusShotsAvailable, referralStats] = await Promise.all([
+        db.getBonusShots(address),
+        db.getReferralStats(address)
+      ]);
+
+      // Process referral code if this is a new connection and not already processed
+      if (!state.referralProcessed) {
+        await processReferralSignup(address);
+      }
+
       // Schedule cooldown notification if player has cooldown
       if (cooldownRemaining > 0) {
         scheduleCooldownNotification(cooldownRemaining);
@@ -647,6 +667,8 @@ const createUnifiedGameStore = () => {
         },
         canShoot,
         cooldownRemaining,
+        bonusShotsAvailable,
+        referralStats,
         lastUpdate: new Date().toISOString()
       }));
 
@@ -655,9 +677,47 @@ const createUnifiedGameStore = () => {
     }
   };
 
-  // Take a shot at the jackpot
-  const takeShot = async () => {
-    console.log('🎯 Unified gameStore.takeShot() called!');
+  // Process referral signup when wallet connects
+  const processReferralSignup = async (address) => {
+    if (!browser || !address) return;
+
+    try {
+      // Process any stored referral code
+      const success = await processReferralOnLoad();
+      
+      if (success) {
+        console.log('✅ Referral processed successfully for:', address);
+        toastStore.success('Welcome! You\'ve received a bonus shot from your referral!');
+        
+        // Reload bonus shots after processing referral
+        const bonusShotsAvailable = await db.getBonusShots(address);
+        const referralStats = await db.getReferralStats(address);
+        
+        update(state => ({
+          ...state,
+          bonusShotsAvailable,
+          referralStats,
+          referralProcessed: true
+        }));
+      } else {
+        // Mark as processed even if no referral code was found
+        update(state => ({
+          ...state,
+          referralProcessed: true
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to process referral signup:', error);
+      update(state => ({
+        ...state,
+        referralProcessed: true
+      }));
+    }
+  };
+
+  // Take a shot at the jackpot (with bonus shot support)
+  const takeShot = async (useBonusShot = false) => {
+    console.log('🎯 Unified gameStore.takeShot() called!', { useBonusShot });
     
     if (!browser) {
       console.log('❌ Not in browser environment');
@@ -672,7 +732,8 @@ const createUnifiedGameStore = () => {
     console.log('👛 Wallet state:', {
       connected: wallet.connected,
       address: wallet.address,
-      activeCrypto: wallet.activeCrypto || 'ETH'
+      activeCrypto: wallet.activeCrypto || 'ETH',
+      bonusShotsAvailable: state.bonusShotsAvailable
     });
     
     if (!wallet.connected || !wallet.address) {
@@ -687,105 +748,151 @@ const createUnifiedGameStore = () => {
       return;
     }
 
+    // Check if user wants to use bonus shot but doesn't have any
+    if (useBonusShot && state.bonusShotsAvailable <= 0) {
+      console.log('❌ No bonus shots available');
+      toastStore.error('No bonus shots available');
+      return;
+    }
+
     console.log('✅ All takeShot checks passed, starting transaction...');
 
     try {
       update(state => ({ ...state, takingShot: true, error: null }));
 
       let result;
+      let actualShotCost = '0'; // For bonus shots, cost is 0
 
-      if (state.isMultiCryptoMode) {
-        // Multi-crypto mode: use adapter
-        const adapter = getActiveAdapter();
-        if (!adapter) {
-          throw new Error('No active cryptocurrency adapter');
+      if (useBonusShot) {
+        // Use bonus shot - no blockchain transaction needed
+        console.log('🎁 Using bonus shot...');
+        
+        const bonusUsed = await db.useBonusShot(wallet.address);
+        if (!bonusUsed) {
+          throw new Error('Failed to use bonus shot. Please try again.');
         }
 
-        result = await adapter.takeShot();
-      } else {
-        // ETH-only mode: direct contract interaction
-        if (!contract || !ethers || !wallet.signer) {
-          throw new Error('Contract or signer not available');
-        }
-
-        const contractWithSigner = contract.connect(wallet.signer);
-        const shotCost = await contract.SHOT_COST();
-
-        // Check user balance
-        const balance = await wallet.provider.getBalance(wallet.address);
+        // Simulate shot result (you might want to implement actual game logic here)
+        // For now, we'll use a simple random chance
+        const won = Math.random() < 0.1; // 10% chance to win (adjust as needed)
         
-        // Estimate gas
-        let gasEstimate;
-        try {
-          gasEstimate = await contractWithSigner.takeShot.estimateGas({
-            value: shotCost
-          });
-        } catch (estimateError) {
-          console.warn('Failed to estimate gas, using default:', estimateError.message);
-          gasEstimate = 150000n;
-        }
-        
-        const gasLimit = gasEstimate < 120000n ? 150000n : gasEstimate + (gasEstimate * 20n / 100n);
-        
-        // Get gas price and calculate total cost
-        const feeData = await wallet.provider.getFeeData();
-        const gasPrice = feeData.gasPrice || feeData.maxFeePerGas;
-        const estimatedGasCost = gasLimit * gasPrice;
-        const totalCost = shotCost + estimatedGasCost;
-        
-        if (balance < totalCost) {
-          const shortfall = ethers.formatEther(totalCost - balance);
-          throw new Error(`Insufficient ETH. Need ${shortfall} more ETH for gas fees.`);
-        }
-
-        // Send transaction
-        const tx = await contractWithSigner.takeShot({
-          value: shotCost,
-          gasLimit: gasLimit
-        });
-
-        toastStore.info('Shot submitted! Waiting for confirmation...');
-        const receipt = await tx.wait();
-        
-        // Check if user won by looking at events
-        const shotTakenEvent = receipt.logs.find(log => {
-          try {
-            const parsed = contract.interface.parseLog(log);
-            return parsed.name === 'ShotTaken';
-          } catch {
-            return false;
-          }
-        });
-
-        let won = false;
-        if (shotTakenEvent) {
-          const parsed = contract.interface.parseLog(shotTakenEvent);
-          won = parsed.args.won;
-        }
-
         result = {
-          hash: receipt.hash,
-          receipt,
-          won
+          hash: `bonus_${Date.now()}_${wallet.address}`, // Fake hash for bonus shots
+          receipt: { blockNumber: 0 }, // Fake receipt
+          won,
+          isBonusShot: true
         };
+
+        toastStore.info(won ? '🎉 BONUS SHOT JACKPOT! You won!' : 'Bonus shot taken! Better luck next time.');
+        
+        // Update bonus shots count
+        const newBonusShotsAvailable = await db.getBonusShots(wallet.address);
+        update(state => ({
+          ...state,
+          bonusShotsAvailable: newBonusShotsAvailable
+        }));
+
+      } else {
+        // Regular paid shot
+        actualShotCost = state.shotCost;
+
+        if (state.isMultiCryptoMode) {
+          // Multi-crypto mode: use adapter
+          const adapter = getActiveAdapter();
+          if (!adapter) {
+            throw new Error('No active cryptocurrency adapter');
+          }
+
+          result = await adapter.takeShot();
+        } else {
+          // ETH-only mode: direct contract interaction
+          if (!contract || !ethers || !wallet.signer) {
+            throw new Error('Contract or signer not available');
+          }
+
+          const contractWithSigner = contract.connect(wallet.signer);
+          const shotCost = await contract.SHOT_COST();
+
+          // Check user balance
+          const balance = await wallet.provider.getBalance(wallet.address);
+          
+          // Estimate gas
+          let gasEstimate;
+          try {
+            gasEstimate = await contractWithSigner.takeShot.estimateGas({
+              value: shotCost
+            });
+          } catch (estimateError) {
+            console.warn('Failed to estimate gas, using default:', estimateError.message);
+            gasEstimate = 150000n;
+          }
+          
+          const gasLimit = gasEstimate < 120000n ? 150000n : gasEstimate + (gasEstimate * 20n / 100n);
+          
+          // Get gas price and calculate total cost
+          const feeData = await wallet.provider.getFeeData();
+          const gasPrice = feeData.gasPrice || feeData.maxFeePerGas;
+          const estimatedGasCost = gasLimit * gasPrice;
+          const totalCost = shotCost + estimatedGasCost;
+          
+          if (balance < totalCost) {
+            const shortfall = ethers.formatEther(totalCost - balance);
+            throw new Error(`Insufficient ETH. Need ${shortfall} more ETH for gas fees.`);
+          }
+
+          // Send transaction
+          const tx = await contractWithSigner.takeShot({
+            value: shotCost,
+            gasLimit: gasLimit
+          });
+
+          toastStore.info('Shot submitted! Waiting for confirmation...');
+          const receipt = await tx.wait();
+          
+          // Check if user won by looking at events
+          const shotTakenEvent = receipt.logs.find(log => {
+            try {
+              const parsed = contract.interface.parseLog(log);
+              return parsed.name === 'ShotTaken';
+            } catch {
+              return false;
+            }
+          });
+
+          let won = false;
+          if (shotTakenEvent) {
+            const parsed = contract.interface.parseLog(shotTakenEvent);
+            won = parsed.args.won;
+          }
+
+          result = {
+            hash: receipt.hash,
+            receipt,
+            won,
+            isBonusShot: false
+          };
+        }
+        
+        console.log('✅ Shot transaction completed:', result.hash);
+        
+        if (result.won) {
+          toastStore.success('🎉 JACKPOT! You won the pot!');
+        } else {
+          toastStore.info('Shot taken! Better luck next time.');
+        }
       }
       
-      console.log('✅ Shot transaction completed:', result.hash);
-      
       if (result.won) {
-        toastStore.success('🎉 JACKPOT! You won the pot!');
-        
         // Trigger winner animation
         winnerEventStore.set({
           winner: wallet.address,
           amount: state.currentPot,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isBonusShot: result.isBonusShot
         });
         
         // Notify all users about the jackpot win
         notifyJackpotWon(state.currentPot, wallet.address);
-      } else {
-        toastStore.info('Shot taken! Better luck next time.');
       }
 
       // Log transaction to database
@@ -794,12 +901,13 @@ const createUnifiedGameStore = () => {
 
         const shotRecord = await db.recordShot({
           playerAddress: wallet.address,
-          amount: state.shotCost,
+          amount: actualShotCost,
           won: result.won,
           txHash: result.hash,
           blockNumber: result.receipt.blockNumber,
           timestamp: new Date().toISOString(),
-          cryptoType: state.activeCrypto
+          cryptoType: state.activeCrypto,
+          isBonusShot: result.isBonusShot || false
         });
 
         console.log('✅ Shot recorded successfully:', shotRecord?.id);
@@ -812,7 +920,8 @@ const createUnifiedGameStore = () => {
             txHash: result.hash,
             blockNumber: result.receipt.blockNumber,
             timestamp: new Date().toISOString(),
-            cryptoType: state.activeCrypto
+            cryptoType: state.activeCrypto,
+            isBonusShot: result.isBonusShot || false
           });
           console.log('✅ Winner recorded successfully:', winnerRecord?.id);
         }
@@ -822,7 +931,7 @@ const createUnifiedGameStore = () => {
         const existingPlayer = await db.getPlayer(wallet.address);
         
         const newTotalShots = (existingPlayer?.total_shots || 0) + 1;
-        const newTotalSpent = parseFloat(existingPlayer?.total_spent || '0') + parseFloat(state.shotCost);
+        const newTotalSpent = parseFloat(existingPlayer?.total_spent || '0') + parseFloat(actualShotCost);
         const newTotalWon = result.won ?
           parseFloat(existingPlayer?.total_won || '0') + parseFloat(state.currentPot) :
           parseFloat(existingPlayer?.total_won || '0');
@@ -854,8 +963,10 @@ const createUnifiedGameStore = () => {
       await loadGameState();
       await loadPlayerData(wallet.address);
       
-      // Update wallet balance
-      await walletStore.updateBalance();
+      // Update wallet balance (only for paid shots)
+      if (!useBonusShot) {
+        await walletStore.updateBalance();
+      }
 
     } catch (error) {
       console.error('Failed to take shot:', error);
@@ -1191,6 +1302,17 @@ export const sponsorCost = derived(gameStore, $game => $game.sponsorCost);
 export const sponsorCostUSD = derived(gameStore, $game => $game.sponsorCostUSD);
 
 export const isMultiCryptoMode = derived(gameStore, $game => $game.isMultiCryptoMode);
+
+// Referral system derived stores
+export const bonusShotsAvailable = derived(gameStore, $game => $game.bonusShotsAvailable);
+
+export const referralStats = derived(gameStore, $game => $game.referralStats);
+
+export const hasReferralData = derived(gameStore, $game => $game.referralStats !== null);
+
+export const canUseBonusShot = derived(gameStore, $game =>
+  $game.bonusShotsAvailable > 0 && !$game.takingShot && $game.canShoot
+);
 
 // Legacy exports for backward compatibility
 export const multiCryptoGameStore = gameStore;

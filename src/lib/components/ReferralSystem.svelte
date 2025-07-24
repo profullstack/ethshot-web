@@ -1,0 +1,548 @@
+<script>
+  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+  import { gameStore, currentPot } from '../stores/game-unified.js';
+  import { walletStore } from '../stores/wallet.js';
+  import { toastStore } from '../stores/toast.js';
+  import { db } from '../supabase.js';
+  import {
+    generateReferralURL,
+    copyReferralURL,
+    shareReferralURL,
+    shareReferralOnTwitter,
+    formatReferralStats,
+    getReferralAchievement,
+    processReferralOnLoad
+  } from '../utils/referral.js';
+
+  // Component state
+  let referralStats = null;
+  let loading = false;
+  let showShareOptions = false;
+  let achievementMessage = '';
+
+  // Reactive statements
+  $: wallet = $walletStore;
+  $: pot = $currentPot;
+  $: formattedStats = formatReferralStats(referralStats);
+  $: referralURL = formattedStats.referralCode ? generateReferralURL(formattedStats.referralCode) : '';
+
+  // Load referral stats when wallet connects
+  $: if (wallet.connected && wallet.address) {
+    loadReferralStats();
+  }
+
+  // Process referral code on component mount
+  onMount(() => {
+    if (browser) {
+      processReferralOnLoad();
+    }
+  });
+
+  async function loadReferralStats() {
+    if (!wallet.address) return;
+
+    try {
+      loading = true;
+      const stats = await db.getReferralStats(wallet.address);
+      
+      // If no referral code exists, create one
+      if (!stats?.referral_code) {
+        await createReferralCode();
+        // Reload stats after creating code
+        const newStats = await db.getReferralStats(wallet.address);
+        referralStats = newStats;
+      } else {
+        referralStats = stats;
+      }
+
+      // Check for achievements
+      const achievement = getReferralAchievement(formattedStats.totalReferrals);
+      if (achievement && formattedStats.totalReferrals > 0) {
+        achievementMessage = achievement;
+        setTimeout(() => achievementMessage = '', 5000);
+      }
+
+    } catch (error) {
+      console.error('Failed to load referral stats:', error);
+      toastStore.error('Failed to load referral data');
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function createReferralCode() {
+    if (!wallet.address) return;
+
+    try {
+      const code = await db.createReferralCode(wallet.address);
+      if (code) {
+        toastStore.success('Your referral code has been created!');
+      }
+    } catch (error) {
+      console.error('Failed to create referral code:', error);
+      toastStore.error('Failed to create referral code');
+    }
+  }
+
+  async function handleCopyLink() {
+    if (!formattedStats.referralCode) return;
+
+    const success = await copyReferralURL(formattedStats.referralCode);
+    if (success) {
+      toastStore.success('Referral link copied to clipboard!');
+    } else {
+      toastStore.error('Failed to copy link');
+    }
+  }
+
+  async function handleNativeShare() {
+    if (!formattedStats.referralCode) return;
+
+    const success = await shareReferralURL(formattedStats.referralCode, pot);
+    if (!success) {
+      // Fallback to copy if native share not available
+      handleCopyLink();
+    }
+  }
+
+  function handleTwitterShare() {
+    if (!formattedStats.referralCode) return;
+    shareReferralOnTwitter(formattedStats.referralCode, pot);
+  }
+
+  function toggleShareOptions() {
+    showShareOptions = !showShareOptions;
+  }
+</script>
+
+<!-- Achievement Notification -->
+{#if achievementMessage}
+  <div class="achievement-notification">
+    <div class="achievement-content">
+      <span class="achievement-icon">🎉</span>
+      <span class="achievement-text">{achievementMessage}</span>
+    </div>
+  </div>
+{/if}
+
+<div class="referral-system">
+  <div class="referral-header">
+    <h2 class="referral-title">
+      <span class="title-icon">🚀</span>
+      Invite Friends & Earn Bonus Shots
+    </h2>
+    <p class="referral-subtitle">
+      Get a free bonus shot for every friend who joins and takes their first shot!
+    </p>
+  </div>
+
+  {#if !wallet.connected}
+    <div class="connect-prompt">
+      <div class="connect-icon">👛</div>
+      <p>Connect your wallet to access your referral system</p>
+    </div>
+  {:else if loading}
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading your referral data...</p>
+    </div>
+  {:else}
+    <!-- Referral Stats -->
+    <div class="stats-grid">
+      <div class="stat-card primary">
+        <div class="stat-value">{formattedStats.bonusShotsAvailable}</div>
+        <div class="stat-label">Bonus Shots Available</div>
+        <div class="stat-icon">🎯</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-value">{formattedStats.totalReferrals}</div>
+        <div class="stat-label">Friends Invited</div>
+        <div class="stat-icon">👥</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-value">{formattedStats.successfulReferrals}</div>
+        <div class="stat-label">Active Players</div>
+        <div class="stat-icon">⭐</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-value">{formattedStats.totalBonusShotsEarned}</div>
+        <div class="stat-label">Total Bonus Shots Earned</div>
+        <div class="stat-icon">🏆</div>
+      </div>
+    </div>
+
+    <!-- Success Rate -->
+    {#if formattedStats.totalReferrals > 0}
+      <div class="success-rate">
+        <div class="success-rate-label">Success Rate</div>
+        <div class="success-rate-bar">
+          <div class="success-rate-fill" style="width: {formattedStats.successRate}%"></div>
+        </div>
+        <div class="success-rate-text">{formattedStats.successRate}% of your referrals became active players</div>
+      </div>
+    {/if}
+
+    <!-- Referral Code Section -->
+    {#if formattedStats.referralCode}
+      <div class="referral-code-section">
+        <div class="code-display">
+          <div class="code-label">Your Referral Code</div>
+          <div class="code-value">{formattedStats.referralCode}</div>
+        </div>
+        
+        <div class="share-buttons">
+          <button class="share-btn primary" on:click={handleNativeShare}>
+            <span class="btn-icon">📤</span>
+            Share Link
+          </button>
+          
+          <button class="share-btn" on:click={handleCopyLink}>
+            <span class="btn-icon">📋</span>
+            Copy Link
+          </button>
+          
+          <button class="share-btn twitter" on:click={handleTwitterShare}>
+            <span class="btn-icon">🐦</span>
+            Tweet
+          </button>
+          
+          <button class="share-btn" on:click={toggleShareOptions}>
+            <span class="btn-icon">⚙️</span>
+            More
+          </button>
+        </div>
+
+        {#if showShareOptions}
+          <div class="share-options">
+            <div class="share-url">
+              <input 
+                type="text" 
+                value={referralURL} 
+                readonly 
+                class="url-input"
+                on:click={(e) => e.target.select()}
+              />
+            </div>
+            
+            <div class="share-tips">
+              <h4>💡 Sharing Tips</h4>
+              <ul>
+                <li>Share in crypto communities and Discord servers</li>
+                <li>Post on social media with relevant hashtags</li>
+                <li>Send directly to friends who love crypto games</li>
+                <li>Include current pot amount to create urgency</li>
+              </ul>
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
+
+    <!-- Referral Benefits -->
+    <div class="benefits-section">
+      <h3 class="benefits-title">🎁 Referral Rewards</h3>
+      <div class="benefits-grid">
+        <div class="benefit-card">
+          <div class="benefit-icon">🎯</div>
+          <div class="benefit-title">Free Bonus Shot</div>
+          <div class="benefit-desc">Your friend gets a free shot when they join</div>
+        </div>
+        
+        <div class="benefit-card">
+          <div class="benefit-icon">🚀</div>
+          <div class="benefit-title">Referral Reward</div>
+          <div class="benefit-desc">You get a bonus shot when they take their first shot</div>
+        </div>
+        
+        <div class="benefit-card">
+          <div class="benefit-icon">🏆</div>
+          <div class="benefit-title">Leaderboard Fame</div>
+          <div class="benefit-desc">Climb the referral leaderboard and earn recognition</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Referred By Section -->
+    {#if formattedStats.referredBy}
+      <div class="referred-by">
+        <div class="referred-icon">🤝</div>
+        <div class="referred-text">
+          You were referred by <span class="referrer-address">{formattedStats.referredBy.slice(0, 6)}...{formattedStats.referredBy.slice(-4)}</span>
+        </div>
+      </div>
+    {/if}
+  {/if}
+</div>
+
+<style>
+  .referral-system {
+    @apply w-full max-w-4xl mx-auto p-6 space-y-6;
+  }
+
+  .achievement-notification {
+    @apply fixed top-4 right-4 z-50;
+    animation: slideInRight 0.5s ease-out, fadeOut 0.5s ease-in 4.5s forwards;
+  }
+
+  .achievement-content {
+    @apply bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-lg shadow-lg;
+    @apply flex items-center space-x-3;
+  }
+
+  .achievement-icon {
+    @apply text-2xl;
+  }
+
+  .achievement-text {
+    @apply font-bold;
+  }
+
+  .referral-header {
+    @apply text-center space-y-2;
+  }
+
+  .referral-title {
+    @apply text-3xl font-bold text-white flex items-center justify-center space-x-3;
+  }
+
+  .title-icon {
+    @apply text-4xl;
+  }
+
+  .referral-subtitle {
+    @apply text-gray-300 text-lg;
+  }
+
+  .connect-prompt {
+    @apply text-center py-12 space-y-4;
+  }
+
+  .connect-icon {
+    @apply text-6xl;
+  }
+
+  .loading-state {
+    @apply text-center py-12 space-y-4;
+  }
+
+  .spinner {
+    @apply w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto;
+  }
+
+  .stats-grid {
+    @apply grid grid-cols-2 md:grid-cols-4 gap-4;
+  }
+
+  .stat-card {
+    @apply bg-gray-800/50 backdrop-blur-sm rounded-xl p-4 text-center relative overflow-hidden;
+    @apply border border-gray-700 hover:border-gray-600 transition-colors;
+  }
+
+  .stat-card.primary {
+    @apply bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-blue-500/50;
+  }
+
+  .stat-value {
+    @apply text-2xl md:text-3xl font-bold text-white;
+  }
+
+  .stat-label {
+    @apply text-sm text-gray-400 mt-1;
+  }
+
+  .stat-icon {
+    @apply absolute top-2 right-2 text-2xl opacity-20;
+  }
+
+  .success-rate {
+    @apply bg-gray-800/50 rounded-xl p-4 space-y-2;
+  }
+
+  .success-rate-label {
+    @apply text-white font-semibold;
+  }
+
+  .success-rate-bar {
+    @apply w-full h-3 bg-gray-700 rounded-full overflow-hidden;
+  }
+
+  .success-rate-fill {
+    @apply h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-1000;
+  }
+
+  .success-rate-text {
+    @apply text-sm text-gray-400;
+  }
+
+  .referral-code-section {
+    @apply bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 space-y-4;
+    @apply border border-gray-700;
+  }
+
+  .code-display {
+    @apply text-center space-y-2;
+  }
+
+  .code-label {
+    @apply text-gray-400 text-sm;
+  }
+
+  .code-value {
+    @apply text-3xl font-mono font-bold text-white bg-gray-900/50 px-4 py-2 rounded-lg;
+    @apply border border-gray-600;
+  }
+
+  .share-buttons {
+    @apply flex flex-wrap gap-3 justify-center;
+  }
+
+  .share-btn {
+    @apply px-4 py-2 rounded-lg font-semibold transition-all duration-200;
+    @apply flex items-center space-x-2 min-w-[100px] justify-center;
+    @apply bg-gray-700 hover:bg-gray-600 text-white;
+  }
+
+  .share-btn.primary {
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700;
+  }
+
+  .share-btn.twitter {
+    @apply bg-blue-500 hover:bg-blue-600;
+  }
+
+  .btn-icon {
+    @apply text-lg;
+  }
+
+  .share-options {
+    @apply space-y-4 pt-4 border-t border-gray-700;
+  }
+
+  .share-url {
+    @apply space-y-2;
+  }
+
+  .url-input {
+    @apply w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg;
+    @apply text-white font-mono text-sm;
+    @apply focus:outline-none focus:border-blue-500;
+  }
+
+  .share-tips {
+    @apply space-y-2;
+  }
+
+  .share-tips h4 {
+    @apply text-white font-semibold;
+  }
+
+  .share-tips ul {
+    @apply text-sm text-gray-400 space-y-1 list-disc list-inside;
+  }
+
+  .benefits-section {
+    @apply space-y-4;
+  }
+
+  .benefits-title {
+    @apply text-xl font-bold text-white text-center;
+  }
+
+  .benefits-grid {
+    @apply grid md:grid-cols-3 gap-4;
+  }
+
+  .benefit-card {
+    @apply bg-gray-800/30 rounded-xl p-4 text-center space-y-2;
+    @apply border border-gray-700/50;
+  }
+
+  .benefit-icon {
+    @apply text-3xl;
+  }
+
+  .benefit-title {
+    @apply font-semibold text-white;
+  }
+
+  .benefit-desc {
+    @apply text-sm text-gray-400;
+  }
+
+  .referred-by {
+    @apply bg-green-900/20 border border-green-700/50 rounded-xl p-4;
+    @apply flex items-center space-x-3 justify-center;
+  }
+
+  .referred-icon {
+    @apply text-2xl;
+  }
+
+  .referred-text {
+    @apply text-green-300;
+  }
+
+  .referrer-address {
+    @apply font-mono font-bold text-green-200;
+  }
+
+  /* Animations */
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  /* Mobile Responsive */
+  @media (max-width: 640px) {
+    .referral-system {
+      @apply p-4;
+    }
+
+    .referral-title {
+      @apply text-2xl;
+    }
+
+    .title-icon {
+      @apply text-3xl;
+    }
+
+    .stats-grid {
+      @apply grid-cols-2 gap-3;
+    }
+
+    .stat-value {
+      @apply text-xl;
+    }
+
+    .code-value {
+      @apply text-2xl px-3 py-1;
+    }
+
+    .share-buttons {
+      @apply grid grid-cols-2 gap-2;
+    }
+
+    .benefits-grid {
+      @apply grid-cols-1 gap-3;
+    }
+  }
+</style>

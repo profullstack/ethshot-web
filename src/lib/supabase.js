@@ -35,6 +35,9 @@ export const TABLES = {
   SPONSORS: 'sponsors',
   GAME_STATS: 'game_stats',
   LEADERBOARD: 'leaderboard',
+  REFERRAL_CODES: 'referral_codes',
+  REFERRALS: 'referrals',
+  BONUS_SHOTS: 'bonus_shots',
 };
 
 // Database functions for ETH Shot game
@@ -452,6 +455,334 @@ export const db = {
         event: '*',
         schema: 'public',
         table: TABLES.SPONSORS,
+      }, callback)
+      .subscribe();
+  },
+
+  // Referral system operations
+  async createReferralCode(referrerAddress) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for createReferralCode');
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('create_referral_code', {
+        referrer_addr: referrerAddress.toLowerCase()
+      });
+
+      if (error) {
+        console.error('Error creating referral code:', error);
+        throw error;
+      }
+
+      console.log('✅ Referral code created:', data);
+      return data;
+    } catch (error) {
+      console.error('Error creating referral code:', error);
+      throw error;
+    }
+  },
+
+  async processReferralSignup(referralCode, refereeAddress) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning false for processReferralSignup');
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('process_referral_signup', {
+        ref_code: referralCode,
+        referee_addr: refereeAddress.toLowerCase()
+      });
+
+      if (error) {
+        console.error('Error processing referral signup:', error);
+        return false;
+      }
+
+      console.log('✅ Referral signup processed:', data);
+      return data;
+    } catch (error) {
+      console.error('Error processing referral signup:', error);
+      return false;
+    }
+  },
+
+  async getBonusShots(playerAddress) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning 0 for getBonusShots');
+      return 0;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('get_bonus_shots', {
+        player_addr: playerAddress.toLowerCase()
+      });
+
+      if (error) {
+        console.error('Error getting bonus shots:', error);
+        return 0;
+      }
+
+      return data || 0;
+    } catch (error) {
+      console.error('Error getting bonus shots:', error);
+      return 0;
+    }
+  },
+
+  async useBonusShot(playerAddress) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning false for useBonusShot');
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('use_bonus_shot', {
+        player_addr: playerAddress.toLowerCase()
+      });
+
+      if (error) {
+        console.error('Error using bonus shot:', error);
+        return false;
+      }
+
+      console.log('✅ Bonus shot used:', data);
+      return data;
+    } catch (error) {
+      console.error('Error using bonus shot:', error);
+      return false;
+    }
+  },
+
+  async getReferralStats(playerAddress) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for getReferralStats');
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('get_referral_stats', {
+        player_addr: playerAddress.toLowerCase()
+      });
+
+      if (error) {
+        console.error('Error getting referral stats:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error getting referral stats:', error);
+      return null;
+    }
+  },
+
+  async getReferralCode(referrerAddress) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for getReferralCode');
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.REFERRAL_CODES)
+        .select('code')
+        .eq('referrer_address', referrerAddress.toLowerCase())
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error getting referral code:', error);
+        return null;
+      }
+
+      return data && data.length > 0 ? data[0].code : null;
+    } catch (error) {
+      console.error('Error getting referral code:', error);
+      return null;
+    }
+  },
+
+  async validateReferralCode(referralCode) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning false for validateReferralCode');
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.REFERRAL_CODES)
+        .select('*')
+        .eq('code', referralCode)
+        .eq('is_active', true)
+        .gte('expires_at', new Date().toISOString())
+        .limit(1);
+
+      if (error) {
+        console.error('Error validating referral code:', error);
+        return false;
+      }
+
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('Error validating referral code:', error);
+      return false;
+    }
+  },
+
+  async getReferralLeaderboard(options = {}) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning empty array for getReferralLeaderboard');
+      return [];
+    }
+
+    const {
+      limit = 100,
+      timeFilter = 'all',
+      sortBy = 'successful_referrals'
+    } = options;
+
+    try {
+      // Get referral codes with basic stats
+      const { data: codes, error: codesError } = await supabase
+        .from(TABLES.REFERRAL_CODES)
+        .select('referrer_address, total_uses, created_at')
+        .eq('is_active', true)
+        .order('total_uses', { ascending: false })
+        .limit(limit);
+
+      if (codesError) throw codesError;
+
+      // Get comprehensive stats for each referrer
+      const leaderboardData = await Promise.all(
+        (codes || []).map(async (code) => {
+          // Get successful referrals count
+          let referralsQuery = supabase
+            .from(TABLES.REFERRALS)
+            .select('id, created_at')
+            .eq('referrer_address', code.referrer_address)
+            .not('first_shot_at', 'is', null);
+
+          // Apply time filter to referrals
+          if (timeFilter === '7d') {
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            referralsQuery = referralsQuery.gte('created_at', sevenDaysAgo);
+          } else if (timeFilter === '30d') {
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            referralsQuery = referralsQuery.gte('created_at', thirtyDaysAgo);
+          }
+
+          const { data: referrals, error: referralsError } = await referralsQuery;
+
+          // Get bonus shots earned
+          const { data: bonusShots, error: bonusError } = await supabase
+            .from(TABLES.BONUS_SHOTS)
+            .select('amount')
+            .eq('player_address', code.referrer_address)
+            .in('bonus_type', ['referral_reward', 'referral_signup']);
+
+          const successfulReferrals = referralsError ? 0 : (referrals || []).length;
+          const totalBonusShots = bonusError ? 0 : (bonusShots || []).reduce((sum, shot) => sum + shot.amount, 0);
+          
+          // Calculate success rate based on time filter
+          let totalReferralsForRate = code.total_uses;
+          if (timeFilter !== 'all') {
+            // For time-filtered views, use the filtered referral count as base
+            totalReferralsForRate = successfulReferrals;
+          }
+          
+          const successRate = totalReferralsForRate > 0 ? Math.round((successfulReferrals / totalReferralsForRate) * 100) : 0;
+
+          return {
+            referrer_address: code.referrer_address,
+            total_referrals: code.total_uses,
+            successful_referrals: successfulReferrals,
+            success_rate: successRate,
+            total_bonus_shots_earned: totalBonusShots,
+            created_at: code.created_at
+          };
+        })
+      );
+
+      // Sort based on sortBy parameter
+      leaderboardData.sort((a, b) => {
+        switch (sortBy) {
+          case 'total_referrals':
+            return b.total_referrals - a.total_referrals;
+          case 'success_rate':
+            return b.success_rate - a.success_rate;
+          case 'successful_referrals':
+          default:
+            return b.successful_referrals - a.successful_referrals;
+        }
+      });
+
+      return leaderboardData;
+    } catch (error) {
+      console.error('Error getting referral leaderboard:', error);
+      return [];
+    }
+  },
+
+  // Real-time subscriptions for referral system
+  subscribeToReferrals(callback) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for subscribeToReferrals');
+      return null;
+    }
+
+    return supabase
+      .channel('referrals')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: TABLES.REFERRALS,
+      }, callback)
+      .subscribe();
+  },
+
+  subscribeToBonusShots(callback) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for subscribeToBonusShots');
+      return null;
+    }
+
+    return supabase
+      .channel('bonus_shots')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: TABLES.BONUS_SHOTS,
+      }, callback)
+      .subscribe();
+  },
+
+  subscribeToReferralUpdates(callback) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for subscribeToReferralUpdates');
+      return null;
+    }
+
+    // Subscribe to multiple tables that affect referral leaderboard
+    return supabase
+      .channel('referral_updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: TABLES.REFERRAL_CODES,
+      }, callback)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: TABLES.REFERRALS,
+      }, callback)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: TABLES.BONUS_SHOTS,
       }, callback)
       .subscribe();
   },
