@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { recentWinners } from '../stores/game.js';
   import { db, formatAddress, formatTimeAgo } from '../supabase.js';
-  import { NETWORK_CONFIG } from '../config.js';
+  import { NETWORK_CONFIG, calculateUSDValue } from '../config.js';
 
   let winners = [];
   let loading = true;
@@ -121,7 +121,7 @@
               +{parseFloat(winner.amount).toFixed(3)} ETH
             </div>
             <div class="amount-usd">
-              ${(parseFloat(winner.amount) * 2500).toLocaleString()}
+              ${calculateUSDValue(winner.amount)}
             </div>
           </div>
 

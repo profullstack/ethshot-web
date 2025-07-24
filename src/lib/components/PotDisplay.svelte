@@ -1,6 +1,6 @@
 <script>
   import { currentPot, gameStore } from '../stores/game.js';
-  import { GAME_CONFIG } from '../config.js';
+  import { GAME_CONFIG, formatEth, calculateUSDValue } from '../config.js';
   import { onMount } from 'svelte';
 
   let animatedPot = '0.000';
@@ -21,7 +21,7 @@
       const easeOut = 1 - Math.pow(1 - progress, 3);
       const current = start + (end - start) * easeOut;
       
-      animatedPot = current.toFixed(3);
+      animatedPot = formatEth(current);
       
       if (progress < 1) {
         requestAnimationFrame(animate);
@@ -39,7 +39,7 @@
   }
 
   onMount(() => {
-    animatedPot = $currentPot;
+    animatedPot = formatEth($currentPot);
     previousPot = $currentPot;
   });
 </script>
@@ -69,7 +69,7 @@
         <span class="pot-currency">ETH</span>
       </div>
       <div class="pot-usd">
-        ≈ ${(parseFloat(animatedPot) * 2500).toLocaleString()} USD
+        ≈ ${calculateUSDValue(animatedPot)} USD
       </div>
     </div>
   </div>

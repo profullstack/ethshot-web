@@ -1,6 +1,7 @@
 <script>
   import { walletStore, isConnected, walletAddress, walletBalance } from '../stores/wallet.js';
   import { gameStore, currentPot } from '../stores/game.js';
+  import { formatEth } from '../config.js';
   import WalletConnect from './WalletConnect.svelte';
 
   let showWalletModal = false;
@@ -47,7 +48,7 @@
         <div class="hidden md:flex items-center space-x-2 bg-gray-800/50 rounded-lg px-3 py-1">
           <span class="text-sm text-gray-400">Pot:</span>
           <span class="font-mono text-yellow-400 font-semibold">
-            {$currentPot} ETH
+            {formatEth($currentPot)} ETH
           </span>
         </div>
       </div>
@@ -127,7 +128,7 @@
       <div class="bg-gray-800/50 rounded-lg px-4 py-2">
         <span class="text-sm text-gray-400">Current Pot: </span>
         <span class="font-mono text-yellow-400 font-semibold text-lg">
-          {$currentPot} ETH
+          {formatEth($currentPot)} ETH
         </span>
       </div>
     </div>

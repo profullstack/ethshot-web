@@ -1,6 +1,8 @@
 // Centralized configuration for ETH Shot
 // All hardcoded values should be moved here and made configurable via environment variables
 
+import { fetchETHUSDRate } from './utils/exchange-rate.js';
+
 // Debug environment variables in development and production
 if (typeof window !== 'undefined') {
   import('./utils/env-debug.js').then(({ debugEnvironmentVariables }) => {
@@ -20,6 +22,7 @@ export const GAME_CONFIG = {
   COOLDOWN_HOURS: parseInt(import.meta.env.VITE_COOLDOWN_HOURS || import.meta.env.PUBLIC_COOLDOWN_HOURS || '1'),
   COOLDOWN_SECONDS: parseInt(import.meta.env.VITE_COOLDOWN_HOURS || import.meta.env.PUBLIC_COOLDOWN_HOURS || '1') * 3600,
   ETH_USD_PRICE: parseFloat(import.meta.env.VITE_ETH_USD_PRICE || import.meta.env.PUBLIC_ETH_USD_PRICE || '2500'),
+  TATUM_API_KEY: import.meta.env.TATUM_API_KEY || import.meta.env.VITE_TATUM_API_KEY || '',
 };
 
 // Network Configuration
@@ -119,17 +122,26 @@ export const validateConfig = () => {
 };
 
 // Helper functions for common calculations
-export const calculateUSDValue = (ethAmount) => {
-  return (parseFloat(ethAmount) * GAME_CONFIG.ETH_USD_PRICE).toLocaleString();
+export const calculateUSDValue = async (ethAmount) => {
+  try {
+    const currentRate = await fetchETHUSDRate();
+    return (parseFloat(ethAmount) * currentRate).toFixed(2);
+  } catch (error) {
+    console.warn('Failed to fetch current ETH/USD rate, using fallback:', error);
+    // Fallback to configured rate if API fails
+    return (parseFloat(ethAmount) * GAME_CONFIG.ETH_USD_PRICE).toFixed(2);
+  }
+};
+
+// Synchronous version for backward compatibility (uses cached rate if available)
+export const calculateUSDValueSync = (ethAmount) => {
+  return (parseFloat(ethAmount) * GAME_CONFIG.ETH_USD_PRICE).toFixed(2);
 };
 
 export const formatEth = (amount) => {
-  // Handle small amounts properly - use 4 decimal places for amounts < 0.001
+  // Use 5 decimal places for consistent precision
   const num = parseFloat(amount);
-  if (num < 0.001 && num > 0) {
-    return num.toFixed(4);
-  }
-  return num.toFixed(3);
+  return num.toFixed(5);
 };
 
 export const formatTime = (seconds) => {
