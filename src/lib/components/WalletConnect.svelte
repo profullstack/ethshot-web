@@ -102,30 +102,49 @@
   const handleInjectedConnect = () => handleConnect('injected');
   const handleWalletConnect = () => handleConnect('walletconnect');
   
-  // Add deep linking for mobile wallets
+  // Add deep linking for mobile wallets (iOS and Android)
   const handleMobileWalletDeepLink = (walletName) => {
-    if (!isIOS) {
+    // Check if we're on mobile (iOS or Android)
+    const isMobileDevice = isMobile();
+    
+    if (!isMobileDevice) {
+      // On desktop, fall back to regular wallet connection
       handleWalletConnect();
       return;
     }
     
-    const currentUrl = encodeURIComponent(window.location.href);
+    // Get the current URL and encode it properly for deep linking
+    const currentUrl = window.location.href;
+    const encodedUrl = encodeURIComponent(currentUrl);
+    
     let deepLinkUrl = '';
     
     switch (walletName) {
       case 'metamask':
-        deepLinkUrl = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+        // MetaMask deep link format with proper URL encoding
+        deepLinkUrl = `https://metamask.app.link/dapp/${encodedUrl}`;
         break;
       case 'phantom':
-        deepLinkUrl = `https://phantom.app/ul/browse/${window.location.host}${window.location.pathname}`;
+        // Phantom deep link format - using full URL encoding like MetaMask
+        deepLinkUrl = `https://phantom.app/ul/browse/${encodedUrl}`;
         break;
       default:
         handleWalletConnect();
         return;
     }
     
-    console.log('📱 Opening mobile wallet deep link:', deepLinkUrl);
-    window.open(deepLinkUrl, '_blank');
+    console.log('📱 Navigating to mobile wallet deep link:', {
+      walletName,
+      originalUrl: currentUrl,
+      encodedUrl,
+      deepLinkUrl,
+      isMobileDevice,
+      isIOS,
+      userAgent: navigator.userAgent
+    });
+    
+    // Navigate directly to the deep link (better than window.open)
+    window.location.href = deepLinkUrl;
   };
 </script>
 
@@ -186,8 +205,8 @@
       <div class="wallet-options">
         <p class="text-xs text-gray-500 mb-2">Or choose a specific option:</p>
         
-        {#if isIOS}
-          <!-- iOS-specific options with deep linking -->
+        {#if showMobileWallet}
+          <!-- Mobile-specific options with deep linking (iOS and Android) -->
           <div class="grid grid-cols-1 gap-2 mb-3">
             <button
               on:click={() => handleMobileWalletDeepLink('metamask')}
