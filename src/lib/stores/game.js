@@ -5,6 +5,13 @@ import { toastStore } from './toast.js';
 import { db, formatAddress, formatEther, formatTimeAgo } from '../supabase.js';
 import { GAME_CONFIG, NETWORK_CONFIG, SOCIAL_CONFIG, UI_CONFIG } from '../config.js';
 import { shareOnTwitter as shareOnTwitterExternal } from '../utils/external-links.js';
+import {
+  notificationManager,
+  notifyJackpotWon,
+  notifyShotTaken,
+  notifyPotMilestone,
+  scheduleCooldownNotification
+} from '../utils/notifications.js';
 
 // Winner event store for triggering animations
 export const winnerEventStore = writable(null);
@@ -356,9 +363,28 @@ const createGameStore = () => {
 
       const sponsor = dbSponsors || (currentSponsor?.active ? currentSponsor : null);
 
+      const newPotAmount = ethers.formatEther(actualPot);
+      const previousPot = get({ subscribe }).currentPot;
+      
+      // Check for pot milestones (1 ETH, 5 ETH, 10 ETH, etc.)
+      if (previousPot && newPotAmount !== previousPot) {
+        const prevValue = parseFloat(previousPot);
+        const newValue = parseFloat(newPotAmount);
+        
+        // Check if we crossed a milestone
+        const milestones = [1, 5, 10, 25, 50, 100];
+        for (const milestone of milestones) {
+          if (prevValue < milestone && newValue >= milestone) {
+            notifyPotMilestone(`${milestone} ETH`);
+            console.log(`🚀 Pot milestone reached: ${milestone} ETH`);
+            break;
+          }
+        }
+      }
+
       update(state => ({
         ...state,
-        currentPot: ethers.formatEther(actualPot),
+        currentPot: newPotAmount,
         shotCost: ethers.formatEther(shotCost || ethers.parseEther('0.001')),
         sponsorCost: ethers.formatEther(sponsorCost || ethers.parseEther('0.001')),
         currentSponsor: sponsor,
@@ -387,6 +413,14 @@ const createGameStore = () => {
       // Also load player data from database for additional stats
       const dbPlayerStats = await db.getPlayer(address);
 
+      const cooldownSeconds = Number(cooldownRemaining);
+      
+      // Schedule cooldown notification if player has cooldown
+      if (cooldownSeconds > 0) {
+        scheduleCooldownNotification(cooldownSeconds);
+        console.log(`🔔 Scheduled cooldown notification for ${cooldownSeconds} seconds`);
+      }
+
       update(state => ({
         ...state,
         playerStats: {
@@ -398,7 +432,7 @@ const createGameStore = () => {
           ...dbPlayerStats
         },
         canShoot,
-        cooldownRemaining: Number(cooldownRemaining),
+        cooldownRemaining: cooldownSeconds,
         lastUpdate: new Date().toISOString()
       }));
 
@@ -572,6 +606,9 @@ const createGameStore = () => {
             amount: potAmount,
             timestamp: new Date().toISOString()
           });
+          
+          // Notify all users about the jackpot win
+          notifyJackpotWon(potAmount, wallet.address);
         } else {
           toastStore.info('Shot taken! Better luck next time.');
         }
@@ -850,6 +887,14 @@ const createGameStore = () => {
 
     const shotsSubscription = db.subscribeToShots((payload) => {
       console.log('New shot:', payload);
+      
+      // Notify about new shot taken (only if it's not the current user)
+      const wallet = get(walletStore);
+      if (payload.new && payload.new.player_address !== wallet.address?.toLowerCase()) {
+        const currentState = get({ subscribe });
+        notifyShotTaken(currentState.currentPot || 'the current pot');
+      }
+      
       // Refresh game state when new shots are taken
       loadGameState();
     });
@@ -932,6 +977,10 @@ const createGameStore = () => {
     copyLink,
     formatTimeRemaining,
     stopRealTimeUpdates,
+    // Notification management
+    requestNotificationPermission: () => notificationManager.requestPermission(),
+    getNotificationPermissionStatus: () => notificationManager.getPermissionStatus(),
+    isNotificationsEnabled: () => notificationManager.isEnabled(),
   };
 };
 

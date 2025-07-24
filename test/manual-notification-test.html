@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETH Shot - Notification System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔔 ETH Shot Notification System Test</h1>
+    
+    <div class="test-section">
+        <h2>Notification Permission Status</h2>
+        <div id="permission-status" class="status info">Checking...</div>
+        <button id="request-permission" onclick="requestNotificationPermission()">Request Permission</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Notifications</h2>
+        <button onclick="testJackpotNotification()" id="test-jackpot">Test Jackpot Won</button>
+        <button onclick="testCooldownNotification()" id="test-cooldown">Test Cooldown Complete</button>
+        <button onclick="testShotNotification()" id="test-shot">Test Shot Taken</button>
+        <button onclick="testMilestoneNotification()" id="test-milestone">Test Pot Milestone</button>
+        <button onclick="testScheduledNotification()" id="test-scheduled">Test Scheduled Notification (5s)</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Log</h2>
+        <div id="test-log" class="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script type="module">
+        // Import the notification manager
+        import { NotificationManager } from '../src/lib/utils/notifications.js';
+
+        // Initialize notification manager
+        const notificationManager = new NotificationManager();
+        let scheduledTimeoutId = null;
+
+        // Global functions for buttons
+        window.requestNotificationPermission = async function() {
+            log('Requesting notification permission...');
+            try {
+                const granted = await notificationManager.requestPermission();
+                updatePermissionStatus();
+                log(`Permission ${granted ? 'granted' : 'denied'}`);
+            } catch (error) {
+                log(`Error requesting permission: ${error.message}`);
+            }
+        };
+
+        window.testJackpotNotification = function() {
+            log('Testing jackpot notification...');
+            const notification = notificationManager.notifyJackpotWon('5.25');
+            if (notification) {
+                log('Jackpot notification sent successfully');
+                notification.onclick = () => log('Jackpot notification clicked');
+            } else {
+                log('Failed to send jackpot notification');
+            }
+        };
+
+        window.testCooldownNotification = function() {
+            log('Testing cooldown notification...');
+            const notification = notificationManager.notifyCooldownComplete();
+            if (notification) {
+                log('Cooldown notification sent successfully');
+                notification.onclick = () => log('Cooldown notification clicked');
+            } else {
+                log('Failed to send cooldown notification');
+            }
+        };
+
+        window.testShotNotification = function() {
+            log('Testing shot taken notification...');
+            const notification = notificationManager.notifyShotTaken('0x1234567890123456789012345678901234567890');
+            if (notification) {
+                log('Shot notification sent successfully');
+                notification.onclick = () => log('Shot notification clicked');
+            } else {
+                log('Failed to send shot notification');
+            }
+        };
+
+        window.testMilestoneNotification = function() {
+            log('Testing milestone notification...');
+            const notification = notificationManager.notifyPotMilestone('10.0');
+            if (notification) {
+                log('Milestone notification sent successfully');
+                notification.onclick = () => log('Milestone notification clicked');
+            } else {
+                log('Failed to send milestone notification');
+            }
+        };
+
+        window.testScheduledNotification = function() {
+            log('Testing scheduled notification (5 seconds)...');
+            if (scheduledTimeoutId) {
+                clearTimeout(scheduledTimeoutId);
+                log('Cleared previous scheduled notification');
+            }
+            
+            const futureTime = Date.now() + 5000; // 5 seconds from now
+            scheduledTimeoutId = notificationManager.scheduleCooldownNotification(futureTime);
+            
+            if (scheduledTimeoutId) {
+                log('Scheduled notification set for 5 seconds from now');
+            } else {
+                log('Failed to schedule notification');
+            }
+        };
+
+        window.clearLog = function() {
+            document.getElementById('test-log').textContent = '';
+        };
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('test-log');
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function updatePermissionStatus() {
+            const statusElement = document.getElementById('permission-status');
+            const requestButton = document.getElementById('request-permission');
+            
+            if (!notificationManager.isSupported()) {
+                statusElement.textContent = 'Notifications not supported in this browser';
+                statusElement.className = 'status error';
+                requestButton.disabled = true;
+                disableTestButtons();
+                return;
+            }
+
+            const permission = notificationManager.getPermissionStatus();
+            const isEnabled = notificationManager.isEnabled();
+
+            switch (permission) {
+                case 'granted':
+                    statusElement.textContent = 'Notifications enabled ✅';
+                    statusElement.className = 'status success';
+                    requestButton.disabled = true;
+                    enableTestButtons();
+                    break;
+                case 'denied':
+                    statusElement.textContent = 'Notifications denied ❌ (Enable in browser settings)';
+                    statusElement.className = 'status error';
+                    requestButton.disabled = true;
+                    disableTestButtons();
+                    break;
+                case 'default':
+                    statusElement.textContent = 'Notifications permission not requested yet';
+                    statusElement.className = 'status info';
+                    requestButton.disabled = false;
+                    disableTestButtons();
+                    break;
+            }
+        }
+
+        function enableTestButtons() {
+            const buttons = ['test-jackpot', 'test-cooldown', 'test-shot', 'test-milestone', 'test-scheduled'];
+            buttons.forEach(id => {
+                document.getElementById(id).disabled = false;
+            });
+        }
+
+        function disableTestButtons() {
+            const buttons = ['test-jackpot', 'test-cooldown', 'test-shot', 'test-milestone', 'test-scheduled'];
+            buttons.forEach(id => {
+                document.getElementById(id).disabled = true;
+            });
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Notification test page loaded');
+            log(`Browser support: ${notificationManager.isSupported() ? 'Yes' : 'No'}`);
+            updatePermissionStatus();
+        });
+
+        // Listen for permission changes
+        if ('permissions' in navigator) {
+            navigator.permissions.query({ name: 'notifications' }).then(permission => {
+                permission.addEventListener('change', () => {
+                    log(`Permission changed to: ${permission.state}`);
+                    updatePermissionStatus();
+                });
+            });
+        }
+    </script>
+</body>
+</html>

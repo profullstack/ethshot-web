@@ -10,6 +10,7 @@
   import RecentWinners from '$lib/components/RecentWinners.svelte';
   import WalletConnect from '$lib/components/WalletConnect.svelte';
   import WinnerAnimation from '$lib/components/WinnerAnimation.svelte';
+  import NotificationPermission from '$lib/components/NotificationPermission.svelte';
 
   let mounted = false;
   let showWinnerAnimation = false;
@@ -207,6 +208,9 @@
   amount={winnerAmount}
   on:complete={handleAnimationComplete}
 />
+
+<!-- Notification Permission Component -->
+<NotificationPermission />
 
 <style>
   @keyframes pulse {
