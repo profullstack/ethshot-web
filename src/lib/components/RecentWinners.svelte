@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { recentWinners } from '../stores/game.js';
+  import { recentWinners } from '../stores/game-unified.js';
   import { db, formatAddress, formatTimeAgo } from '../supabase.js';
   import { NETWORK_CONFIG, calculateUSDValue } from '../config.js';
 

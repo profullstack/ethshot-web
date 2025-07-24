@@ -1,7 +1,7 @@
 <script>
   console.log('🔧 GameButton component loading...');
   
-  import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError } from '../stores/game.js';
+  import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError } from '../stores/game-unified.js';
   import { walletStore, isConnected, isCorrectNetwork } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatTime as configFormatTime } from '../config.js';

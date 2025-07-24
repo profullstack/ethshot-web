@@ -1,6 +1,6 @@
 <script>
   import { walletStore, isConnected, walletAddress, walletBalance } from '../stores/wallet.js';
-  import { gameStore, currentPot } from '../stores/game.js';
+  import { gameStore, currentPot } from '../stores/game-unified.js';
   import { formatEth } from '../config.js';
   import WalletConnect from './WalletConnect.svelte';
 

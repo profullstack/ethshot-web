@@ -1,5 +1,5 @@
 <script>
-  import { currentPot, gameStore } from '../stores/game.js';
+  import { currentPot, gameStore } from '../stores/game-unified.js';
   import { GAME_CONFIG, formatEth, calculateUSDValue } from '../config.js';
   import { onMount } from 'svelte';
 

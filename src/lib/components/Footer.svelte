@@ -1,5 +1,5 @@
 <script>
-  import { gameStore } from '../stores/game.js';
+  import { gameStore } from '../stores/game-unified.js';
   import { GAME_CONFIG, SOCIAL_CONFIG, NETWORK_CONFIG, formatEth, formatCooldownTime } from '../config.js';
 </script>
 
