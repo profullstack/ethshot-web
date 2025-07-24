@@ -308,14 +308,15 @@ const createUnifiedGameStore = () => {
       // Start real-time updates
       startRealTimeUpdates();
       
-      update(async state => {
-        const updatedState = await updateUSDValues({
-          ...state,
-          loading: false,
-          lastUpdate: new Date().toISOString()
-        });
-        return updatedState;
+      // Update USD values after loading game state
+      const currentState = get({ subscribe });
+      const updatedState = await updateUSDValues({
+        ...currentState,
+        loading: false,
+        lastUpdate: new Date().toISOString()
       });
+      
+      update(state => updatedState);
       
     } catch (error) {
       console.error('Failed to initialize unified game:', error);
@@ -437,15 +438,16 @@ const createUnifiedGameStore = () => {
         // Calculate actual pot using adapter
         const actualPot = await adapter.getCurrentPot();
         
-        update(async state => {
-          const updatedState = await updateUSDValues({
-            ...state,
-            currentPot: actualPot || '0',
-            shotCost: shotCost || '0',
-            sponsorCost: sponsorCost || '0',
-          });
-          return updatedState;
+        // Update USD values for multi-crypto mode
+        const currentState = get({ subscribe });
+        const updatedState = await updateUSDValues({
+          ...currentState,
+          currentPot: actualPot || '0',
+          shotCost: shotCost || '0',
+          sponsorCost: sponsorCost || '0',
         });
+        
+        update(state => updatedState);
 
       } else {
         // ETH-only mode: direct contract calls
@@ -544,15 +546,16 @@ const createUnifiedGameStore = () => {
           }
         }
 
-        update(async state => {
-          const updatedState = await updateUSDValues({
-            ...state,
-            currentPot: newPotAmount,
-            shotCost: ethers.formatEther(shotCost || ethers.parseEther('0.001')),
-            sponsorCost: ethers.formatEther(sponsorCost || ethers.parseEther('0.001')),
-          });
-          return updatedState;
+        // Update USD values for ETH-only mode
+        const currentState = get({ subscribe });
+        const updatedState = await updateUSDValues({
+          ...currentState,
+          currentPot: newPotAmount,
+          shotCost: ethers.formatEther(shotCost || ethers.parseEther('0.001')),
+          sponsorCost: ethers.formatEther(sponsorCost || ethers.parseEther('0.001')),
         });
+        
+        update(state => updatedState);
       }
 
       // Load database data (common for both modes)

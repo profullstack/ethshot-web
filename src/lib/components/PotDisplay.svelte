@@ -1,15 +1,19 @@
 <script>
-  import { currentPot, gameStore } from '../stores/game-unified.js';
-  import { GAME_CONFIG, formatEth, calculateUSDValue } from '../config.js';
+  import { currentPot, currentPotUSD, gameStore } from '../stores/game-unified.js';
+  import { GAME_CONFIG, formatEth } from '../config.js';
   import { onMount } from 'svelte';
 
   let animatedPot = '0.000';
+  let animatedPotUSD = '0.00';
   let previousPot = '0.000';
+  let previousPotUSD = '0.00';
 
   // Animate pot value changes
-  const animatePotChange = (newValue) => {
+  const animatePotChange = (newValue, newUSDValue) => {
     const start = parseFloat(previousPot) || 0;
     const end = parseFloat(newValue) || 0;
+    const startUSD = parseFloat(previousPotUSD) || 0;
+    const endUSD = parseFloat(newUSDValue) || 0;
     const duration = 1000; // 1 second animation
     const startTime = Date.now();
 
@@ -19,14 +23,17 @@
       
       // Easing function for smooth animation
       const easeOut = 1 - Math.pow(1 - progress, 3);
-      const current = start + (end - start) * easeOut;
+      const currentETH = start + (end - start) * easeOut;
+      const currentUSD = startUSD + (endUSD - startUSD) * easeOut;
       
-      animatedPot = formatEth(current);
+      animatedPot = formatEth(currentETH);
+      animatedPotUSD = currentUSD.toFixed(2);
       
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
         previousPot = newValue;
+        previousPotUSD = newUSDValue;
       }
     };
 
@@ -34,13 +41,18 @@
   };
 
   // React to pot changes
-  $: if ($currentPot !== previousPot) {
-    animatePotChange($currentPot);
+  $: if ($currentPot !== previousPot || $currentPotUSD !== previousPotUSD) {
+    animatePotChange($currentPot, $currentPotUSD);
   }
 
   onMount(() => {
+    // Initialize the store
+    gameStore.init();
+    
     animatedPot = formatEth($currentPot);
+    animatedPotUSD = $currentPotUSD || '0.00';
     previousPot = $currentPot;
+    previousPotUSD = $currentPotUSD || '0.00';
   });
 </script>
 
@@ -69,7 +81,7 @@
         <span class="pot-currency">ETH</span>
       </div>
       <div class="pot-usd">
-        ≈ ${calculateUSDValue(animatedPot)} USD
+        ≈ ${animatedPotUSD} USD
       </div>
     </div>
   </div>
