@@ -10,6 +10,7 @@
     copyReferralURL,
     shareReferralURL,
     shareReferralOnTwitter,
+    shareReferralOnBluesky,
     formatReferralStats,
     getReferralAchievement,
     processReferralOnLoad
@@ -111,8 +112,9 @@
     shareReferralOnTwitter(formattedStats.referralCode, pot);
   }
 
-  function toggleShareOptions() {
-    showShareOptions = !showShareOptions;
+  function handleBlueskyShare() {
+    if (!formattedStats.referralCode) return;
+    shareReferralOnBluesky(formattedStats.referralCode, pot);
   }
 </script>
 
@@ -149,29 +151,33 @@
     </div>
   {:else}
     <!-- Referral Stats -->
-    <div class="stats-grid">
-      <div class="stat-card primary">
+    <div class="stats-container">
+      <!-- Primary stat - full width on mobile -->
+      <div class="stat-card primary large">
         <div class="stat-value">{formattedStats.bonusShotsAvailable}</div>
         <div class="stat-label">Bonus Shots Available</div>
         <div class="stat-icon">🎯</div>
       </div>
       
-      <div class="stat-card">
-        <div class="stat-value">{formattedStats.totalReferrals}</div>
-        <div class="stat-label">Friends Invited</div>
-        <div class="stat-icon">👥</div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-value">{formattedStats.successfulReferrals}</div>
-        <div class="stat-label">Active Players</div>
-        <div class="stat-icon">⭐</div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-value">{formattedStats.totalBonusShotsEarned}</div>
-        <div class="stat-label">Total Bonus Shots Earned</div>
-        <div class="stat-icon">🏆</div>
+      <!-- Secondary stats grid -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">{formattedStats.totalReferrals}</div>
+          <div class="stat-label">Friends Invited</div>
+          <div class="stat-icon">👥</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-value">{formattedStats.successfulReferrals}</div>
+          <div class="stat-label">Active Players</div>
+          <div class="stat-icon">⭐</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-value">{formattedStats.totalBonusShotsEarned}</div>
+          <div class="stat-label">Total Bonus Shots Earned</div>
+          <div class="stat-icon">🏆</div>
+        </div>
       </div>
     </div>
 
@@ -195,50 +201,31 @@
         </div>
         
         <div class="share-buttons">
-          <button class="share-btn primary" on:click={handleNativeShare}>
-            <span class="btn-icon">📤</span>
-            Share Link
-          </button>
-          
-          <button class="share-btn" on:click={handleCopyLink}>
+          <button class="share-btn primary" on:click={handleCopyLink}>
             <span class="btn-icon">📋</span>
             Copy Link
           </button>
           
           <button class="share-btn twitter" on:click={handleTwitterShare}>
-            <span class="btn-icon">🐦</span>
-            Tweet
+            Share on 𝕏
           </button>
           
-          <button class="share-btn" on:click={toggleShareOptions}>
-            <span class="btn-icon">⚙️</span>
-            More
+          <button class="share-btn bluesky" on:click={handleBlueskyShare}>
+            Share on 🦋
           </button>
         </div>
 
-        {#if showShareOptions}
-          <div class="share-options">
-            <div class="share-url">
-              <input 
-                type="text" 
-                value={referralURL} 
-                readonly 
-                class="url-input"
-                on:click={(e) => e.target.select()}
-              />
-            </div>
-            
-            <div class="share-tips">
-              <h4>💡 Sharing Tips</h4>
-              <ul>
-                <li>Share in crypto communities and Discord servers</li>
-                <li>Post on social media with relevant hashtags</li>
-                <li>Send directly to friends who love crypto games</li>
-                <li>Include current pot amount to create urgency</li>
-              </ul>
-            </div>
-          </div>
-        {/if}
+        <!-- Share URL for easy copying -->
+        <div class="share-url-display">
+          <div class="url-label">Your Referral Link:</div>
+          <input
+            type="text"
+            value={referralURL}
+            readonly
+            class="url-input"
+            on:click={(e) => e.target.select()}
+          />
+        </div>
       </div>
     {/if}
 
@@ -333,25 +320,44 @@
     @apply w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto;
   }
 
+  .stats-container {
+    @apply space-y-4;
+  }
+
   .stats-grid {
-    @apply grid grid-cols-2 md:grid-cols-4 gap-4;
+    @apply grid grid-cols-1 md:grid-cols-3 gap-4;
   }
 
   .stat-card {
     @apply bg-gray-800/50 backdrop-blur-sm rounded-xl p-4 text-center relative overflow-hidden;
     @apply border border-gray-700 hover:border-gray-600 transition-colors;
+    @apply min-h-[100px] flex flex-col justify-center;
   }
 
   .stat-card.primary {
     @apply bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-blue-500/50;
   }
 
+  .stat-card.large {
+    @apply md:col-span-1 p-6 min-h-[120px];
+  }
+
+  .stat-card.large .stat-value {
+    @apply text-4xl md:text-5xl leading-none;
+  }
+
+  .stat-card.large .stat-label {
+    @apply text-base mt-3;
+  }
+
   .stat-value {
-    @apply text-2xl md:text-3xl font-bold text-white;
+    @apply text-2xl md:text-3xl font-bold text-white leading-tight;
   }
 
   .stat-label {
-    @apply text-sm text-gray-400 mt-1;
+    @apply text-sm text-gray-400 mt-2 leading-relaxed;
+    word-wrap: break-word;
+    hyphens: auto;
   }
 
   .stat-icon {
@@ -411,37 +417,30 @@
   }
 
   .share-btn.twitter {
-    @apply bg-blue-500 hover:bg-blue-600;
+    @apply bg-black hover:bg-gray-800;
+  }
+
+  .share-btn.bluesky {
+    @apply bg-blue-600 hover:bg-blue-700;
   }
 
   .btn-icon {
     @apply text-lg;
   }
 
-  .share-options {
-    @apply space-y-4 pt-4 border-t border-gray-700;
+  .share-url-display {
+    @apply space-y-2 pt-4 border-t border-gray-700;
   }
 
-  .share-url {
-    @apply space-y-2;
+  .url-label {
+    @apply text-sm text-gray-400 font-medium;
   }
 
   .url-input {
     @apply w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg;
     @apply text-white font-mono text-sm;
-    @apply focus:outline-none focus:border-blue-500;
-  }
-
-  .share-tips {
-    @apply space-y-2;
-  }
-
-  .share-tips h4 {
-    @apply text-white font-semibold;
-  }
-
-  .share-tips ul {
-    @apply text-sm text-gray-400 space-y-1 list-disc list-inside;
+    @apply focus:outline-none focus:border-blue-500 cursor-pointer;
+    @apply hover:border-gray-500 transition-colors;
   }
 
   .benefits-section {
@@ -453,7 +452,7 @@
   }
 
   .benefits-grid {
-    @apply grid md:grid-cols-3 gap-4;
+    @apply grid grid-cols-1 gap-3;
   }
 
   .benefit-card {
@@ -525,8 +524,24 @@
       @apply text-3xl;
     }
 
+    .stats-container {
+      @apply space-y-3;
+    }
+
     .stats-grid {
-      @apply grid-cols-2 gap-3;
+      @apply grid-cols-1 gap-3;
+    }
+
+    .stat-card.large {
+      @apply min-h-[100px] p-4;
+    }
+
+    .stat-card.large .stat-value {
+      @apply text-3xl leading-tight;
+    }
+
+    .stat-card.large .stat-label {
+      @apply text-sm mt-2;
     }
 
     .stat-value {
@@ -541,8 +556,5 @@
       @apply grid grid-cols-2 gap-2;
     }
 
-    .benefits-grid {
-      @apply grid-cols-1 gap-3;
-    }
   }
 </style>

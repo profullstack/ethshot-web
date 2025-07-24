@@ -172,7 +172,7 @@ export const shareReferralURL = async (referralCode, currentPot = null) => {
 };
 
 /**
- * Opens Twitter share dialog with referral content
+ * Opens Twitter/X share dialog with referral content
  * @param {string} referralCode - The referral code
  * @param {string} currentPot - Current pot amount (optional)
  */
@@ -186,6 +186,24 @@ export const shareReferralOnTwitter = (referralCode, currentPot = null) => {
   
   // Open in new window/tab
   window.open(twitterUrl, '_blank', 'width=550,height=420');
+};
+
+/**
+ * Opens Bluesky share dialog with referral content
+ * @param {string} referralCode - The referral code
+ * @param {string} currentPot - Current pot amount (optional)
+ */
+export const shareReferralOnBluesky = (referralCode, currentPot = null) => {
+  if (!browser) return;
+  
+  const url = generateReferralURL(referralCode);
+  const text = generateReferralShareText(referralCode, currentPot);
+  const fullText = `${text} ${url}`;
+  
+  const blueskyUrl = `https://bsky.app/intent/compose?text=${encodeURIComponent(fullText)}`;
+  
+  // Open in new window/tab
+  window.open(blueskyUrl, '_blank', 'width=550,height=600');
 };
 
 /**
