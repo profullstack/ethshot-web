@@ -4,6 +4,7 @@ import { walletStore } from './wallet.js';
 import { toastStore } from './toast.js';
 import { db, formatAddress, formatEther, formatTimeAgo } from '../supabase.js';
 import { GAME_CONFIG, NETWORK_CONFIG, SOCIAL_CONFIG, UI_CONFIG } from '../config.js';
+import { shareOnTwitter as shareOnTwitterExternal } from '../utils/external-links.js';
 
 // Winner event store for triggering animations
 export const winnerEventStore = writable(null);
@@ -809,10 +810,15 @@ const createGameStore = () => {
     }
 
     const state = get({ subscribe });
-    const text = `I just took a shot at #ETHShot and the pot is now ${state.currentPot} ETH! 🎯 Try your luck:`;
+    // Ensure we have a valid pot value, fallback to "the current pot" if not loaded
+    const potValue = state.currentPot && state.currentPot !== '0' ? `${state.currentPot} ETH` : 'the current pot';
+    const text = `I just took a shot at #ETHShot and the pot is now ${potValue}! 🎯 Try your luck:`;
     const url = SOCIAL_CONFIG.APP_URL;
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
-    window.open(twitterUrl, '_blank');
+    
+    console.log('🐦 Sharing on Twitter:', { currentPot: state.currentPot, potValue, text });
+    
+    // Use the external links utility to properly handle webviews
+    shareOnTwitterExternal(text, url);
   };
 
   // Copy link to clipboard

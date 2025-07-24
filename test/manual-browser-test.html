@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>External Links Manual Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>External Links Utility - Manual Test</h1>
+    
+    <div class="test-section">
+        <h2>Environment Detection</h2>
+        <div id="environment-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Twitter Share URL Generation</h2>
+        <div id="twitter-url-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>External Link Opening Test</h2>
+        <p>Click the button below to test external link opening. Check the console for logs.</p>
+        <button onclick="testExternalLink()">Test External Link Opening</button>
+        <button onclick="testTwitterShare()">Test Twitter Share</button>
+        <div id="link-test-results"></div>
+    </div>
+
+    <script type="module">
+        // Import our utility functions
+        import { 
+            isInWebview, 
+            isIOSDevice, 
+            openExternalLink,
+            createTwitterShareUrl,
+            shareOnTwitter
+        } from '../src/lib/utils/external-links.js';
+
+        // Test environment detection
+        function testEnvironmentDetection() {
+            const results = document.getElementById('environment-results');
+            
+            const isIOS = isIOSDevice();
+            const inWebview = isInWebview();
+            const userAgent = navigator.userAgent;
+            
+            results.innerHTML = `
+                <div class="result info">
+                    <strong>User Agent:</strong><br>
+                    <code>${userAgent}</code>
+                </div>
+                <div class="result ${isIOS ? 'success' : 'info'}">
+                    <strong>iOS Device:</strong> ${isIOS ? 'Yes' : 'No'}
+                </div>
+                <div class="result ${inWebview ? 'success' : 'info'}">
+                    <strong>In Webview:</strong> ${inWebview ? 'Yes' : 'No'}
+                </div>
+                <div class="result info">
+                    <strong>Recommended Method:</strong> ${isIOS && inWebview ? 'location.assign()' : 'window.open()'}
+                </div>
+            `;
+        }
+
+        // Test Twitter URL generation
+        function testTwitterUrlGeneration() {
+            const results = document.getElementById('twitter-url-results');
+            
+            const text = 'I just took a shot at #ETHShot and the pot is now 1.5 ETH! 🎯 Try your luck:';
+            const url = 'https://ethshot.io';
+            const twitterUrl = createTwitterShareUrl(text, url);
+            
+            results.innerHTML = `
+                <div class="result info">
+                    <strong>Generated Twitter URL:</strong><br>
+                    <code style="word-break: break-all;">${twitterUrl}</code>
+                </div>
+                <div class="result success">
+                    URL generation working correctly!
+                </div>
+            `;
+        }
+
+        // Test external link opening
+        window.testExternalLink = function() {
+            const results = document.getElementById('link-test-results');
+            const testUrl = 'https://example.com';
+            
+            console.log('🔗 Testing external link opening...');
+            console.log('🔍 Environment:', {
+                isIOS: isIOSDevice(),
+                inWebview: isInWebview(),
+                userAgent: navigator.userAgent
+            });
+            
+            openExternalLink(testUrl);
+            
+            results.innerHTML = `
+                <div class="result success">
+                    External link test executed! Check console for details and verify if link opened correctly.
+                </div>
+            `;
+        };
+
+        // Test Twitter share
+        window.testTwitterShare = function() {
+            const results = document.getElementById('link-test-results');
+            const text = 'Testing Twitter share from ETHShot! 🎯';
+            const url = 'https://ethshot.io';
+            
+            console.log('🐦 Testing Twitter share...');
+            shareOnTwitter(text, url);
+            
+            results.innerHTML = `
+                <div class="result success">
+                    Twitter share test executed! Check if Twitter opened correctly.
+                </div>
+            `;
+        };
+
+        // Run tests on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            testEnvironmentDetection();
+            testTwitterUrlGeneration();
+        });
+    </script>
+</body>
+</html>

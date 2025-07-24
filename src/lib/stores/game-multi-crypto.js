@@ -9,6 +9,7 @@ import { db, formatAddress, formatTimeAgo } from '../supabase.js';
 import { getActiveAdapter } from '../crypto/adapters/index.js';
 import { getCryptoGameConfig, getCurrentCrypto } from '../crypto/config.js';
 import { UI_CONFIG } from '../config.js';
+import { shareOnTwitter as shareOnTwitterExternal } from '../utils/external-links.js';
 
 // Winner event store for triggering animations
 export const winnerEventStore = writable(null);
@@ -599,10 +600,15 @@ const createMultiCryptoGameStore = () => {
 
     const state = get({ subscribe });
     const cryptoSymbol = state.activeCrypto || 'ETH';
-    const text = `I just took a shot at #${cryptoSymbol}Shot and the pot is now ${state.currentPot} ${cryptoSymbol}! 🎯 Try your luck:`;
+    // Ensure we have a valid pot value, fallback to "the current pot" if not loaded
+    const potValue = state.currentPot && state.currentPot !== '0' ? `${state.currentPot} ${cryptoSymbol}` : 'the current pot';
+    const text = `I just took a shot at #${cryptoSymbol}Shot and the pot is now ${potValue}! 🎯 Try your luck:`;
     const url = 'https://ethshot.io'; // TODO: Make this configurable
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
-    window.open(twitterUrl, '_blank');
+    
+    console.log('🐦 Sharing on Twitter:', { currentPot: state.currentPot, cryptoSymbol, potValue, text });
+    
+    // Use the external links utility to properly handle webviews
+    shareOnTwitterExternal(text, url);
   };
 
   // Copy link to clipboard
