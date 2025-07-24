@@ -142,7 +142,8 @@
     <!-- Bottom Bar -->
     <div class="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
       <div class="text-sm text-gray-400">
-        © 2024 ETH Shot. All rights reserved.
+        © 2025 Profullstack, Inc. All rights reserved.
+
       </div>
       
       <div class="flex items-center space-x-4 text-xs text-gray-500">
