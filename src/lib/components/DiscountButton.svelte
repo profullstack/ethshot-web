@@ -1,5 +1,5 @@
 <script>
-  import { gameStore, availableDiscounts, discountCount, canUseDiscount, isLoading, nextDiscount } from '../stores/game-unified.js';
+  import { gameStore, availableDiscounts, discountCount, canUseDiscount, canCommitShot, hasPendingShot, isLoading, isRevealing, nextDiscount } from '../stores/game-unified.js';
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
 
@@ -9,14 +9,17 @@
   $: discountAvailable = $discountCount;
   $: canUse = $canUseDiscount;
   $: loading = $isLoading;
+  $: revealing = $isRevealing;
+  $: pendingShot = $hasPendingShot;
+  $: canCommit = $canCommitShot;
   $: discount = $nextDiscount;
 
   // Calculate discount percentage and savings
   $: discountPercentage = discount ? Math.round(discount.discount_percentage * 100) : 20;
   $: discountSavings = discount ? (0.0005 * discount.discount_percentage).toFixed(4) : '0.0001';
 
-  // Handle discount shot click
-  async function handleDiscountShot() {
+  // Handle discount shot commit
+  async function handleDiscountCommit() {
     if (!wallet.connected) {
       toastStore.error('Please connect your wallet first');
       return;
@@ -27,37 +30,84 @@
       return;
     }
 
+    if (pendingShot) {
+      toastStore.error('You already have a pending shot. Please reveal it first.');
+      return;
+    }
+
     try {
-      await gameStore.takeShot(true, discount.id); // Pass true to use discount and discount ID
+      await gameStore.commitShot(true, discount.id); // Pass true to use discount and discount ID
     } catch (error) {
-      console.error('Failed to use discount:', error);
+      console.error('Failed to commit discount shot:', error);
       toastStore.error('Failed to apply discount');
+    }
+  }
+
+  // Handle discount shot reveal
+  async function handleDiscountReveal() {
+    if (!wallet.connected) {
+      toastStore.error('Please connect your wallet first');
+      return;
+    }
+
+    if (!pendingShot) {
+      toastStore.error('No pending shot to reveal');
+      return;
+    }
+
+    try {
+      await gameStore.revealShot();
+    } catch (error) {
+      console.error('Failed to reveal discount shot:', error);
+      toastStore.error('Failed to reveal discount shot');
     }
   }
 </script>
 
 {#if wallet.connected && discountAvailable > 0 && discount}
   <div class="discount-container">
-    <button
-      class="discount-btn"
-      class:disabled={!canUse || loading}
-      disabled={!canUse || loading}
-      on:click={handleDiscountShot}
-    >
-      {#if loading}
-        <div class="loading-spinner"></div>
-        <span>Taking Shot...</span>
-      {:else}
-        <div class="discount-icon">💰</div>
-        <div class="discount-content">
-          <div class="discount-title">Use {discountPercentage}% Discount</div>
-          <div class="discount-details">
-            <span class="discount-count">{discountAvailable} available</span>
-            <span class="discount-savings">Save {discountSavings} ETH</span>
+    {#if pendingShot}
+      <!-- Reveal Discount Shot -->
+      <button
+        class="discount-btn discount-reveal"
+        class:disabled={revealing}
+        disabled={revealing}
+        on:click={handleDiscountReveal}
+      >
+        {#if revealing}
+          <div class="loading-spinner"></div>
+          <span>Revealing Discount...</span>
+        {:else}
+          <div class="discount-icon">🔓</div>
+          <div class="discount-content">
+            <div class="discount-title">Reveal Discount Shot</div>
+            <div class="discount-savings">Click to reveal</div>
           </div>
-        </div>
-      {/if}
-    </button>
+        {/if}
+      </button>
+    {:else}
+      <!-- Commit Discount Shot -->
+      <button
+        class="discount-btn"
+        class:disabled={!canUse || loading || !canCommit}
+        disabled={!canUse || loading || !canCommit}
+        on:click={handleDiscountCommit}
+      >
+        {#if loading}
+          <div class="loading-spinner"></div>
+          <span>Committing Discount...</span>
+        {:else}
+          <div class="discount-icon">💰</div>
+          <div class="discount-content">
+            <div class="discount-title">Use {discountPercentage}% Discount</div>
+            <div class="discount-details">
+              <span class="discount-count">{discountAvailable} available</span>
+              <span class="discount-savings">Save {discountSavings} ETH</span>
+            </div>
+          </div>
+        {/if}
+      </button>
+    {/if}
     
     <div class="discount-info">
       <span class="info-icon">ℹ️</span>

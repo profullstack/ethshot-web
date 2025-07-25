@@ -31,23 +31,40 @@ import {
 // Winner event store for triggering animations
 export const winnerEventStore = writable(null);
 
-// ETH Shot contract ABI (for backward compatibility with ETH-only mode)
+// ETH Shot contract ABI (updated for commit-reveal scheme)
 const ETH_SHOT_ABI = [
-  'function takeShot() external payable',
+  // Commit-reveal functions
+  'function commitShot(bytes32 commitment) external payable',
+  'function revealShot(uint256 secret) external',
+  
+  // Utility functions
+  'function canCommitShot(address player) external view returns (bool)',
+  'function canRevealShot(address player) external view returns (bool)',
+  'function getPendingShot(address player) external view returns (bool exists, uint256 blockNumber, uint256 amount)',
+  'function hasPendingShot(address player) external view returns (bool)',
+  'function getPendingPayout(address player) external view returns (uint256)',
+  'function claimPayout() external',
+  
+  // Existing functions
   'function sponsorRound(string calldata name, string calldata logoUrl) external payable',
   'function getCurrentPot() external view returns (uint256)',
   'function getContractBalance() external view returns (uint256)',
   'function getHouseFunds() external view returns (uint256)',
   'function getPlayerStats(address player) external view returns (tuple(uint256 totalShots, uint256 totalSpent, uint256 totalWon, uint256 lastShotTime))',
-  'function canTakeShot(address player) external view returns (bool)',
   'function getCooldownRemaining(address player) external view returns (uint256)',
   'function getCurrentSponsor() external view returns (tuple(address sponsor, string name, string logoUrl, uint256 timestamp, bool active))',
   'function getRecentWinners() external view returns (tuple(address winner, uint256 amount, uint256 timestamp, uint256 blockNumber)[])',
+  'function getGameConfig() external view returns (uint256 winPercentageBP, uint256 housePercentageBP, uint256 winChanceBP)',
   'function SHOT_COST() external view returns (uint256)',
   'function SPONSOR_COST() external view returns (uint256)',
-  'event ShotTaken(address indexed player, uint256 amount, bool won)',
-  'event JackpotWon(address indexed winner, uint256 amount, uint256 timestamp)',
+  
+  // Updated events
+  'event ShotCommitted(address indexed player, bytes32 indexed commitment, uint256 amount)',
+  'event ShotRevealed(address indexed player, uint256 indexed amount, bool indexed won)',
+  'event JackpotWon(address indexed winner, uint256 indexed amount, uint256 indexed timestamp)',
   'event SponsorshipActivated(address indexed sponsor, string name, string logoUrl)',
+  'event PayoutFailed(address indexed player, uint256 amount)',
+  'event PayoutClaimed(address indexed player, uint256 amount)',
 ];
 
 // Cache for reducing RPC calls
@@ -127,6 +144,7 @@ const createUnifiedGameStore = () => {
     
     // Referral system state
     availableDiscounts: [],
+    bonusShotsAvailable: 0,
     referralStats: null,
     referralProcessed: false,
     
@@ -756,9 +774,29 @@ const createUnifiedGameStore = () => {
     }
   };
 
-  // Take a shot at the jackpot (with discount support)
-  const takeShot = async (useDiscount = false, discountId = null) => {
-    console.log('🎯 Unified gameStore.takeShot() called!', { useDiscount, discountId });
+  // Generate a secure random secret for commit-reveal
+  const generateSecret = () => {
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+      const array = new Uint8Array(32);
+      window.crypto.getRandomValues(array);
+      return '0x' + Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    } else {
+      // Fallback for environments without crypto.getRandomValues
+      return '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    }
+  };
+
+  // Generate commitment hash
+  const generateCommitment = (secret, playerAddress) => {
+    if (!ethers) {
+      throw new Error('Ethers not available');
+    }
+    return ethers.keccak256(ethers.solidityPacked(['uint256', 'address'], [secret, playerAddress]));
+  };
+
+  // Step 1: Commit to taking a shot
+  const commitShot = async (useDiscount = false, discountId = null, useBonus = false) => {
+    console.log('🎯 Unified gameStore.commitShot() called!', { useDiscount, discountId, useBonus });
     
     if (!browser) {
       console.log('❌ Not in browser environment');
@@ -789,19 +827,41 @@ const createUnifiedGameStore = () => {
       return;
     }
 
+    // Check if player already has a pending shot
+    if (state.pendingShot?.exists) {
+      console.log('❌ Player already has a pending shot');
+      toastStore.error('You already have a pending shot. Please reveal it first.');
+      return;
+    }
+
     // Check if user wants to use discount but doesn't have any or didn't provide discount ID
     if (useDiscount && (!state.availableDiscounts?.length || !discountId)) {
       console.log('❌ No discounts available or discount ID not provided');
       toastStore.error('No discounts available');
       return;
     }
+    
+    // Check if user wants to use bonus shot but doesn't have any
+    if (useBonus && (!state.bonusShotsAvailable || state.bonusShotsAvailable <= 0)) {
+      console.log('❌ No bonus shots available');
+      toastStore.error('No bonus shots available');
+      return;
+    }
 
-    console.log('✅ All takeShot checks passed, starting transaction...');
+    console.log('✅ All commitShot checks passed, starting transaction...');
 
     try {
       update(state => ({ ...state, takingShot: true, error: null }));
 
-      let result;
+      // Generate secret and commitment for commit-reveal scheme
+      const secret = generateSecret();
+      const commitment = generateCommitment(secret, wallet.address);
+      
+      console.log('🔐 Generated commitment for shot:', {
+        commitment: commitment.substring(0, 10) + '...',
+        playerAddress: wallet.address
+      });
+
       let actualShotCost = state.shotCost; // Default to full shot cost
       let discountApplied = false;
       let discountPercentage = 0;
@@ -838,7 +898,7 @@ const createUnifiedGameStore = () => {
         }));
       }
 
-      // Regular paid shot (with or without discount)
+      // Commit shot with generated commitment
 
       if (state.isMultiCryptoMode) {
         // Multi-crypto mode: use adapter
@@ -847,9 +907,9 @@ const createUnifiedGameStore = () => {
           throw new Error('No active cryptocurrency adapter');
         }
 
-        // For multi-crypto mode, we need to implement discount logic in the adapter
-        // For now, we'll use the regular takeShot and handle refunds separately
-        result = await adapter.takeShot();
+        // For multi-crypto mode, we need to implement commitShot in the adapter
+        // For now, throw error as adapters need to be updated
+        throw new Error('Multi-crypto mode not yet supported with commit-reveal scheme');
       } else {
         // ETH-only mode: direct contract interaction
         if (!contract || !ethers || !wallet.signer) {
@@ -867,14 +927,14 @@ const createUnifiedGameStore = () => {
         // Check user balance
         const balance = await wallet.provider.getBalance(wallet.address);
         
-        // Estimate gas
+        // Estimate gas for commitShot
         let gasEstimate;
         try {
-          gasEstimate = await contractWithSigner.takeShot.estimateGas({
+          gasEstimate = await contractWithSigner.commitShot.estimateGas(commitment, {
             value: transactionValue
           });
         } catch (estimateError) {
-          console.warn('Failed to estimate gas, using default:', estimateError.message);
+          console.warn('Failed to estimate gas for commitShot, using default:', estimateError.message);
           gasEstimate = 150000n;
         }
         
@@ -891,116 +951,120 @@ const createUnifiedGameStore = () => {
           throw new Error(`Insufficient ETH. Need ${shortfall} more ETH for gas fees.`);
         }
 
-        // Send transaction with discounted value
-        const tx = await contractWithSigner.takeShot({
+        // Send commitShot transaction
+        const tx = await contractWithSigner.commitShot(commitment, {
           value: transactionValue,
           gasLimit: gasLimit
         });
 
-        toastStore.info('Shot submitted! Waiting for confirmation...');
+        toastStore.info('Commitment submitted! Waiting for confirmation...');
         const receipt = await tx.wait();
         
-        // Check if user won by looking at events
-        const shotTakenEvent = receipt.logs.find(log => {
+        // Check for ShotCommitted event
+        const shotCommittedEvent = receipt.logs.find(log => {
           try {
             const parsed = contract.interface.parseLog(log);
-            return parsed.name === 'ShotTaken';
+            return parsed.name === 'ShotCommitted';
           } catch {
             return false;
           }
         });
 
-        let won = false;
-        if (shotTakenEvent) {
-          const parsed = contract.interface.parseLog(shotTakenEvent);
-          won = parsed.args.won;
+        if (!shotCommittedEvent) {
+          throw new Error('Shot commitment failed - no ShotCommitted event found');
         }
 
+        const parsed = contract.interface.parseLog(shotCommittedEvent);
+        const commitBlock = parsed.args.blockNumber;
+        
+        // Store pending shot state
+        const pendingShot = {
+          exists: true,
+          secret,
+          commitment,
+          commitBlock: Number(commitBlock),
+          commitTxHash: receipt.hash,
+          discountApplied,
+          discountPercentage,
+          timestamp: Date.now()
+        };
+        
+        // Store in localStorage for persistence across browser refreshes
+        if (browser) {
+          localStorage.setItem(`ethshot_pending_${wallet.address}`, JSON.stringify(pendingShot));
+        }
+        
         result = {
           hash: receipt.hash,
           receipt,
-          won,
-          isDiscountShot: discountApplied
+          committed: true,
+          pendingShot
         };
       }
       
-      console.log('✅ Shot transaction completed:', result.hash);
+      console.log('✅ Shot commitment completed:', result.hash);
       
-      if (result.won) {
-        toastStore.success('🎉 JACKPOT! You won the pot!');
-      } else {
-        const message = discountApplied ?
-          `Shot taken with ${(discountPercentage * 100).toFixed(0)}% discount! Better luck next time.` :
-          'Shot taken! Better luck next time.';
-        toastStore.info(message);
-      }
-      
-      if (result.won) {
-        // Trigger winner animation
-        winnerEventStore.set({
-          winner: wallet.address,
-          amount: state.currentPot,
-          timestamp: new Date().toISOString(),
-          isDiscountShot: result.isDiscountShot || false
-        });
+      const message = discountApplied ?
+        `Shot committed with ${(discountPercentage * 100).toFixed(0)}% discount! You can reveal after block ${result.pendingShot.commitBlock + 1}.` :
+        `Shot committed! You can reveal after block ${result.pendingShot.commitBlock + 1}.`;
+      toastStore.success(message);
+
+      // Update state with pending shot and decrement bonus shot if used
+      update(state => {
+        // Calculate new bonus shot count if bonus shot was used
+        const newBonusShotsAvailable = useBonus ? Math.max(0, state.bonusShotsAvailable - 1) : state.bonusShotsAvailable;
         
-        // Notify all users about the jackpot win
-        notifyJackpotWon(state.currentPot, wallet.address);
-      }
+        // If bonus shot was used, log it
+        if (useBonus) {
+          console.log(`🎮 Bonus shot used! Remaining: ${newBonusShotsAvailable}`);
+        }
+        
+        return {
+          ...state,
+          pendingShot: result.pendingShot,
+          takingShot: false,
+          bonusShotsAvailable: newBonusShotsAvailable
+        };
+      });
 
-      // Log transaction to database
+      // Log commitment to database (no win/loss yet)
       try {
-        console.log('📝 Recording shot to database...');
+        console.log('📝 Recording shot commitment to database...');
 
-        const shotRecord = await db.recordShot({
+        const shotRecord = await db.recordShotCommit({
           playerAddress: wallet.address,
-          amount: actualShotCost,
-          won: result.won,
+          amount: ethers.formatEther(state.shotCost),
+          commitmentHash: commitment,
           txHash: result.hash,
           blockNumber: result.receipt.blockNumber,
           timestamp: new Date().toISOString(),
           cryptoType: state.activeCrypto,
-          isDiscountShot: result.isDiscountShot || false,
-          discountPercentage: discountApplied ? discountPercentage : 0
+          usedDiscount: useDiscount,
+          discountId: discountId,
+          usedBonus: useBonus
         });
 
-        console.log('✅ Shot recorded successfully:', shotRecord?.id);
+        console.log('✅ Shot commitment recorded successfully:', shotRecord?.id);
 
-        if (result.won) {
-          console.log('🏆 Recording winner to database...');
-          const winnerRecord = await db.recordWinner({
-            winnerAddress: wallet.address,
-            amount: state.currentPot,
-            txHash: result.hash,
-            blockNumber: result.receipt.blockNumber,
-            timestamp: new Date().toISOString(),
-            cryptoType: state.activeCrypto,
-            isDiscountShot: result.isDiscountShot || false
-          });
-          console.log('✅ Winner recorded successfully:', winnerRecord?.id);
-        }
-
-        // Update player record
-        console.log('👤 Updating player record...');
+        // Update player record (commit phase only - no win/loss yet)
+        console.log('👤 Updating player record for commitment...');
         const existingPlayer = await db.getPlayer(wallet.address);
         
         const newTotalShots = (existingPlayer?.total_shots || 0) + 1;
         const newTotalSpent = parseFloat(existingPlayer?.total_spent || '0') + parseFloat(actualShotCost);
-        const newTotalWon = result.won ?
-          parseFloat(existingPlayer?.total_won || '0') + parseFloat(state.currentPot) :
-          parseFloat(existingPlayer?.total_won || '0');
+        // Don't update totalWon yet - that happens in reveal phase
 
         const playerData = {
           address: wallet.address,
           totalShots: newTotalShots,
           totalSpent: newTotalSpent.toString(),
-          totalWon: newTotalWon.toString(),
+          totalWon: existingPlayer?.total_won || '0', // Keep existing value
           lastShotTime: new Date().toISOString(),
           cryptoType: state.activeCrypto
         };
 
         const playerRecord = await db.upsertPlayer(playerData);
-        console.log('✅ Player record updated successfully:', playerRecord?.address);
+        console.log('✅ Player record updated successfully for commitment:', playerRecord?.address);
 
       } catch (dbError) {
         console.error('❌ Failed to log transaction to database:', dbError);
@@ -1040,6 +1104,371 @@ const createUnifiedGameStore = () => {
       update(state => ({ ...state, error: errorMessage }));
     } finally {
       update(state => ({ ...state, takingShot: false }));
+    }
+  };
+
+  // Reveal a committed shot
+  const revealShot = async () => {
+    if (!browser) {
+      console.log('❌ Not in browser environment');
+      toastStore.error('Not available on server');
+      return;
+    }
+
+    const state = get({ subscribe });
+    const walletStore = getWalletStore();
+    const wallet = get(walletStore);
+    
+    console.log('🔓 Starting shot reveal process...');
+    
+    if (!wallet.connected || !wallet.address) {
+      console.log('❌ Wallet not connected');
+      toastStore.error('Please connect your wallet first');
+      return;
+    }
+
+    if (state.contractDeployed === false) {
+      console.log('❌ Contract not deployed');
+      toastStore.error(`${state.activeCrypto} contract not deployed yet.`);
+      return;
+    }
+
+    // Check if player has a pending shot
+    if (!state.pendingShot?.exists) {
+      console.log('❌ No pending shot found');
+      toastStore.error('No pending shot to reveal. Please commit a shot first.');
+      return;
+    }
+
+    // Check if reveal window is open
+    const currentBlock = await wallet.provider.getBlockNumber();
+    const canReveal = currentBlock > state.pendingShot.commitBlock && 
+                     currentBlock <= state.pendingShot.commitBlock + 256;
+    
+    if (!canReveal) {
+      console.log('❌ Reveal window not open', {
+        currentBlock,
+        commitBlock: state.pendingShot.commitBlock,
+        windowEnd: state.pendingShot.commitBlock + 256
+      });
+      
+      if (currentBlock <= state.pendingShot.commitBlock) {
+        toastStore.error('Cannot reveal yet. Wait for next block.');
+      } else {
+        toastStore.error('Reveal window expired. Your shot has been forfeited.');
+        // Clear expired pending shot
+        if (browser) {
+          localStorage.removeItem(`ethshot_pending_${wallet.address}`);
+        }
+        update(state => ({ ...state, pendingShot: null }));
+      }
+      return;
+    }
+
+    console.log('✅ All revealShot checks passed, starting reveal...');
+
+    try {
+      update(state => ({ ...state, revealing: true, error: null }));
+
+      if (state.isMultiCryptoMode) {
+        throw new Error('Multi-crypto mode not yet supported with commit-reveal scheme');
+      }
+
+      // ETH-only mode: direct contract interaction
+      if (!contract || !ethers || !wallet.signer) {
+        throw new Error('Contract or signer not available');
+      }
+
+      const contractWithSigner = contract.connect(wallet.signer);
+      const secret = state.pendingShot.secret;
+      
+      if (!secret) {
+        throw new Error('Secret not found for pending shot');
+      }
+
+      // Estimate gas for revealShot
+      let gasEstimate;
+      try {
+        gasEstimate = await contractWithSigner.revealShot.estimateGas(secret);
+      } catch (estimateError) {
+        console.warn('Failed to estimate gas for revealShot, using default:', estimateError.message);
+        gasEstimate = 100000n;
+      }
+      
+      const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
+      
+      // Check user balance for gas
+      const balance = await wallet.provider.getBalance(wallet.address);
+      const feeData = await wallet.provider.getFeeData();
+      const gasPrice = feeData.gasPrice || feeData.maxFeePerGas;
+      const estimatedGasCost = gasLimit * gasPrice;
+      
+      if (balance < estimatedGasCost) {
+        const shortfall = ethers.formatEther(estimatedGasCost - balance);
+        throw new Error(`Insufficient ETH for gas. Need ${shortfall} more ETH.`);
+      }
+
+      // Send revealShot transaction
+      const tx = await contractWithSigner.revealShot(secret, {
+        gasLimit: gasLimit
+      });
+
+      toastStore.info('Revealing shot... Waiting for confirmation...');
+      const receipt = await tx.wait();
+      
+      // Check for ShotRevealed event
+      const shotRevealedEvent = receipt.logs.find(log => {
+        try {
+          const parsed = contract.interface.parseLog(log);
+          return parsed.name === 'ShotRevealed';
+        } catch {
+          return false;
+        }
+      });
+
+      if (!shotRevealedEvent) {
+        throw new Error('Shot reveal failed - no ShotRevealed event found');
+      }
+
+      const parsed = contract.interface.parseLog(shotRevealedEvent);
+      const won = parsed.args.won;
+      const randomNumber = parsed.args.randomNumber;
+      
+      console.log('🎲 Shot revealed:', {
+        won,
+        randomNumber: randomNumber.toString(),
+        txHash: receipt.hash
+      });
+
+      // Check for JackpotWon event if player won
+      let jackpotAmount = '0';
+      if (won) {
+        const jackpotEvent = receipt.logs.find(log => {
+          try {
+            const parsed = contract.interface.parseLog(log);
+            return parsed.name === 'JackpotWon';
+          } catch {
+            return false;
+          }
+        });
+        
+        if (jackpotEvent) {
+          const jackpotParsed = contract.interface.parseLog(jackpotEvent);
+          jackpotAmount = ethers.formatEther(jackpotParsed.args.amount);
+        }
+      }
+
+      const result = {
+        hash: receipt.hash,
+        receipt,
+        won,
+        randomNumber,
+        jackpotAmount,
+        pendingShot: state.pendingShot
+      };
+      
+      console.log('✅ Shot reveal completed:', result.hash);
+      
+      if (won) {
+        toastStore.success(`🎉 JACKPOT! You won ${jackpotAmount} ETH!`);
+        
+        // Trigger winner animation
+        winnerEventStore.set({
+          winner: wallet.address,
+          amount: jackpotAmount,
+          timestamp: new Date().toISOString(),
+          isDiscountShot: state.pendingShot.discountApplied || false
+        });
+        
+        // Notify all users about the jackpot win
+        notifyJackpotWon(jackpotAmount, wallet.address);
+      } else {
+        const message = state.pendingShot.discountApplied ?
+          `Shot revealed with ${(state.pendingShot.discountPercentage * 100).toFixed(0)}% discount! Better luck next time.` :
+          'Shot revealed! Better luck next time.';
+        toastStore.info(message);
+      }
+
+      // Update database with reveal results
+      try {
+        console.log('📝 Updating shot record with reveal results...');
+        
+        // Update the original shot record with win/loss result
+        await db.updateShotResult({
+          commitmentHash: state.pendingShot.commitment,
+          won,
+          revealTxHash: result.hash,
+          revealBlockNumber: result.receipt.blockNumber,
+          revealTimestamp: new Date().toISOString()
+        });
+
+        if (won) {
+          console.log('🏆 Recording winner to database...');
+          await db.recordWinner({
+            winnerAddress: wallet.address,
+            amount: jackpotAmount,
+            txHash: result.hash,
+            blockNumber: result.receipt.blockNumber,
+            timestamp: new Date().toISOString(),
+            cryptoType: state.activeCrypto,
+            isDiscountShot: state.pendingShot.discountApplied || false
+          });
+          
+          // Update player total winnings
+          const existingPlayer = await db.getPlayer(wallet.address);
+          const newTotalWon = parseFloat(existingPlayer?.total_won || '0') + parseFloat(jackpotAmount);
+          
+          await db.upsertPlayer({
+            address: wallet.address,
+            totalShots: existingPlayer?.total_shots || 0,
+            totalSpent: existingPlayer?.total_spent || '0',
+            totalWon: newTotalWon.toString(),
+            lastShotTime: new Date().toISOString(),
+            cryptoType: state.activeCrypto
+          });
+        }
+        
+        console.log('✅ Database updated successfully with reveal results');
+      } catch (dbError) {
+        console.error('❌ Failed to update database with reveal results:', dbError);
+        toastStore.error('Reveal successful but failed to update leaderboard. Please refresh the page.');
+      }
+
+      // Clear pending shot from state and localStorage
+      if (browser) {
+        localStorage.removeItem(`ethshot_pending_${wallet.address}`);
+      }
+      
+      update(state => ({
+        ...state,
+        pendingShot: null,
+        revealing: false
+      }));
+
+      // Clear cache and refresh game state
+      rpcCache.clear();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await loadGameState();
+      await loadPlayerData(wallet.address);
+      await walletStore.updateBalance();
+
+    } catch (error) {
+      console.error('Failed to reveal shot:', error);
+      
+      let errorMessage = 'Failed to reveal shot';
+      if (error.message.includes('insufficient funds')) {
+        errorMessage = `Insufficient ETH balance for gas fees`;
+      } else if (error.message.includes('user rejected')) {
+        errorMessage = 'Transaction cancelled';
+      } else if (error.message.includes('reveal window')) {
+        errorMessage = 'Reveal window expired';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toastStore.error(errorMessage);
+      update(state => ({ ...state, error: errorMessage }));
+    } finally {
+      update(state => ({ ...state, revealing: false }));
+    }
+  };
+
+  // Claim failed payout
+  const claimPayout = async () => {
+    if (!browser) {
+      console.log('❌ Not in browser environment');
+      toastStore.error('Not available on server');
+      return;
+    }
+
+    const state = get({ subscribe });
+    const walletStore = getWalletStore();
+    const wallet = get(walletStore);
+    
+    console.log('💰 Starting payout claim process...');
+    
+    if (!wallet.connected || !wallet.address) {
+      console.log('❌ Wallet not connected');
+      toastStore.error('Please connect your wallet first');
+      return;
+    }
+
+    if (state.contractDeployed === false) {
+      console.log('❌ Contract not deployed');
+      toastStore.error(`${state.activeCrypto} contract not deployed yet.`);
+      return;
+    }
+
+    try {
+      update(state => ({ ...state, claimingPayout: true, error: null }));
+
+      if (state.isMultiCryptoMode) {
+        throw new Error('Multi-crypto mode not yet supported with commit-reveal scheme');
+      }
+
+      // ETH-only mode: direct contract interaction
+      if (!contract || !ethers || !wallet.signer) {
+        throw new Error('Contract or signer not available');
+      }
+
+      const contractWithSigner = contract.connect(wallet.signer);
+      
+      // Check if user has pending payout
+      const pendingPayout = await contractWithSigner.getPendingPayout(wallet.address);
+      if (pendingPayout === 0n) {
+        throw new Error('No pending payout to claim');
+      }
+
+      console.log('💰 Claiming payout:', ethers.formatEther(pendingPayout), 'ETH');
+
+      // Send claimPayout transaction
+      const tx = await contractWithSigner.claimPayout();
+      toastStore.info('Claiming payout... Waiting for confirmation...');
+      const receipt = await tx.wait();
+      
+      const claimedAmount = ethers.formatEther(pendingPayout);
+      console.log('✅ Payout claimed successfully:', claimedAmount, 'ETH');
+      
+      toastStore.success(`💰 Successfully claimed ${claimedAmount} ETH!`);
+
+      // Update database
+      try {
+        await db.recordPayoutClaim({
+          playerAddress: wallet.address,
+          amount: claimedAmount,
+          txHash: receipt.hash,
+          blockNumber: receipt.blockNumber,
+          timestamp: new Date().toISOString(),
+          cryptoType: state.activeCrypto
+        });
+      } catch (dbError) {
+        console.error('❌ Failed to record payout claim:', dbError);
+      }
+
+      // Refresh state
+      rpcCache.clear();
+      await loadGameState();
+      await loadPlayerData(wallet.address);
+      await walletStore.updateBalance();
+
+    } catch (error) {
+      console.error('Failed to claim payout:', error);
+      
+      let errorMessage = 'Failed to claim payout';
+      if (error.message.includes('No pending payout')) {
+        errorMessage = 'No pending payout to claim';
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = 'Insufficient ETH for gas fees';
+      } else if (error.message.includes('user rejected')) {
+        errorMessage = 'Transaction cancelled';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toastStore.error(errorMessage);
+      update(state => ({ ...state, error: errorMessage }));
+    } finally {
+      update(state => ({ ...state, claimingPayout: false }));
     }
   };
 
@@ -1215,10 +1644,11 @@ const createUnifiedGameStore = () => {
       }));
     });
 
-    const shotsSubscription = db.subscribeToShots((payload) => {
-      console.log('New shot:', payload);
+    // Subscribe to shot commits (when players commit shots)
+    const shotCommitsSubscription = db.subscribeToShotCommits((payload) => {
+      console.log('New shot commit:', payload);
       
-      // Notify about new shot taken (only if it's not the current user)
+      // Notify about new shot committed (only if it's not the current user)
       const walletStore = getWalletStore();
       const wallet = get(walletStore);
       if (payload.new && payload.new.player_address !== wallet.address?.toLowerCase()) {
@@ -1226,8 +1656,66 @@ const createUnifiedGameStore = () => {
         notifyShotTaken(currentState.currentPot || 'the current pot');
       }
       
-      // Refresh game state when new shots are taken
+      // Refresh game state when new shots are committed
       loadGameState();
+    });
+
+    // Subscribe to shot reveals (when players reveal their shots)
+    const shotRevealsSubscription = db.subscribeToShotReveals((payload) => {
+      console.log('Shot revealed:', payload);
+      
+      // Handle shot reveal updates
+      const walletStore = getWalletStore();
+      const wallet = get(walletStore);
+      
+      // If this is the current user's shot being revealed, clear pending shot
+      if (payload.new && payload.new.player_address === wallet.address?.toLowerCase()) {
+        update(state => ({
+          ...state,
+          pendingShot: null,
+          lastUpdate: new Date().toISOString()
+        }));
+        
+        // Clear localStorage
+        if (browser) {
+          localStorage.removeItem('ethshot_pending_shot');
+        }
+      }
+      
+      // Refresh game state when shots are revealed
+      loadGameState();
+    });
+
+    // Subscribe to general shot updates (fallback for any shot table changes)
+    const shotsSubscription = db.subscribeToShots((payload) => {
+      console.log('Shot update:', payload);
+      
+      // Only handle if not already handled by specific commit/reveal subscriptions
+      if (payload.eventType === 'INSERT' && payload.new?.status !== 'committed') {
+        // Handle legacy shots or direct shot inserts
+        const walletStore = getWalletStore();
+        const wallet = get(walletStore);
+        if (payload.new && payload.new.player_address !== wallet.address?.toLowerCase()) {
+          const currentState = get({ subscribe });
+          notifyShotTaken(currentState.currentPot || 'the current pot');
+        }
+        loadGameState();
+      }
+    });
+
+    // Subscribe to payout claims
+    const payoutClaimsSubscription = db.subscribeToPayoutClaims((payload) => {
+      console.log('Payout claimed:', payload);
+      
+      // Refresh game state when payouts are claimed
+      loadGameState();
+      
+      // If this is the current user's payout claim, update their data
+      const walletStore = getWalletStore();
+      const wallet = get(walletStore);
+      if (payload.new && payload.new.player_address === wallet.address?.toLowerCase()) {
+        loadPlayerData(wallet.address);
+      }
     });
 
     const sponsorsSubscription = db.subscribeToSponsors((payload) => {
@@ -1261,7 +1749,14 @@ const createUnifiedGameStore = () => {
     // Store subscriptions for cleanup
     updateInterval = {
       timer: updateInterval,
-      subscriptions: [winnersSubscription, shotsSubscription, sponsorsSubscription]
+      subscriptions: [
+        winnersSubscription, 
+        shotCommitsSubscription, 
+        shotRevealsSubscription, 
+        shotsSubscription, 
+        payoutClaimsSubscription, 
+        sponsorsSubscription
+      ]
     };
   };
 
@@ -1318,6 +1813,12 @@ const createUnifiedGameStore = () => {
     requestNotificationPermission: () => notificationManager.requestPermission(),
     getNotificationPermissionStatus: () => notificationManager.getPermissionStatus(),
     isNotificationsEnabled: () => notificationManager.isEnabled(),
+    // Commit-reveal functions
+    commitShot,
+    revealShot,
+    claimPayout,
+    generateSecret,
+    generateCommitment
   };
 };
 
@@ -1368,7 +1869,7 @@ export const referralStats = derived(gameStore, $game => $game.referralStats);
 export const hasReferralData = derived(gameStore, $game => $game.referralStats !== null);
 
 export const canUseDiscount = derived(gameStore, $game =>
-  ($game.availableDiscounts?.length || 0) > 0 && !$game.takingShot && $game.canShoot
+  ($game.availableDiscounts?.length || 0) > 0 && !$game.takingShot && $game.canCommitShot
 );
 
 export const nextDiscount = derived(gameStore, $game => {
@@ -1376,5 +1877,31 @@ export const nextDiscount = derived(gameStore, $game => {
   return discounts.length > 0 ? discounts[0] : null;
 });
 
+// Bonus shot derived stores
+export const bonusShotsAvailable = derived(gameStore, $game => $game.bonusShotsAvailable || 0);
+
+export const canUseBonusShot = derived(gameStore, $game => 
+  ($game.bonusShotsAvailable > 0) && !$game.takingShot && $game.canCommitShot
+);
+
+// Commit-reveal specific derived stores
+export const pendingShot = derived(gameStore, $game => $game.pendingShot);
+
+export const canCommitShot = derived(gameStore, $game => $game.canCommitShot);
+
+export const canRevealShot = derived(gameStore, $game => $game.canRevealShot);
+
+export const revealDeadline = derived(gameStore, $game => $game.revealDeadline);
+
+export const isRevealing = derived(gameStore, $game => $game.revealing);
+
+export const isClaimingPayout = derived(gameStore, $game => $game.claimingPayout);
+
+export const hasPendingShot = derived(gameStore, $game => $game.pendingShot?.exists || false);
+
+export const pendingPayout = derived(gameStore, $game => $game.pendingPayout);
+
 // Legacy exports for backward compatibility
 export const multiCryptoGameStore = gameStore;
+
+// Commit-reveal functions are exported through the gameStore object above

@@ -1,5 +1,5 @@
 <script>
-  import { gameStore, bonusShotsAvailable, canUseBonusShot, isLoading } from '../stores/game-unified.js';
+  import { gameStore, bonusShotsAvailable, canUseBonusShot, canCommitShot, hasPendingShot, isLoading, isRevealing } from '../stores/game-unified.js';
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
 
@@ -8,9 +8,12 @@
   $: bonusShots = $bonusShotsAvailable;
   $: canUseBonus = $canUseBonusShot;
   $: loading = $isLoading;
+  $: revealing = $isRevealing;
+  $: pendingShot = $hasPendingShot;
+  $: canCommit = $canCommitShot;
 
-  // Handle bonus shot click
-  async function handleBonusShot() {
+  // Handle bonus shot commit
+  async function handleBonusCommit() {
     if (!wallet.connected) {
       toastStore.error('Please connect your wallet first');
       return;
@@ -21,34 +24,82 @@
       return;
     }
 
+    if (pendingShot) {
+      toastStore.error('You already have a pending shot. Please reveal it first.');
+      return;
+    }
+
     try {
-      await gameStore.takeShot(true); // Pass true to use bonus shot
+      // Pass false for useDiscount, null for discountId, true for useBonus
+      await gameStore.commitShot(false, null, true);
     } catch (error) {
-      console.error('Failed to use bonus shot:', error);
-      toastStore.error('Failed to use bonus shot');
+      console.error('Failed to commit bonus shot:', error);
+      toastStore.error('Failed to commit bonus shot');
+    }
+  }
+
+  // Handle bonus shot reveal
+  async function handleBonusReveal() {
+    if (!wallet.connected) {
+      toastStore.error('Please connect your wallet first');
+      return;
+    }
+
+    if (!pendingShot) {
+      toastStore.error('No pending shot to reveal');
+      return;
+    }
+
+    try {
+      await gameStore.revealShot();
+    } catch (error) {
+      console.error('Failed to reveal bonus shot:', error);
+      toastStore.error('Failed to reveal bonus shot');
     }
   }
 </script>
 
 {#if wallet.connected && bonusShots > 0}
   <div class="bonus-shot-container">
-    <button
-      class="bonus-shot-btn"
-      class:disabled={!canUseBonus || loading}
-      disabled={!canUseBonus || loading}
-      on:click={handleBonusShot}
-    >
-      {#if loading}
-        <div class="loading-spinner"></div>
-        <span>Taking Shot...</span>
-      {:else}
-        <div class="bonus-icon">🎁</div>
-        <div class="bonus-content">
-          <div class="bonus-title">Use Bonus Shot</div>
-          <div class="bonus-count">{bonusShots} available</div>
-        </div>
-      {/if}
-    </button>
+    {#if pendingShot}
+      <!-- Reveal Bonus Shot -->
+      <button
+        class="bonus-shot-btn bonus-reveal"
+        class:disabled={revealing}
+        disabled={revealing}
+        on:click={handleBonusReveal}
+      >
+        {#if revealing}
+          <div class="loading-spinner"></div>
+          <span>Revealing Bonus...</span>
+        {:else}
+          <div class="bonus-icon">🔓</div>
+          <div class="bonus-content">
+            <div class="bonus-title">Reveal Bonus Shot</div>
+            <div class="bonus-count">Click to reveal</div>
+          </div>
+        {/if}
+      </button>
+    {:else}
+      <!-- Commit Bonus Shot -->
+      <button
+        class="bonus-shot-btn"
+        class:disabled={!canUseBonus || loading || !canCommit}
+        disabled={!canUseBonus || loading || !canCommit}
+        on:click={handleBonusCommit}
+      >
+        {#if loading}
+          <div class="loading-spinner"></div>
+          <span>Committing Bonus...</span>
+        {:else}
+          <div class="bonus-icon">🎁</div>
+          <div class="bonus-content">
+            <div class="bonus-title">Use Bonus Shot</div>
+            <div class="bonus-count">{bonusShots} available</div>
+          </div>
+        {/if}
+      </button>
+    {/if}
     
     <div class="bonus-info">
       <span class="info-icon">ℹ️</span>
