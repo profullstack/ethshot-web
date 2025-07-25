@@ -11,23 +11,21 @@
   // Form data
   let formData = {
     nickname: '',
-    username: '',
     bio: '',
     avatarFile: null
   };
 
   // Form state
   let saving = false;
-  let usernameAvailable = true;
-  let usernameChecking = false;
-  let usernameCheckTimeout = null;
+  let nicknameAvailable = true;
+  let nicknameChecking = false;
+  let nicknameCheckTimeout = null;
   let avatarPreview = null;
   let fileInput;
 
   // Validation
   let errors = {
     nickname: '',
-    username: '',
     bio: '',
     avatar: ''
   };
@@ -36,7 +34,6 @@
   $: if ($userProfile && show) {
     formData = {
       nickname: $userProfile.nickname || '',
-      username: $userProfile.username || '',
       bio: $userProfile.bio || '',
       avatarFile: null
     };
@@ -44,43 +41,55 @@
     clearErrors();
   }
 
-  // Watch username changes for availability checking
-  $: if (formData.username && formData.username !== ($userProfile?.username || '')) {
-    checkUsernameAvailability(formData.username);
+  // Watch nickname changes for availability checking
+  $: if (formData.nickname && formData.nickname !== ($userProfile?.nickname || '')) {
+    checkNicknameAvailability(formData.nickname);
   }
 
   const clearErrors = () => {
     errors = {
       nickname: '',
-      username: '',
       bio: '',
       avatar: ''
     };
+  };
+
+  const checkNicknameAvailability = async (nickname) => {
+    if (!nickname || nickname === ($userProfile?.nickname || '')) {
+      nicknameAvailable = true;
+      return;
+    }
+
+    // Clear previous timeout
+    if (nicknameCheckTimeout) {
+      clearTimeout(nicknameCheckTimeout);
+    }
+
+    // Debounce nickname checking
+    nicknameCheckTimeout = setTimeout(async () => {
+      nicknameChecking = true;
+      try {
+        nicknameAvailable = await profileStore.checkNicknameAvailability(nickname, $walletAddress);
+      } catch (error) {
+        console.error('Failed to check nickname availability:', error);
+        nicknameAvailable = false;
+      } finally {
+        nicknameChecking = false;
+      }
+    }, 500);
   };
 
   const validateForm = () => {
     clearErrors();
     let isValid = true;
 
-    // Nickname validation (optional)
-    if (formData.nickname && formData.nickname.length > 50) {
-      errors.nickname = 'Nickname must be 50 characters or less';
-      isValid = false;
-    }
-
-    // Username validation
-    if (formData.username) {
-      if (formData.username.length < 3) {
-        errors.username = 'Username must be at least 3 characters';
+    // Nickname validation (optional but must be unique if provided)
+    if (formData.nickname) {
+      if (formData.nickname.length > 50) {
+        errors.nickname = 'Nickname must be 50 characters or less';
         isValid = false;
-      } else if (formData.username.length > 30) {
-        errors.username = 'Username must be 30 characters or less';
-        isValid = false;
-      } else if (!/^[a-zA-Z0-9_-]+$/.test(formData.username)) {
-        errors.username = 'Username can only contain letters, numbers, hyphens, and underscores';
-        isValid = false;
-      } else if (!usernameAvailable) {
-        errors.username = 'Username is already taken';
+      } else if (!nicknameAvailable && formData.nickname !== ($userProfile?.nickname || '')) {
+        errors.nickname = 'Nickname is already taken';
         isValid = false;
       }
     }
@@ -106,31 +115,6 @@
     }
 
     return isValid;
-  };
-
-  const checkUsernameAvailability = async (username) => {
-    if (!username || username === ($userProfile?.username || '')) {
-      usernameAvailable = true;
-      return;
-    }
-
-    // Clear previous timeout
-    if (usernameCheckTimeout) {
-      clearTimeout(usernameCheckTimeout);
-    }
-
-    // Debounce username checking
-    usernameCheckTimeout = setTimeout(async () => {
-      usernameChecking = true;
-      try {
-        usernameAvailable = await profileStore.checkUsernameAvailability(username, $walletAddress);
-      } catch (error) {
-        console.error('Failed to check username availability:', error);
-        usernameAvailable = false;
-      } finally {
-        usernameChecking = false;
-      }
-    }, 500);
   };
 
   const handleAvatarChange = (event) => {
@@ -164,17 +148,16 @@
     try {
       let avatarUrl = $userProfile?.avatar_url;
 
-      // Upload avatar if a new file was selected
+      // If there's a new avatar file, upload it first and get the URL
       if (formData.avatarFile) {
         avatarUrl = await profileStore.uploadAvatar(formData.avatarFile, $walletAddress);
         toastStore.success('Avatar uploaded successfully!');
       }
 
-      // Update profile
+      // Update profile with all data (including new avatar URL if uploaded)
       await profileStore.updateProfile({
         walletAddress: $walletAddress,
         nickname: formData.nickname || null,
-        username: formData.username || null,
         bio: formData.bio || null,
         avatarUrl: avatarUrl
       });
@@ -196,7 +179,6 @@
     // Reset form
     formData = {
       nickname: '',
-      username: '',
       bio: '',
       avatarFile: null
     };
@@ -298,42 +280,23 @@
           <label for="nickname" class="block text-sm font-medium text-gray-300 mb-2">
             Nickname (Optional)
           </label>
-          <input
-            id="nickname"
-            type="text"
-            bind:value={formData.nickname}
-            placeholder="Enter a display name"
-            class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            disabled={saving || $uploadingAvatar}
-            maxlength="50"
-          />
-          {#if errors.nickname}
-            <p class="text-red-400 text-sm mt-1">{errors.nickname}</p>
-          {/if}
-        </div>
-
-        <!-- Username Field -->
-        <div>
-          <label for="username" class="block text-sm font-medium text-gray-300 mb-2">
-            Username (Optional)
-          </label>
           <div class="relative">
             <input
-              id="username"
+              id="nickname"
               type="text"
-              bind:value={formData.username}
-              placeholder="Enter a unique username"
+              bind:value={formData.nickname}
+              placeholder="Enter a display name"
               class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
               disabled={saving || $uploadingAvatar}
-              maxlength="30"
+              maxlength="50"
             />
             
-            <!-- Username availability indicator -->
+            <!-- Nickname availability indicator -->
             <div class="absolute right-3 top-1/2 transform -translate-y-1/2">
-              {#if usernameChecking}
+              {#if nicknameChecking}
                 <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              {:else if formData.username && formData.username !== ($userProfile?.username || '')}
-                {#if usernameAvailable}
+              {:else if formData.nickname && formData.nickname !== ($userProfile?.nickname || '')}
+                {#if nicknameAvailable}
                   <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
                   </svg>
@@ -346,14 +309,15 @@
             </div>
           </div>
           
-          {#if errors.username}
-            <p class="text-red-400 text-sm mt-1">{errors.username}</p>
-          {:else if formData.username}
+          {#if errors.nickname}
+            <p class="text-red-400 text-sm mt-1">{errors.nickname}</p>
+          {:else if formData.nickname}
             <p class="text-gray-400 text-xs mt-1">
-              Username can only contain letters, numbers, hyphens, and underscores
+              Nickname must be unique across all users
             </p>
           {/if}
         </div>
+
 
         <!-- Bio Field -->
         <div>
@@ -399,7 +363,7 @@
           <button
             type="submit"
             class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={saving || $uploadingAvatar || usernameChecking || (!usernameAvailable && formData.username !== ($userProfile?.username || ''))}
+            disabled={saving || $uploadingAvatar || nicknameChecking || (!nicknameAvailable && formData.nickname !== ($userProfile?.nickname || ''))}
           >
             {#if saving || $uploadingAvatar}
               <div class="flex items-center justify-center space-x-2">

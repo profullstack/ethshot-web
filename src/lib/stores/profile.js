@@ -67,18 +67,17 @@ const createProfileStore = () => {
       }
     },
 
-    // Upload avatar
+    // Upload avatar (returns URL without updating profile)
     async uploadAvatar(file, walletAddr) {
       update(state => ({ ...state, uploadingAvatar: true, error: null }));
 
       try {
         // Delete old avatar if exists
-        const currentState = await new Promise(resolve => {
-          const unsubscribe = subscribe(state => {
-            unsubscribe();
-            resolve(state);
-          });
+        let currentState;
+        const unsubscribe = subscribe(state => {
+          currentState = state;
         });
+        unsubscribe();
 
         if (currentState.profile?.avatar_url) {
           try {
@@ -89,40 +88,34 @@ const createProfileStore = () => {
           }
         }
 
-        // Upload new avatar
+        // Upload new avatar and return URL
         const avatarUrl = await db.uploadAvatar(file, walletAddr);
         
-        // Update profile with new avatar URL
-        const updatedProfile = await db.upsertUserProfile({
-          walletAddress: walletAddr,
-          avatarUrl
-        });
-
-        update(state => ({ 
-          ...state, 
-          profile: updatedProfile, 
-          uploadingAvatar: false, 
-          error: null 
+        update(state => ({
+          ...state,
+          uploadingAvatar: false,
+          error: null
         }));
 
         return avatarUrl;
       } catch (error) {
         console.error('Failed to upload avatar:', error);
-        update(state => ({ 
-          ...state, 
-          uploadingAvatar: false, 
-          error: error.message || 'Failed to upload avatar' 
+        update(state => ({
+          ...state,
+          uploadingAvatar: false,
+          error: error.message || 'Failed to upload avatar'
         }));
         throw error;
       }
     },
 
-    // Check username availability
-    async checkUsernameAvailability(username, excludeWalletAddress = null) {
+
+    // Check nickname availability
+    async checkNicknameAvailability(nickname, excludeWalletAddress = null) {
       try {
-        return await db.isUsernameAvailable(username, excludeWalletAddress);
+        return await db.isNicknameAvailable(nickname, excludeWalletAddress);
       } catch (error) {
-        console.error('Failed to check username availability:', error);
+        console.error('Failed to check nickname availability:', error);
         return false;
       }
     },
@@ -147,12 +140,11 @@ export const profileLoading = derived(profileStore, $profileStore => $profileSto
 export const profileError = derived(profileStore, $profileStore => $profileStore.error);
 export const uploadingAvatar = derived(profileStore, $profileStore => $profileStore.uploadingAvatar);
 
-// Derived store for display name (nickname or username or truncated address)
+// Derived store for display name (nickname or truncated address)
 export const displayName = derived(
-  [userProfile, walletAddress], 
+  [userProfile, walletAddress],
   ([$userProfile, $walletAddress]) => {
     if ($userProfile?.nickname) return $userProfile.nickname;
-    if ($userProfile?.username) return $userProfile.username;
     if ($walletAddress) return `${$walletAddress.slice(0, 6)}...${$walletAddress.slice(-4)}`;
     return '';
   }

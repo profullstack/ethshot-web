@@ -495,18 +495,23 @@ export const db = {
       console.log('🔄 Upserting user profile to Supabase:', {
         wallet_address: profileData.walletAddress.toLowerCase(),
         nickname: profileData.nickname,
-        username: profileData.username,
         avatar_url: profileData.avatarUrl,
         bio: profileData.bio
       });
 
-      const { data, error } = await supabase.rpc('upsert_user_profile', {
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Profile update timed out after 30 seconds')), 30000);
+      });
+
+      const updatePromise = supabase.rpc('upsert_user_profile', {
         wallet_addr: profileData.walletAddress.toLowerCase(),
         p_nickname: profileData.nickname || null,
-        p_username: profileData.username || null,
         p_avatar_url: profileData.avatarUrl || null,
         p_bio: profileData.bio || null
       });
+
+      const { data, error } = await Promise.race([updatePromise, timeoutPromise]);
 
       if (error) {
         console.error('❌ Supabase upsertUserProfile error:', error);
@@ -521,26 +526,26 @@ export const db = {
     }
   },
 
-  async isUsernameAvailable(username, excludeWalletAddress = null) {
+  async isNicknameAvailable(nickname, excludeWalletAddress = null) {
     if (!supabase) {
-      console.warn('Supabase not configured - returning false for isUsernameAvailable');
+      console.warn('Supabase not configured - returning false for isNicknameAvailable');
       return false;
     }
 
     try {
-      const { data, error } = await supabase.rpc('is_username_available', {
-        p_username: username,
+      const { data, error } = await supabase.rpc('is_nickname_available', {
+        p_nickname: nickname,
         exclude_wallet_addr: excludeWalletAddress?.toLowerCase() || null
       });
 
       if (error) {
-        console.error('Error checking username availability:', error);
+        console.error('Error checking nickname availability:', error);
         return false;
       }
 
       return data === true;
     } catch (error) {
-      console.error('Error checking username availability:', error);
+      console.error('Error checking nickname availability:', error);
       return false;
     }
   },
@@ -675,16 +680,21 @@ export const db = {
     }
   },
 
-  async getUserDiscounts(userId) {
+  async getUserDiscounts(walletAddress) {
     if (!supabase) {
       console.warn('Supabase not configured - returning empty array for getUserDiscounts');
       return [];
     }
 
     try {
-      const { data, error } = await supabase.rpc('get_user_discounts', {
-        p_user_id: userId
-      });
+      // According to the migration, this function intentionally returns empty results
+      // and is not used by the frontend. We'll query the referral_discounts table directly.
+      const { data, error } = await supabase
+        .from(TABLES.REFERRAL_DISCOUNTS)
+        .select('id, discount_type, discount_percentage, expires_at, created_at')
+        .eq('wallet_address', walletAddress.toLowerCase())
+        .eq('is_used', false)
+        .gt('expires_at', new Date().toISOString());
 
       if (error) {
         console.error('Error getting user discounts:', error);
