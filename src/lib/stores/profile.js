@@ -155,6 +155,11 @@ export const avatarUrl = derived(userProfile, $userProfile => {
   return $userProfile?.avatar_url || null;
 });
 
+// Derived store for notification preferences
+export const notificationsEnabled = derived(userProfile, $userProfile => {
+  return $userProfile?.notifications_enabled ?? true; // Default to true if not set
+});
+
 // Auto-load profile when wallet connects
 let currentAddress = null;
 walletAddress.subscribe(async (address) => {

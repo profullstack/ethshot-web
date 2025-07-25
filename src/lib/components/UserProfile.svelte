@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher, onMount } from 'svelte';
-  import { profileStore, userProfile, profileLoading, profileError, uploadingAvatar } from '../stores/profile.js';
+  import { profileStore, userProfile, profileLoading, profileError, uploadingAvatar, notificationsEnabled } from '../stores/profile.js';
   import { walletAddress } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
 
@@ -12,7 +12,8 @@
   let formData = {
     nickname: '',
     bio: '',
-    avatarFile: null
+    avatarFile: null,
+    notificationsEnabled: true
   };
 
   // Form state
@@ -35,7 +36,8 @@
     formData = {
       nickname: $userProfile.nickname || '',
       bio: $userProfile.bio || '',
-      avatarFile: null
+      avatarFile: null,
+      notificationsEnabled: $userProfile.notifications_enabled ?? true
     };
     avatarPreview = $userProfile.avatar_url;
     clearErrors();
@@ -159,7 +161,8 @@
         walletAddress: $walletAddress,
         nickname: formData.nickname || null,
         bio: formData.bio || null,
-        avatarUrl: avatarUrl
+        avatarUrl: avatarUrl,
+        notificationsEnabled: formData.notificationsEnabled
       });
 
       toastStore.success('Profile updated successfully!');
@@ -180,7 +183,8 @@
     formData = {
       nickname: '',
       bio: '',
-      avatarFile: null
+      avatarFile: null,
+      notificationsEnabled: true
     };
     avatarPreview = null;
     clearErrors();
@@ -340,6 +344,35 @@
               <div></div>
             {/if}
             <p class="text-gray-400 text-xs">{formData.bio.length}/500</p>
+          </div>
+        </div>
+
+        <!-- Notification Settings -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-3">
+            Notification Settings
+          </label>
+          <div class="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-600">
+            <div class="flex items-center space-x-3">
+              <div class="text-yellow-400">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-white text-sm font-medium">Push Notifications</p>
+                <p class="text-gray-400 text-xs">Get notified about game events and updates</p>
+              </div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                bind:checked={formData.notificationsEnabled}
+                class="sr-only peer"
+                disabled={saving || $uploadingAvatar}
+              />
+              <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
           </div>
         </div>
 

@@ -65,6 +65,27 @@
     toggleMobileMenu(event);
   };
 
+  // Handle navigation link clicks with iOS/Safari compatibility
+  const handleNavLinkClick = (href, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showMobileMenu = false;
+    console.log('Navigating to:', href);
+    
+    // Use window.location for better iOS/Safari compatibility
+    window.location.href = href;
+  };
+
+  const handleNavLinkTouch = (href, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showMobileMenu = false;
+    console.log('Touch navigating to:', href);
+    
+    // Use window.location for better iOS/Safari compatibility
+    window.location.href = href;
+  };
+
   // Close dropdown when clicking outside
   const handleClickOutside = (event) => {
     // Don't handle clicks on the mobile menu button itself
@@ -354,32 +375,36 @@
                 <a
                   href="/"
                   class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-base"
-                  on:click={() => showMobileMenu = false}
-                  on:touchstart={() => showMobileMenu = false}
+                  on:click={(e) => handleNavLinkClick('/', e)}
+                  on:touchstart={(e) => handleNavLinkTouch('/', e)}
+                  style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
                 >
                   🎯 Game
                 </a>
                 <a
                   href="/referrals"
                   class="block px-4 py-3 text-gray-300 hover:text-purple-400 hover:bg-gray-700 rounded-lg transition-colors font-semibold text-base"
-                  on:click={() => showMobileMenu = false}
-                  on:touchstart={() => showMobileMenu = false}
+                  on:click={(e) => handleNavLinkClick('/referrals', e)}
+                  on:touchstart={(e) => handleNavLinkTouch('/referrals', e)}
+                  style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
                 >
                   🎯 Referrals
                 </a>
                 <a
                   href="/leaderboard"
                   class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-base"
-                  on:click={() => showMobileMenu = false}
-                  on:touchstart={() => showMobileMenu = false}
+                  on:click={(e) => handleNavLinkClick('/leaderboard', e)}
+                  on:touchstart={(e) => handleNavLinkTouch('/leaderboard', e)}
+                  style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
                 >
                   🏆 Leaderboard
                 </a>
                 <a
                   href="/about"
                   class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-base"
-                  on:click={() => showMobileMenu = false}
-                  on:touchstart={() => showMobileMenu = false}
+                  on:click={(e) => handleNavLinkClick('/about', e)}
+                  on:touchstart={(e) => handleNavLinkTouch('/about', e)}
+                  style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
                 >
                   ℹ️ About
                 </a>

@@ -496,7 +496,8 @@ export const db = {
         wallet_address: profileData.walletAddress.toLowerCase(),
         nickname: profileData.nickname,
         avatar_url: profileData.avatarUrl,
-        bio: profileData.bio
+        bio: profileData.bio,
+        notifications_enabled: profileData.notificationsEnabled
       });
 
       // Add timeout to prevent hanging
@@ -508,7 +509,8 @@ export const db = {
         wallet_addr: profileData.walletAddress.toLowerCase(),
         p_nickname: profileData.nickname || null,
         p_avatar_url: profileData.avatarUrl || null,
-        p_bio: profileData.bio || null
+        p_bio: profileData.bio || null,
+        p_notifications_enabled: profileData.notificationsEnabled ?? true
       });
 
       const { data, error } = await Promise.race([updatePromise, timeoutPromise]);
