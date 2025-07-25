@@ -34,8 +34,8 @@ const mockDb = {
     referral_code: 'TEST1234',
     total_referrals: 5,
     successful_referrals: 3,
-    bonus_shots_available: 2,
-    total_bonus_shots_earned: 8,
+    available_discounts: 2,
+    total_discounts_earned: 8,
     referred_by: null
   }),
   createReferralCode: async () => 'TEST1234'
@@ -123,10 +123,10 @@ describe('ReferralSystem Component', () => {
       
       // Wait for async loading to complete
       await waitFor(() => {
-        expect(screen.getByText('2')).to.exist; // bonus shots available
+        expect(screen.getByText('2')).to.exist; // available discounts
         expect(screen.getByText('5')).to.exist; // total referrals
         expect(screen.getByText('3')).to.exist; // successful referrals
-        expect(screen.getByText('8')).to.exist; // total bonus shots earned
+        expect(screen.getByText('8')).to.exist; // total discounts earned
       });
     });
 
@@ -241,8 +241,8 @@ describe('ReferralSystem Component', () => {
           referral_code: 'TEST1234',
           total_referrals: 10, // Achievement milestone
           successful_referrals: 8,
-          bonus_shots_available: 5,
-          total_bonus_shots_earned: 15,
+          available_discounts: 5,
+          total_discounts_earned: 15,
           referred_by: null
         }),
         createReferralCode: async () => 'TEST1234'
@@ -281,7 +281,7 @@ describe('ReferralSystem Component', () => {
       
       await waitFor(() => {
         expect(screen.getByText('🎁 Referral Rewards')).to.exist;
-        expect(screen.getByText('Free Bonus Shot')).to.exist;
+        expect(screen.getByText('20% Discount')).to.exist;
         expect(screen.getByText('Referral Reward')).to.exist;
         expect(screen.getByText('Leaderboard Fame')).to.exist;
       });
@@ -295,8 +295,8 @@ describe('ReferralSystem Component', () => {
           referral_code: 'TEST1234',
           total_referrals: 2,
           successful_referrals: 1,
-          bonus_shots_available: 1,
-          total_bonus_shots_earned: 3,
+          available_discounts: 1,
+          total_discounts_earned: 3,
           referred_by: '0x456...def'
         }),
         createReferralCode: async () => 'TEST1234'

@@ -3,14 +3,28 @@
   import { db } from '$lib/supabase.js';
   import { formatAddress, formatEther } from '$lib/supabase.js';
   import MetaTags from '$lib/components/MetaTags.svelte';
+  import UserDisplay from '$lib/components/UserDisplay.svelte';
 
   let topPlayers = [];
+  let userProfiles = new Map();
   let loading = true;
   let error = null;
 
   onMount(async () => {
     try {
       topPlayers = await db.getTopPlayers(50, 'total_shots');
+      
+      // Fetch user profiles for all players
+      if (topPlayers.length > 0) {
+        const addresses = topPlayers.map(player => player.address);
+        const profiles = await db.getUserProfiles(addresses);
+        
+        // Create a map for quick profile lookup
+        userProfiles = new Map();
+        profiles.forEach(profile => {
+          userProfiles.set(profile.wallet_address.toLowerCase(), profile);
+        });
+      }
     } catch (err) {
       console.error('Failed to load leaderboard:', err);
       error = 'Failed to load leaderboard data';
@@ -18,6 +32,11 @@
       loading = false;
     }
   });
+
+  // Get profile for a player
+  function getPlayerProfile(address) {
+    return userProfiles.get(address.toLowerCase()) || null;
+  }
 
   const getRankIcon = (rank) => {
     switch (rank) {
@@ -105,9 +124,12 @@
                   </div>
                 </td>
                 <td class="px-6 py-4">
-                  <div class="font-mono text-sm text-gray-300">
-                    {formatAddress(player.address)}
-                  </div>
+                  <UserDisplay
+                    walletAddress={player.address}
+                    profile={getPlayerProfile(player.address)}
+                    size="sm"
+                    showAddress={true}
+                  />
                 </td>
                 <td class="px-6 py-4 text-right">
                   <div class="font-bold text-white">

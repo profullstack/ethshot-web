@@ -158,12 +158,6 @@
                 <span class="text-gray-400">Total Won:</span>
                 <span class="font-mono text-green-400">{$gameStore.playerStats?.totalWon || '0.000'} ETH</span>
               </div>
-              {#if $gameStore.bonusShotsAvailable > 0}
-                <div class="flex justify-between">
-                  <span class="text-gray-400">Bonus Shots:</span>
-                  <span class="font-mono text-purple-400">{$gameStore.bonusShotsAvailable}</span>
-                </div>
-              {/if}
               {#if $gameStore.referralStats?.totalReferrals > 0}
                 <div class="flex justify-between">
                   <span class="text-gray-400">Referrals:</span>

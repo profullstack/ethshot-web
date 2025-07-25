@@ -128,8 +128,8 @@ describe('Referral System Core Functionality', () => {
         referral_code: 'TEST1234',
         total_referrals: 10,
         successful_referrals: 7,
-        bonus_shots_available: 3,
-        total_bonus_shots_earned: 15,
+        available_discounts: 3,
+        total_discounts_earned: 15,
         referred_by: '0x123...abc'
       };
 
@@ -138,8 +138,8 @@ describe('Referral System Core Functionality', () => {
       expect(formatted).to.have.property('referralCode', 'TEST1234');
       expect(formatted).to.have.property('totalReferrals', 10);
       expect(formatted).to.have.property('successfulReferrals', 7);
-      expect(formatted).to.have.property('bonusShotsAvailable', 3);
-      expect(formatted).to.have.property('totalBonusShotsEarned', 15);
+      expect(formatted).to.have.property('availableDiscounts', 3);
+      expect(formatted).to.have.property('totalDiscountsEarned', 15);
       expect(formatted).to.have.property('referredBy', '0x123...abc');
       expect(formatted).to.have.property('successRate', 70);
     });
@@ -150,8 +150,8 @@ describe('Referral System Core Functionality', () => {
       expect(formatted).to.have.property('referralCode', null);
       expect(formatted).to.have.property('totalReferrals', 0);
       expect(formatted).to.have.property('successfulReferrals', 0);
-      expect(formatted).to.have.property('bonusShotsAvailable', 0);
-      expect(formatted).to.have.property('totalBonusShotsEarned', 0);
+      expect(formatted).to.have.property('availableDiscounts', 0);
+      expect(formatted).to.have.property('totalDiscountsEarned', 0);
       expect(formatted).to.have.property('referredBy', null);
       expect(formatted).to.have.property('successRate', 0);
     });
@@ -182,12 +182,12 @@ describe('Referral System Core Functionality', () => {
 
   describe('Achievement System', () => {
     it('should return correct achievements for referral milestones', () => {
-      expect(getReferralAchievement(1)).to.equal('🎉 First Referral! Welcome to the referral program!');
-      expect(getReferralAchievement(5)).to.equal('🚀 Referral Rookie! You\'ve referred 5 friends!');
-      expect(getReferralAchievement(10)).to.equal('⭐ Referral Champion! 10 successful referrals!');
-      expect(getReferralAchievement(25)).to.equal('🏆 Referral Master! 25 friends joined through you!');
-      expect(getReferralAchievement(50)).to.equal('👑 Referral Legend! 50 successful referrals!');
-      expect(getReferralAchievement(100)).to.equal('🌟 Referral God! 100 friends - you\'re unstoppable!');
+      expect(getReferralAchievement(1)).to.equal("🎉 First Referral! You're spreading the word!");
+      expect(getReferralAchievement(5)).to.equal("🔥 5 Referrals! You're on fire!");
+      expect(getReferralAchievement(10)).to.equal("⭐ 10 Referrals! Superstar status!");
+      expect(getReferralAchievement(25)).to.equal("💎 25 Referrals! Diamond referrer!");
+      expect(getReferralAchievement(50)).to.equal("👑 50 Referrals! Referral royalty!");
+      expect(getReferralAchievement(100)).to.equal("🚀 100 Referrals! To the moon!");
     });
 
     it('should return null for non-milestone numbers', () => {
@@ -362,8 +362,8 @@ describe('Referral System Core Functionality', () => {
       const largeStats = {
         total_referrals: 1000000,
         successful_referrals: 750000,
-        bonus_shots_available: 50,
-        total_bonus_shots_earned: 2000000
+        available_discounts: 50,
+        total_discounts_earned: 2000000
       };
 
       const start = Date.now();

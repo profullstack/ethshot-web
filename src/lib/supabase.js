@@ -38,6 +38,7 @@ export const TABLES = {
   REFERRAL_CODES: 'referral_codes',
   REFERRALS: 'referrals',
   REFERRAL_DISCOUNTS: 'referral_discounts',
+  USER_PROFILES: 'user_profiles',
 };
 
 // Database functions for ETH Shot game
@@ -652,6 +653,207 @@ export const db = {
       .subscribe();
   },
 
+  // User Profile operations
+  async getUserProfile(walletAddress) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for getUserProfile');
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('get_user_profile', {
+        wallet_addr: walletAddress.toLowerCase()
+      });
+
+      if (error) {
+        console.warn('Supabase getUserProfile query error (expected if profile not found):', error);
+        return null;
+      }
+
+      // Return first item if exists, otherwise null
+      return data && data.length > 0 ? data[0] : null;
+    } catch (error) {
+      console.warn('Error fetching user profile (expected if profile not found):', error);
+      return null;
+    }
+  },
+
+  async upsertUserProfile(profileData) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for upsertUserProfile');
+      return null;
+    }
+
+    try {
+      console.log('🔄 Upserting user profile to Supabase:', {
+        wallet_address: profileData.walletAddress.toLowerCase(),
+        nickname: profileData.nickname,
+        avatar_url: profileData.avatarUrl,
+        bio: profileData.bio
+      });
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Profile update timed out after 30 seconds')), 30000);
+      });
+
+      const updatePromise = supabase.rpc('upsert_user_profile', {
+        wallet_addr: profileData.walletAddress.toLowerCase(),
+        p_nickname: profileData.nickname || null,
+        p_avatar_url: profileData.avatarUrl || null,
+        p_bio: profileData.bio || null
+      });
+
+      const { data, error } = await Promise.race([updatePromise, timeoutPromise]);
+
+      if (error) {
+        console.error('❌ Supabase upsertUserProfile error:', error);
+        throw error;
+      }
+      
+      console.log('✅ User profile upserted successfully:', data);
+      return data && data.length > 0 ? data[0] : null;
+    } catch (error) {
+      console.error('❌ Error upserting user profile:', error);
+      throw error;
+    }
+  },
+
+  async isNicknameAvailable(nickname, excludeWalletAddress = null) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning false for isNicknameAvailable');
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('is_nickname_available', {
+        p_nickname: nickname,
+        exclude_wallet_addr: excludeWalletAddress?.toLowerCase() || null
+      });
+
+      if (error) {
+        console.error('Error checking nickname availability:', error);
+        return false;
+      }
+
+      return data === true;
+    } catch (error) {
+      console.error('Error checking nickname availability:', error);
+      return false;
+    }
+  },
+
+  async getUserProfiles(walletAddresses) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning empty array for getUserProfiles');
+      return [];
+    }
+
+    if (!walletAddresses || walletAddresses.length === 0) {
+      return [];
+    }
+
+    try {
+      // Convert addresses to lowercase for consistent querying
+      const normalizedAddresses = walletAddresses.map(addr => addr.toLowerCase());
+
+      const { data, error } = await supabase
+        .from(TABLES.USER_PROFILES)
+        .select('wallet_address, nickname, avatar_url, bio, created_at, updated_at')
+        .in('wallet_address', normalizedAddresses);
+
+      if (error) {
+        console.warn('Supabase getUserProfiles query error:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.warn('Error fetching user profiles:', error);
+      return [];
+    }
+  },
+
+  async uploadAvatar(file, walletAddress) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for uploadAvatar');
+      return null;
+    }
+
+    try {
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${walletAddress.toLowerCase()}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      console.log('📤 Uploading avatar to Supabase Storage:', {
+        fileName,
+        filePath,
+        fileSize: file.size,
+        fileType: file.type
+      });
+
+      // Upload file to storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('❌ Avatar upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      console.log('✅ Avatar uploaded successfully:', {
+        path: uploadData.path,
+        publicUrl: urlData.publicUrl
+      });
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('❌ Error uploading avatar:', error);
+      throw error;
+    }
+  },
+
+  async deleteAvatar(avatarUrl) {
+    if (!supabase || !avatarUrl) {
+      console.warn('Supabase not configured or no avatar URL provided');
+      return false;
+    }
+
+    try {
+      // Extract file path from URL
+      const url = new URL(avatarUrl);
+      const pathParts = url.pathname.split('/');
+      const filePath = pathParts.slice(-2).join('/'); // Get 'avatars/filename.ext'
+
+      console.log('🗑️ Deleting avatar from Supabase Storage:', filePath);
+
+      const { error } = await supabase.storage
+        .from('avatars')
+        .remove([filePath]);
+
+      if (error) {
+        console.error('❌ Avatar deletion error:', error);
+        throw error;
+      }
+
+      console.log('✅ Avatar deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ Error deleting avatar:', error);
+      return false;
+    }
+  },
+
   // Referral system operations
   async createReferralCode(referrerAddress) {
     if (!supabase) {
@@ -702,16 +904,21 @@ export const db = {
     }
   },
 
-  async getUserDiscounts(userId) {
+  async getUserDiscounts(walletAddress) {
     if (!supabase) {
       console.warn('Supabase not configured - returning empty array for getUserDiscounts');
       return [];
     }
 
     try {
-      const { data, error } = await supabase.rpc('get_user_discounts', {
-        p_user_id: userId
-      });
+      // According to the migration, this function intentionally returns empty results
+      // and is not used by the frontend. We'll query the referral_discounts table directly.
+      const { data, error } = await supabase
+        .from(TABLES.REFERRAL_DISCOUNTS)
+        .select('id, discount_type, discount_percentage, expires_at, created_at')
+        .eq('wallet_address', walletAddress.toLowerCase())
+        .eq('is_used', false)
+        .gt('expires_at', new Date().toISOString());
 
       if (error) {
         console.error('Error getting user discounts:', error);

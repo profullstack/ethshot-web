@@ -4,9 +4,11 @@
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
   import { db } from '../supabase.js';
+  import UserDisplay from './UserDisplay.svelte';
 
   // Component state
   let leaderboardData = [];
+  let userProfiles = new Map();
   let loading = false;
   let error = null;
   let currentUserRank = null;
@@ -46,14 +48,34 @@
       });
       
       leaderboardData = data || [];
+
+      // Fetch user profiles for all referrers
+      if (leaderboardData.length > 0) {
+        const addresses = leaderboardData.map(entry => entry.referrer_address);
+        const profiles = await db.getUserProfiles(addresses);
+        
+        // Create a map for quick profile lookup
+        userProfiles = new Map();
+        profiles.forEach(profile => {
+          userProfiles.set(profile.wallet_address.toLowerCase(), profile);
+        });
+      } else {
+        userProfiles = new Map();
+      }
       
     } catch (err) {
       console.error('Failed to load referral leaderboard:', err);
       error = 'Failed to load leaderboard data';
       toastStore.error('Failed to load referral leaderboard');
+      userProfiles = new Map();
     } finally {
       loading = false;
     }
+  }
+
+  // Get profile for a referrer
+  function getReferrerProfile(address) {
+    return userProfiles.get(address.toLowerCase()) || null;
   }
 
   function findCurrentUserRank() {
@@ -184,12 +206,11 @@
         <div class="header-referrals">Referrals</div>
         <div class="header-active">Active</div>
         <div class="header-rate">Success Rate</div>
-        <div class="header-bonus">Bonus Shots</div>
       </div>
 
       <div class="table-body">
         {#each leaderboardData as entry, index}
-          <div 
+          <div
             class="table-row {getRankClass(index + 1)} {isCurrentUser(entry.referrer_address) ? 'current-user' : ''}"
           >
             <div class="cell-rank">
@@ -198,7 +219,13 @@
             
             <div class="cell-player">
               <div class="player-info">
-                <span class="player-address">{formatAddress(entry.referrer_address)}</span>
+                <UserDisplay
+                  walletAddress={entry.referrer_address}
+                  profile={getReferrerProfile(entry.referrer_address)}
+                  size="sm"
+                  showAddress={false}
+                  className={isCurrentUser(entry.referrer_address) ? 'current-user' : ''}
+                />
                 {#if isCurrentUser(entry.referrer_address)}
                   <span class="you-badge">YOU</span>
                 {/if}
@@ -215,10 +242,6 @@
             
             <div class="cell-rate">
               <span class="success-rate">{formatSuccessRate(entry.success_rate)}</span>
-            </div>
-            
-            <div class="cell-bonus">
-              <span class="bonus-count">{entry.total_bonus_shots_earned}</span>
             </div>
           </div>
         {/each}
@@ -330,7 +353,7 @@
   }
 
   .table-header {
-    @apply grid grid-cols-6 gap-4 p-4 bg-gray-900/50 border-b border-gray-700;
+    @apply grid grid-cols-5 gap-4 p-4 bg-gray-900/50 border-b border-gray-700;
     @apply text-gray-300 font-semibold text-sm;
   }
 
@@ -339,7 +362,7 @@
   }
 
   .table-row {
-    @apply grid grid-cols-6 gap-4 p-4 hover:bg-gray-700/30 transition-colors;
+    @apply grid grid-cols-5 gap-4 p-4 hover:bg-gray-700/30 transition-colors;
   }
 
   .table-row.current-user {
@@ -382,11 +405,11 @@
     @apply bg-blue-600 text-white text-xs px-2 py-1 rounded-full font-bold;
   }
 
-  .cell-referrals, .cell-active, .cell-rate, .cell-bonus {
+  .cell-referrals, .cell-active, .cell-rate {
     @apply flex items-center text-white font-semibold;
   }
 
-  .referral-count, .active-count, .bonus-count {
+  .referral-count, .active-count {
     @apply text-lg;
   }
 
@@ -440,8 +463,8 @@
       @apply grid-cols-3 gap-2 text-sm;
     }
 
-    .header-active, .header-rate, .header-bonus,
-    .cell-active, .cell-rate, .cell-bonus {
+    .header-active, .header-rate,
+    .cell-active, .cell-rate {
       @apply hidden;
     }
 
@@ -453,10 +476,10 @@
   /* Tablet Responsive */
   @media (max-width: 1024px) and (min-width: 769px) {
     .table-header, .table-row {
-      @apply grid-cols-5 gap-3;
+      @apply grid-cols-4 gap-3;
     }
 
-    .header-bonus, .cell-bonus {
+    .header-rate, .cell-rate {
       @apply hidden;
     }
   }
