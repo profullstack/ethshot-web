@@ -16,6 +16,9 @@
     notificationsEnabled: true
   };
 
+  // Separate reactive variable for notifications to avoid reset issues
+  let notificationsToggle = true;
+
   // Form state
   let saving = false;
   let nicknameAvailable = true;
@@ -39,9 +42,13 @@
       avatarFile: null,
       notificationsEnabled: $userProfile.notifications_enabled ?? true
     };
+    notificationsToggle = $userProfile.notifications_enabled ?? true;
     avatarPreview = $userProfile.avatar_url;
     clearErrors();
   }
+
+  // Sync the separate notification toggle with formData
+  $: formData.notificationsEnabled = notificationsToggle;
 
   // Watch nickname changes for availability checking
   $: if (formData.nickname && formData.nickname !== ($userProfile?.nickname || '')) {
@@ -186,6 +193,7 @@
       avatarFile: null,
       notificationsEnabled: true
     };
+    notificationsToggle = true;
     avatarPreview = null;
     clearErrors();
     
@@ -367,7 +375,7 @@
             <label class="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
-                bind:checked={formData.notificationsEnabled}
+                bind:checked={notificationsToggle}
                 class="sr-only peer"
                 disabled={saving || $uploadingAvatar}
               />
