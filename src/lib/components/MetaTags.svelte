@@ -7,7 +7,7 @@
   export let description = 'A viral, pay-to-play, Ethereum-powered game where users take a chance to win an ETH jackpot by clicking a single button. 0.0005 ETH per shot, 1% chance to win!';
   export let keywords = 'ethereum, eth, jackpot, game, crypto, blockchain, gambling, web3, defi, shot';
   export let author = 'ETH Shot';
-  export let image = '/favicon-32x32.png';
+  export let image = '/logo.svg';
   export let imageAlt = 'ETH Shot - Ethereum Jackpot Game';
   export let imageWidth = '1200';
   export let imageHeight = '630';
@@ -56,7 +56,7 @@
       "name": siteName,
       "logo": {
         "@type": "ImageObject",
-        "url": `${new URL(currentUrl).origin}/favicon-32x32.png`
+        "url": `${new URL(currentUrl).origin}/logo.svg`
       }
     },
     ...(publishedTime && { "datePublished": publishedTime }),

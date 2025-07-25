@@ -24,7 +24,7 @@
   <!-- What is ETH Shot -->
   <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-8 border border-gray-700">
     <h2 class="text-3xl font-bold text-white mb-6 flex items-center space-x-3">
-      <span>🎯</span>
+      <img src="/logo.svg" alt="ETH Shot" class="w-8 h-8" />
       <span>What is ETH Shot?</span>
     </h2>
     <div class="space-y-4 text-gray-300 text-lg leading-relaxed">
@@ -148,7 +148,7 @@
       href="/" 
       class="inline-flex items-center space-x-3 bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-lg transition-colors font-bold text-lg"
     >
-      <span>🎯</span>
+      <img src="/logo.svg" alt="ETH Shot" class="w-5 h-5" />
       <span>Play ETH Shot Now</span>
     </a>
   </div>

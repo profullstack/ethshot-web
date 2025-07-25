@@ -155,9 +155,11 @@
       <!-- Logo -->
       <div class="flex items-center space-x-4">
         <a href="/" class="flex items-center space-x-2">
-          <div class="w-8 h-8 bg-gradient-to-br from-red-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold text-lg">🎯</span>
-          </div>
+          <img
+            src="/logo.svg"
+            alt="ETH Shot Logo"
+            class="w-8 h-8"
+          />
           <span class="text-xl font-bold gradient-text">ETH SHOT</span>
         </a>
         
@@ -182,9 +184,10 @@
           </a>
           <a
             href="/referrals"
-            class="text-gray-300 hover:text-purple-400 transition-colors font-semibold"
+            class="text-gray-300 hover:text-purple-400 transition-colors font-semibold flex items-center space-x-1"
           >
-            🎯 Referrals
+            <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
+            <span>Referrals</span>
           </a>
           <a
             href="/leaderboard"
@@ -374,21 +377,23 @@
               <nav class="p-4 space-y-3">
                 <a
                   href="/"
-                  class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-base"
+                  class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-base flex items-center space-x-2"
                   on:click={(e) => handleNavLinkClick('/', e)}
                   on:touchstart={(e) => handleNavLinkTouch('/', e)}
                   style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
                 >
-                  🎯 Game
+                  <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
+                  <span>Game</span>
                 </a>
                 <a
                   href="/referrals"
-                  class="block px-4 py-3 text-gray-300 hover:text-purple-400 hover:bg-gray-700 rounded-lg transition-colors font-semibold text-base"
+                  class="block px-4 py-3 text-gray-300 hover:text-purple-400 hover:bg-gray-700 rounded-lg transition-colors font-semibold text-base flex items-center space-x-2"
                   on:click={(e) => handleNavLinkClick('/referrals', e)}
                   on:touchstart={(e) => handleNavLinkTouch('/referrals', e)}
                   style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
                 >
-                  🎯 Referrals
+                  <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
+                  <span>Referrals</span>
                 </a>
                 <a
                   href="/leaderboard"

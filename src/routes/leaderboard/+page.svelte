@@ -91,7 +91,7 @@
     </div>
   {:else if topPlayers.length === 0}
     <div class="text-center py-12">
-      <div class="text-6xl mb-4">🎯</div>
+      <img src="/logo.svg" alt="ETH Shot" class="w-16 h-16 mx-auto mb-4" />
       <h3 class="text-2xl font-bold text-gray-300 mb-2">No Players Yet</h3>
       <p class="text-gray-400">Be the first to take a shot and claim the top spot!</p>
       <a href="/" class="inline-block mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg transition-colors">
@@ -164,7 +164,7 @@
         href="/" 
         class="inline-flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg transition-colors font-semibold"
       >
-        <span>🎯</span>
+        <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
         <span>Back to Game</span>
       </a>
     </div>
