@@ -1,11 +1,14 @@
 <script>
   import { walletStore, isConnected, walletAddress, walletBalance } from '../stores/wallet.js';
   import { gameStore, currentPot } from '../stores/game-unified.js';
+  import { displayName, avatarUrl, userProfile } from '../stores/profile.js';
   import { formatEth } from '../config.js';
   import WalletConnect from './WalletConnect.svelte';
+  import UserProfile from './UserProfile.svelte';
 
   let showWalletModal = false;
   let showWalletDropdown = false;
+  let showProfileModal = false;
 
   // Truncate address for display
   const truncateAddress = (address) => {
@@ -26,6 +29,12 @@
     } catch (error) {
       console.error('Failed to disconnect wallet:', error);
     }
+  };
+
+  // Handle profile modal
+  const handleEditProfile = () => {
+    showProfileModal = true;
+    showWalletDropdown = false;
   };
 
   // Toggle wallet dropdown
@@ -118,14 +127,22 @@
               on:click={toggleWalletDropdown}
               class="flex items-center space-x-2 bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-2 transition-colors"
             >
-              <!-- Wallet Icon -->
-              <div class="w-5 h-5 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center">
-                <span class="text-white text-xs">💰</span>
-              </div>
+              <!-- Avatar or Wallet Icon -->
+              {#if $avatarUrl}
+                <img
+                  src={$avatarUrl}
+                  alt="Profile avatar"
+                  class="w-6 h-6 rounded-full object-cover border border-gray-600"
+                />
+              {:else}
+                <div class="w-6 h-6 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center">
+                  <span class="text-white text-xs">👤</span>
+                </div>
+              {/if}
               
-              <!-- Address -->
+              <!-- Display Name or Address -->
               <span class="font-mono text-sm text-gray-300">
-                {truncateAddress($walletAddress)}
+                {$displayName}
               </span>
               
               <!-- Balance (hidden on mobile) -->
@@ -146,19 +163,36 @@
 
             <!-- Dropdown Menu -->
             {#if showWalletDropdown}
-              <div class="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50">
-                <!-- Wallet Info Header -->
+              <div class="absolute right-0 mt-2 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50">
+                <!-- Profile Info Header -->
                 <div class="px-4 py-3 border-b border-gray-700">
-                  <div class="flex items-center space-x-2 mb-2">
-                    <div class="w-6 h-6 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center">
-                      <span class="text-white text-sm">💰</span>
+                  <div class="flex items-center space-x-3 mb-3">
+                    {#if $avatarUrl}
+                      <img
+                        src={$avatarUrl}
+                        alt="Profile avatar"
+                        class="w-10 h-10 rounded-full object-cover border-2 border-gray-600"
+                      />
+                    {:else}
+                      <div class="w-10 h-10 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center">
+                        <span class="text-white text-lg">👤</span>
+                      </div>
+                    {/if}
+                    <div class="flex-1 min-w-0">
+                      <div class="text-white font-semibold truncate">
+                        {$displayName}
+                      </div>
+                      {#if $userProfile?.bio}
+                        <div class="text-xs text-gray-400 truncate mt-1">
+                          {$userProfile.bio}
+                        </div>
+                      {/if}
                     </div>
-                    <span class="text-white font-semibold">Wallet Connected</span>
                   </div>
                   
-                  <!-- Full Address -->
+                  <!-- Wallet Address -->
                   <div class="space-y-1">
-                    <span class="text-xs text-gray-400">Address:</span>
+                    <span class="text-xs text-gray-400">Wallet Address:</span>
                     <div class="flex items-center space-x-2">
                       <span class="font-mono text-xs text-gray-300 break-all">
                         {$walletAddress}
@@ -183,7 +217,17 @@
                 </div>
 
                 <!-- Actions -->
-                <div class="p-2">
+                <div class="p-2 space-y-1">
+                  <button
+                    on:click={handleEditProfile}
+                    class="w-full flex items-center space-x-2 px-3 py-2 text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors text-sm"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                    <span>Edit Profile</span>
+                  </button>
+                  
                   <button
                     on:click={handleDisconnect}
                     class="w-full flex items-center space-x-2 px-3 py-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors text-sm"
@@ -246,6 +290,9 @@
     </div>
   </div>
 {/if}
+
+<!-- User Profile Modal -->
+<UserProfile bind:show={showProfileModal} on:close={() => showProfileModal = false} />
 
 <style>
   .gradient-text {
