@@ -4,15 +4,30 @@
   import { gameStore } from '$lib/stores/game-unified.js';
   import ReferralLeaderboard from '$lib/components/ReferralLeaderboard.svelte';
   import ReferralSystem from '$lib/components/ReferralSystem.svelte';
+  import WalletConnect from '$lib/components/WalletConnect.svelte';
   import MetaTags from '$lib/components/MetaTags.svelte';
 
   let mounted = false;
+  let showWalletModal = false;
 
   onMount(() => {
     mounted = true;
     gameStore.init();
     gameStore.processReferralOnLoad();
   });
+
+  function handleConnectWallet() {
+    showWalletModal = true;
+  }
+
+  function handleWalletConnected() {
+    showWalletModal = false;
+  }
+
+  // Watch for wallet connection changes to close modal
+  $: if ($walletStore.connected && showWalletModal) {
+    handleWalletConnected();
+  }
 </script>
 
 <MetaTags
@@ -152,12 +167,12 @@
           <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 text-center">
             <h3 class="text-lg font-bold mb-4">🔗 Get Started</h3>
             <p class="text-gray-400 mb-4">Connect your wallet to get your referral link and start earning discounts!</p>
-            <a 
-              href="/"
+            <button
+              on:click={handleConnectWallet}
               class="inline-block bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition-colors"
             >
               Connect Wallet
-            </a>
+            </button>
           </div>
         {/if}
 
@@ -176,6 +191,22 @@
       </a>
     </div>
   </div>
+
+  <!-- Wallet Connection Modal -->
+  {#if showWalletModal}
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="relative">
+        <!-- Close button -->
+        <button
+          on:click={() => showWalletModal = false}
+          class="absolute -top-2 -right-2 z-10 bg-gray-800 hover:bg-gray-700 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+        >
+          ✕
+        </button>
+        <WalletConnect />
+      </div>
+    </div>
+  {/if}
 {:else}
   <!-- Loading State -->
   <div class="flex items-center justify-center min-h-[60vh]">

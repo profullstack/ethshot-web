@@ -44,7 +44,15 @@ const createWalletStore = () => {
       // Check if user was previously connected via localStorage
       const wasConnected = localStorage.getItem('wallet_connected') === 'true';
       if (wasConnected && window.ethereum) {
-        console.log('Previous wallet connection found, ready to reconnect');
+        console.log('Previous wallet connection found, attempting to reconnect...');
+        // Attempt to reconnect automatically
+        setTimeout(() => {
+          connect('injected').catch(error => {
+            console.log('Auto-reconnection failed:', error.message);
+            // Clear the stored connection state if reconnection fails
+            localStorage.removeItem('wallet_connected');
+          });
+        }, 100); // Small delay to ensure everything is initialized
       }
 
     } catch (error) {
