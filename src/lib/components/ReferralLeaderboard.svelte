@@ -184,12 +184,11 @@
         <div class="header-referrals">Referrals</div>
         <div class="header-active">Active</div>
         <div class="header-rate">Success Rate</div>
-        <div class="header-bonus">Bonus Shots</div>
       </div>
 
       <div class="table-body">
         {#each leaderboardData as entry, index}
-          <div 
+          <div
             class="table-row {getRankClass(index + 1)} {isCurrentUser(entry.referrer_address) ? 'current-user' : ''}"
           >
             <div class="cell-rank">
@@ -215,10 +214,6 @@
             
             <div class="cell-rate">
               <span class="success-rate">{formatSuccessRate(entry.success_rate)}</span>
-            </div>
-            
-            <div class="cell-bonus">
-              <span class="bonus-count">{entry.total_bonus_shots_earned}</span>
             </div>
           </div>
         {/each}
@@ -330,7 +325,7 @@
   }
 
   .table-header {
-    @apply grid grid-cols-6 gap-4 p-4 bg-gray-900/50 border-b border-gray-700;
+    @apply grid grid-cols-5 gap-4 p-4 bg-gray-900/50 border-b border-gray-700;
     @apply text-gray-300 font-semibold text-sm;
   }
 
@@ -339,7 +334,7 @@
   }
 
   .table-row {
-    @apply grid grid-cols-6 gap-4 p-4 hover:bg-gray-700/30 transition-colors;
+    @apply grid grid-cols-5 gap-4 p-4 hover:bg-gray-700/30 transition-colors;
   }
 
   .table-row.current-user {
@@ -382,11 +377,11 @@
     @apply bg-blue-600 text-white text-xs px-2 py-1 rounded-full font-bold;
   }
 
-  .cell-referrals, .cell-active, .cell-rate, .cell-bonus {
+  .cell-referrals, .cell-active, .cell-rate {
     @apply flex items-center text-white font-semibold;
   }
 
-  .referral-count, .active-count, .bonus-count {
+  .referral-count, .active-count {
     @apply text-lg;
   }
 
@@ -440,8 +435,8 @@
       @apply grid-cols-3 gap-2 text-sm;
     }
 
-    .header-active, .header-rate, .header-bonus,
-    .cell-active, .cell-rate, .cell-bonus {
+    .header-active, .header-rate,
+    .cell-active, .cell-rate {
       @apply hidden;
     }
 
@@ -453,10 +448,10 @@
   /* Tablet Responsive */
   @media (max-width: 1024px) and (min-width: 769px) {
     .table-header, .table-row {
-      @apply grid-cols-5 gap-3;
+      @apply grid-cols-4 gap-3;
     }
 
-    .header-bonus, .cell-bonus {
+    .header-rate, .cell-rate {
       @apply hidden;
     }
   }

@@ -37,14 +37,14 @@ global.navigator = {
 const mockDb = {
   createReferralCode: async (address) => 'TEST1234',
   processReferralSignup: async (code, address) => true,
-  getBonusShots: async (address) => 2,
-  useBonusShot: async (address) => true,
+  getAvailableDiscounts: async (address) => 2,
+  useDiscount: async (address) => true,
   getReferralStats: async (address) => ({
     referral_code: 'TEST1234',
     total_referrals: 5,
     successful_referrals: 3,
-    bonus_shots_available: 2,
-    total_bonus_shots_earned: 8,
+    available_discounts: 2,
+    total_discounts_earned: 8,
     referred_by: null
   }),
   getReferralLeaderboard: async (options) => [
@@ -53,14 +53,14 @@ const mockDb = {
       total_referrals: 10,
       successful_referrals: 8,
       success_rate: 80,
-      total_bonus_shots_earned: 15
+      total_discounts_earned: 15
     },
     {
       referrer_address: '0x456...def',
       total_referrals: 7,
       successful_referrals: 5,
       success_rate: 71,
-      total_bonus_shots_earned: 12
+      total_discounts_earned: 12
     }
   ]
 };
@@ -188,19 +188,19 @@ describe('Referral System Integration', () => {
       expect(result).to.be.true;
     });
 
-    it('should track bonus shots correctly', async () => {
+    it('should track available discounts correctly', async () => {
       const testAddress = '0x123...abc';
       
-      const bonusShots = await db.getBonusShots(testAddress);
+      const availableDiscounts = await db.getAvailableDiscounts(testAddress);
       
-      expect(bonusShots).to.be.a('number');
-      expect(bonusShots).to.be.at.least(0);
+      expect(availableDiscounts).to.be.a('number');
+      expect(availableDiscounts).to.be.at.least(0);
     });
 
-    it('should use bonus shots correctly', async () => {
+    it('should use discounts correctly', async () => {
       const testAddress = '0x123...abc';
       
-      const result = await db.useBonusShot(testAddress);
+      const result = await db.useDiscount(testAddress);
       
       expect(result).to.be.true;
     });
@@ -214,7 +214,7 @@ describe('Referral System Integration', () => {
       expect(stats).to.have.property('referral_code');
       expect(stats).to.have.property('total_referrals');
       expect(stats).to.have.property('successful_referrals');
-      expect(stats).to.have.property('bonus_shots_available');
+      expect(stats).to.have.property('available_discounts');
     });
 
     it('should retrieve referral leaderboard', async () => {
@@ -244,13 +244,13 @@ describe('Referral System Integration', () => {
       // Mock game store methods
       const mockGameStore = {
         loadPlayerData: async (address) => {
-          const [bonusShots, referralStats] = await Promise.all([
-            db.getBonusShots(address),
+          const [availableDiscounts, referralStats] = await Promise.all([
+            db.getAvailableDiscounts(address),
             db.getReferralStats(address)
           ]);
           
           return {
-            bonusShotsAvailable: bonusShots,
+            availableDiscounts: availableDiscounts,
             referralStats: referralStats
           };
         }
@@ -258,24 +258,24 @@ describe('Referral System Integration', () => {
 
       const playerData = await mockGameStore.loadPlayerData(mockWallet.address);
       
-      expect(playerData).to.have.property('bonusShotsAvailable');
+      expect(playerData).to.have.property('availableDiscounts');
       expect(playerData).to.have.property('referralStats');
-      expect(playerData.bonusShotsAvailable).to.be.a('number');
+      expect(playerData.availableDiscounts).to.be.a('number');
       expect(playerData.referralStats).to.be.an('object');
     });
 
-    it('should handle bonus shot usage in game flow', async () => {
+    it('should handle discount usage in game flow', async () => {
       const testAddress = '0x123...abc';
       
-      // Check initial bonus shots
-      const initialBonusShots = await db.getBonusShots(testAddress);
-      expect(initialBonusShots).to.be.at.least(1);
+      // Check initial available discounts
+      const initialDiscounts = await db.getAvailableDiscounts(testAddress);
+      expect(initialDiscounts).to.be.at.least(1);
       
-      // Use a bonus shot
-      const usageResult = await db.useBonusShot(testAddress);
+      // Use a discount
+      const usageResult = await db.useDiscount(testAddress);
       expect(usageResult).to.be.true;
       
-      // Verify bonus shot was consumed (in real implementation)
+      // Verify discount was consumed (in real implementation)
       // This would check that the count decreased
     });
   });

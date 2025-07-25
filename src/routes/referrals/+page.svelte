@@ -16,11 +16,11 @@
 </script>
 
 <MetaTags
-  title="ETH Shot Referrals - Earn Bonus Shots by Inviting Friends"
-  description="Invite friends to ETH Shot and earn bonus shots! Share your referral link and climb the leaderboard. The more friends you invite, the more free shots you get!"
-  keywords="ethereum, eth, referral, bonus, shots, invite, friends, viral, crypto, blockchain"
+  title="ETH Shot Referrals - Earn Discounts by Inviting Friends"
+  description="Invite friends to ETH Shot and earn discounts! Share your referral link and climb the leaderboard. The more friends you invite, the more discounts you get!"
+  keywords="ethereum, eth, referral, discount, invite, friends, viral, crypto, blockchain"
   image="/favicon-32x32.png"
-  imageAlt="ETH Shot Referrals - Earn bonus shots"
+  imageAlt="ETH Shot Referrals - Earn discounts"
   type="website"
   twitterCard="summary_large_image"
 />
@@ -33,7 +33,7 @@
         🎯 REFERRAL SYSTEM
       </h1>
       <p class="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto">
-        Invite friends and earn <span class="text-purple-400 font-semibold">FREE bonus shots</span>!
+        Invite friends and earn <span class="text-purple-400 font-semibold">20% discounts</span>!
         Share your referral link and climb the leaderboard.
       </p>
     </div>
@@ -74,7 +74,7 @@
                 <span class="text-2xl">4️⃣</span>
                 <div>
                   <h3 class="font-semibold text-yellow-400">Earn Rewards</h3>
-                  <p class="text-sm text-gray-400">Both you and your friend get bonus shots!</p>
+                  <p class="text-sm text-gray-400">Both you and your friend get 20% discounts!</p>
                 </div>
               </div>
             </div>
@@ -88,19 +88,19 @@
             <div class="bg-black/30 rounded-lg p-4">
               <div class="text-3xl mb-2">🎁</div>
               <h3 class="font-semibold text-purple-400">You Get</h3>
-              <p class="text-2xl font-bold text-white">1 Bonus Shot</p>
+              <p class="text-2xl font-bold text-white">20% Discount</p>
               <p class="text-sm text-gray-400">For each successful referral</p>
             </div>
             <div class="bg-black/30 rounded-lg p-4">
               <div class="text-3xl mb-2">🎉</div>
               <h3 class="font-semibold text-green-400">Friend Gets</h3>
-              <p class="text-2xl font-bold text-white">1 Bonus Shot</p>
+              <p class="text-2xl font-bold text-white">20% Discount</p>
               <p class="text-sm text-gray-400">Welcome bonus for joining</p>
             </div>
           </div>
           <div class="mt-4 text-center">
             <p class="text-sm text-gray-400">
-              Bonus shots expire after 30 days. Use them or lose them!
+              Discounts expire after 30 days. Use them or lose them!
             </p>
           </div>
         </div>
@@ -151,7 +151,7 @@
         {:else}
           <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 text-center">
             <h3 class="text-lg font-bold mb-4">🔗 Get Started</h3>
-            <p class="text-gray-400 mb-4">Connect your wallet to get your referral link and start earning bonus shots!</p>
+            <p class="text-gray-400 mb-4">Connect your wallet to get your referral link and start earning discounts!</p>
             <a 
               href="/"
               class="inline-block bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition-colors"

@@ -72,7 +72,7 @@ describe('Referral Utility Functions (Node.js Compatible)', () => {
       expect(text).to.be.a('string');
       expect(text).to.include(code);
       expect(text).to.include('ETH Shot');
-      expect(text).to.include('FREE bonus shot');
+      expect(text).to.include('20% discount');
     });
 
     it('should include pot amount when provided', () => {
@@ -107,8 +107,8 @@ describe('Referral Utility Functions (Node.js Compatible)', () => {
         referral_code: 'ABC12345',
         total_referrals: 10,
         successful_referrals: 8,
-        bonus_shots_available: 3,
-        total_bonus_shots_earned: 15,
+        available_discounts: 3,
+        total_discounts_earned: 15,
         referred_by: '0x123...abc'
       };
       
@@ -118,8 +118,8 @@ describe('Referral Utility Functions (Node.js Compatible)', () => {
         referralCode: 'ABC12345',
         totalReferrals: 10,
         successfulReferrals: 8,
-        bonusShotsAvailable: 3,
-        totalBonusShotsEarned: 15,
+        availableDiscounts: 3,
+        totalDiscountsEarned: 15,
         referredBy: '0x123...abc',
         successRate: 80
       });
@@ -132,8 +132,8 @@ describe('Referral Utility Functions (Node.js Compatible)', () => {
         referralCode: null,
         totalReferrals: 0,
         successfulReferrals: 0,
-        bonusShotsAvailable: 0,
-        totalBonusShotsEarned: 0,
+        availableDiscounts: 0,
+        totalDiscountsEarned: 0,
         referredBy: null,
         successRate: 0
       });
@@ -146,8 +146,8 @@ describe('Referral Utility Functions (Node.js Compatible)', () => {
         referralCode: null,
         totalReferrals: 0,
         successfulReferrals: 0,
-        bonusShotsAvailable: 0,
-        totalBonusShotsEarned: 0,
+        availableDiscounts: 0,
+        totalDiscountsEarned: 0,
         referredBy: null,
         successRate: 0
       });
@@ -179,8 +179,8 @@ describe('Referral Utility Functions (Node.js Compatible)', () => {
       expect(formatted.referralCode).to.equal('TEST1234');
       expect(formatted.totalReferrals).to.equal(5);
       expect(formatted.successfulReferrals).to.equal(0);
-      expect(formatted.bonusShotsAvailable).to.equal(0);
-      expect(formatted.totalBonusShotsEarned).to.equal(0);
+      expect(formatted.availableDiscounts).to.equal(0);
+      expect(formatted.totalDiscountsEarned).to.equal(0);
       expect(formatted.referredBy).to.be.null;
       expect(formatted.successRate).to.equal(0);
     });
