@@ -4,9 +4,11 @@
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
   import { db } from '../supabase.js';
+  import UserDisplay from './UserDisplay.svelte';
 
   // Component state
   let leaderboardData = [];
+  let userProfiles = new Map();
   let loading = false;
   let error = null;
   let currentUserRank = null;
@@ -46,14 +48,34 @@
       });
       
       leaderboardData = data || [];
+
+      // Fetch user profiles for all referrers
+      if (leaderboardData.length > 0) {
+        const addresses = leaderboardData.map(entry => entry.referrer_address);
+        const profiles = await db.getUserProfiles(addresses);
+        
+        // Create a map for quick profile lookup
+        userProfiles = new Map();
+        profiles.forEach(profile => {
+          userProfiles.set(profile.wallet_address.toLowerCase(), profile);
+        });
+      } else {
+        userProfiles = new Map();
+      }
       
     } catch (err) {
       console.error('Failed to load referral leaderboard:', err);
       error = 'Failed to load leaderboard data';
       toastStore.error('Failed to load referral leaderboard');
+      userProfiles = new Map();
     } finally {
       loading = false;
     }
+  }
+
+  // Get profile for a referrer
+  function getReferrerProfile(address) {
+    return userProfiles.get(address.toLowerCase()) || null;
   }
 
   function findCurrentUserRank() {
@@ -197,7 +219,13 @@
             
             <div class="cell-player">
               <div class="player-info">
-                <span class="player-address">{formatAddress(entry.referrer_address)}</span>
+                <UserDisplay
+                  walletAddress={entry.referrer_address}
+                  profile={getReferrerProfile(entry.referrer_address)}
+                  size="sm"
+                  showAddress={false}
+                  className={isCurrentUser(entry.referrer_address) ? 'current-user' : ''}
+                />
                 {#if isCurrentUser(entry.referrer_address)}
                   <span class="you-badge">YOU</span>
                 {/if}

@@ -2,8 +2,10 @@
   import { onMount } from 'svelte';
   import { gameStore } from '../stores/game-unified.js';
   import { db, formatAddress } from '../supabase.js';
+  import UserDisplay from './UserDisplay.svelte';
 
   let topPlayers = [];
+  let userProfiles = new Map();
   let loading = true;
   let error = null;
 
@@ -29,23 +31,35 @@
           totalWon: player.total_won || '0',
           rank: index + 1
         }));
+
+        // Fetch user profiles for all players
+        const addresses = topPlayers.map(player => player.address);
+        const profiles = await db.getUserProfiles(addresses);
+        
+        // Create a map for quick profile lookup
+        userProfiles = new Map();
+        profiles.forEach(profile => {
+          userProfiles.set(profile.wallet_address.toLowerCase(), profile);
+        });
       } else {
         // No players in database yet
         topPlayers = [];
+        userProfiles = new Map();
       }
     } catch (err) {
       console.error('Error loading leaderboard:', err);
       error = 'Failed to load leaderboard';
       topPlayers = [];
+      userProfiles = new Map();
     } finally {
       loading = false;
     }
   }
 
-  // Truncate address for display
-  const truncateAddress = (address) => {
-    return formatAddress(address);
-  };
+  // Get profile for a player
+  function getPlayerProfile(address) {
+    return userProfiles.get(address.toLowerCase()) || null;
+  }
 
   // Get rank badge color
   const getRankColor = (rank) => {
@@ -114,9 +128,13 @@
 
           <!-- Player Info -->
           <div class="player-info">
-            <div class="player-address">
-              {truncateAddress(player.address)}
-            </div>
+            <UserDisplay
+              walletAddress={player.address}
+              profile={getPlayerProfile(player.address)}
+              size="sm"
+              showAddress={false}
+              className="mb-1"
+            />
             <div class="player-stats">
               <span class="stat-item">
                 <span class="stat-value">{player.totalShots}</span>

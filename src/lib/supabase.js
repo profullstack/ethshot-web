@@ -550,6 +550,37 @@ export const db = {
     }
   },
 
+  async getUserProfiles(walletAddresses) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning empty array for getUserProfiles');
+      return [];
+    }
+
+    if (!walletAddresses || walletAddresses.length === 0) {
+      return [];
+    }
+
+    try {
+      // Convert addresses to lowercase for consistent querying
+      const normalizedAddresses = walletAddresses.map(addr => addr.toLowerCase());
+
+      const { data, error } = await supabase
+        .from(TABLES.USER_PROFILES)
+        .select('wallet_address, nickname, avatar_url, bio, created_at, updated_at')
+        .in('wallet_address', normalizedAddresses);
+
+      if (error) {
+        console.warn('Supabase getUserProfiles query error:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.warn('Error fetching user profiles:', error);
+      return [];
+    }
+  },
+
   async uploadAvatar(file, walletAddress) {
     if (!supabase) {
       console.warn('Supabase not configured - returning null for uploadAvatar');
