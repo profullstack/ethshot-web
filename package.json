@@ -19,7 +19,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "compile": "hardhat compile",
-    "deploy:testnet": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:testnet": "hardhat run scripts/deploy-testnet.js --network sepolia",
     "deploy:testnet-advanced": "hardhat run scripts/deploy-testnet.js --network sepolia",
     "deploy:phantom": "hardhat run scripts/deploy-phantom.js --network sepolia",
     "setup:deployment": "node scripts/setup-deployment.js",
