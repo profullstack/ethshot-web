@@ -372,15 +372,17 @@
                 <p class="text-gray-400 text-xs">Get notified about game events and updates</p>
               </div>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                bind:checked={notificationsToggle}
-                class="sr-only peer"
-                disabled={saving || $uploadingAvatar}
-              />
-              <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-            </label>
+            <button
+              type="button"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {notificationsToggle ? 'bg-blue-600' : 'bg-gray-600'}"
+              disabled={saving || $uploadingAvatar}
+              on:click={() => notificationsToggle = !notificationsToggle}
+            >
+              <span class="sr-only">Toggle notifications</span>
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {notificationsToggle ? 'translate-x-6' : 'translate-x-1'}"
+              ></span>
+            </button>
           </div>
         </div>
 
