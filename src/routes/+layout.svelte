@@ -2,7 +2,7 @@
   import '../styles/global.css';
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
-  import { gameStore } from '$lib/stores/game-unified.js';
+  import { gameStore } from '$lib/stores/game/index.js';
   import Header from '$lib/components/Header.svelte';
   import Footer from '$lib/components/Footer.svelte';
   import Toast from '$lib/components/Toast.svelte';

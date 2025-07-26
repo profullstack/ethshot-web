@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
-  import { gameStore, winnerEventStore } from '$lib/stores/game-unified.js';
+  import { gameStore, winnerEventStore } from '$lib/stores/game/index.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatCooldownTime } from '$lib/config.js';
   import GameButton from '$lib/components/GameButton.svelte';
   import PotDisplay from '$lib/components/PotDisplay.svelte';

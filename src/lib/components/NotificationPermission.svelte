@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { gameStore } from '../stores/game-unified.js';
+  import { gameStore } from '../stores/game/index.js';
 
   let permissionStatus = 'default';
   let showPrompt = false;

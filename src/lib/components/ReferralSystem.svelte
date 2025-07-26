@@ -4,7 +4,7 @@
   import { gameStore, currentPot } from '../stores/game/index.js';
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
-  import { db } from '../supabase.js';
+  import { db } from '../database/index.js';
   import {
     generateReferralURL,
     copyReferralURL,

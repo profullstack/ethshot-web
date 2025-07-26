@@ -1,6 +1,6 @@
 import { writable, derived } from 'svelte/store';
 import { walletAddress, isConnected } from './wallet.js';
-import { db } from '../supabase.js';
+import { db } from '../database/index.js';
 
 // Profile store state
 const createProfileStore = () => {

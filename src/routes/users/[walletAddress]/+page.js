@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { supabase } from '$lib/supabase.js';
+import { supabase } from '$lib/database/index.js';
 
 /** @type {import('./$types').PageLoad} */
 export async function load({ params }) {

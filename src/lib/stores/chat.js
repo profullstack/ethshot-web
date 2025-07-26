@@ -6,7 +6,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { getChatClient } from '$lib/utils/chat-client.js';
-import { supabase } from '$lib/supabase.js';
+import { supabase } from '$lib/database/index.js';
 
 // Chat connection state
 export const chatConnected = writable(false);

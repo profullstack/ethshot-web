@@ -5,7 +5,7 @@
 
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
-import { supabase } from '$lib/supabase.js';
+import { supabase } from '$lib/database/index.js';
 import {
   showMentionNotification,
   requestNotificationPermission,

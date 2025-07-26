@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { db } from '$lib/supabase.js';
-  import { formatAddress, formatEther } from '$lib/supabase.js';
+  import { db } from '$lib/database/index.js';
+  import { formatAddress, formatEther } from '$lib/database/index.js';
   import MetaTags from '$lib/components/MetaTags.svelte';
   import UserDisplay from '$lib/components/UserDisplay.svelte';
 

@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { walletStore, isConnected, walletAddress, walletBalance } from '../stores/wallet.js';
-  import { gameStore, currentPot } from '../stores/game-unified.js';
+  import { gameStore, currentPot } from '../stores/game/index.js';
   import { displayName, avatarUrl, userProfile } from '../stores/profile.js';
   import { formatEth } from '../config.js';
   import WalletConnect from './WalletConnect.svelte';

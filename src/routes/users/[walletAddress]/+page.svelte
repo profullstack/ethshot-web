@@ -1,6 +1,6 @@
 <script>
 	import { page } from '$app/stores';
-	import { formatAddress } from '$lib/supabase.js';
+	import { formatAddress } from '$lib/database/index.js';
 	import UserDisplay from '$lib/components/UserDisplay.svelte';
 	import MetaTags from '$lib/components/MetaTags.svelte';
 

@@ -1,5 +1,5 @@
 <script>
-  import { formatAddress } from '../supabase.js';
+  import { formatAddress } from '../database/index.js';
 
   // Props
   export let walletAddress = '';
