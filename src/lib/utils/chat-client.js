@@ -4,8 +4,9 @@
  */
 
 import { browser } from '$app/environment';
+import { CHAT_CONFIG } from '$lib/config/chat.js';
 
-const CHAT_SERVER_URL = 'ws://localhost:8080/chat';
+const CHAT_SERVER_URL = CHAT_CONFIG.SERVER_URL;
 const RECONNECT_INTERVAL = 5000; // 5 seconds
 const PING_INTERVAL = 30000; // 30 seconds
 const MAX_RECONNECT_ATTEMPTS = 5;
