@@ -1,7 +1,7 @@
 <script>
   console.log('🔧 GameButton component loading...');
   
-  import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError } from '../stores/game-unified.js';
+  import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError } from '../stores/game/index.js';
   import { walletStore, isConnected, isCorrectNetwork } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatTime as configFormatTime } from '../config.js';
@@ -44,19 +44,18 @@
     }, 1000);
   };
 
-  // Handle committing a shot
-  const handleCommitShot = async () => {
-    console.log('🎯 COMMIT SHOT BUTTON CLICKED!');
+  // Handle taking a shot
+  const handleTakeShot = async () => {
+    console.log('🎯 TAKE SHOT BUTTON CLICKED!');
     console.log('🔍 Button click handler executing...');
     
     console.log('Debug info:', {
       isConnected: $isConnected,
       isCorrectNetwork: $isCorrectNetwork,
-      canCommitShot: $canCommitShot,
+      canTakeShot: $canTakeShot,
       contractDeployed: $contractDeployed,
       isLoading: $isLoading,
-      gameError: $gameError,
-      hasPendingShot: $hasPendingShot
+      gameError: $gameError
     });
 
     if (!$isConnected) {
@@ -71,74 +70,26 @@
       return;
     }
 
-    if ($hasPendingShot) {
-      console.log('❌ Already have pending shot - stopping here');
-      toastStore.error('You already have a pending shot. Please reveal it first.');
+    if (!$canTakeShot) {
+      console.log('❌ Cannot take shot - stopping here');
+      toastStore.error('Cannot take shot at this time');
       return;
     }
 
-    console.log('✅ All checks passed, calling gameStore.commitShot()');
-    console.log('🚀 About to call gameStore.commitShot()...');
+    console.log('✅ All checks passed, calling gameStore.takeShot()');
+    console.log('🚀 About to call gameStore.takeShot()...');
     
     try {
-      const result = await gameStore.commitShot();
-      console.log('✅ gameStore.commitShot() completed:', result);
+      const result = await gameStore.takeShot();
+      console.log('✅ gameStore.takeShot() completed:', result);
     } catch (error) {
-      console.error('❌ Failed to commit shot:', error);
+      console.error('❌ Failed to take shot:', error);
       console.error('Error details:', {
         message: error.message,
         code: error.code,
         stack: error.stack
       });
-      toastStore.error('Failed to commit shot: ' + error.message);
-    }
-  };
-
-  // Handle revealing a shot
-  const handleRevealShot = async () => {
-    console.log('🔓 REVEAL SHOT BUTTON CLICKED!');
-    console.log('🔍 Button click handler executing...');
-    
-    console.log('Debug info:', {
-      isConnected: $isConnected,
-      isCorrectNetwork: $isCorrectNetwork,
-      canRevealShot: $canRevealShot,
-      pendingShot: $pendingShot,
-      isRevealing: $isRevealing
-    });
-
-    if (!$isConnected) {
-      console.log('❌ Wallet not connected - stopping here');
-      toastStore.error('Please connect your wallet first');
-      return;
-    }
-
-    if (!$isCorrectNetwork) {
-      console.log('❌ Wrong network - stopping here');
-      toastStore.error('Please switch to the correct network');
-      return;
-    }
-
-    if (!$pendingShot?.exists) {
-      console.log('❌ No pending shot - stopping here');
-      toastStore.error('No pending shot to reveal. Please commit a shot first.');
-      return;
-    }
-
-    console.log('✅ All checks passed, calling gameStore.revealShot()');
-    console.log('🚀 About to call gameStore.revealShot()...');
-    
-    try {
-      const result = await gameStore.revealShot();
-      console.log('✅ gameStore.revealShot() completed:', result);
-    } catch (error) {
-      console.error('❌ Failed to reveal shot:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
-      toastStore.error('Failed to reveal shot: ' + error.message);
+      toastStore.error('Failed to take shot: ' + error.message);
     }
   };
 
@@ -217,7 +168,7 @@
         <span class="text-sm opacity-80">Next shot in {formatTime(timeRemaining)}</span>
       </button>
     {:else if $isLoading}
-      <!-- Committing Shot -->
+      <!-- Taking Shot -->
       <button
         class="btn-game btn-loading"
         disabled
@@ -225,58 +176,24 @@
         <div class="flex items-center space-x-3">
           <div class="spinner w-6 h-6"></div>
           <div class="flex flex-col">
-            <span class="text-2xl font-bold">Committing Shot...</span>
+            <span class="text-2xl font-bold">Taking Shot...</span>
             <span class="text-sm opacity-80">Confirm in wallet</span>
           </div>
         </div>
       </button>
-    {:else if $isRevealing}
-      <!-- Revealing Shot -->
+    {:else if $canTakeShot}
+      <!-- Ready to Take Shot -->
       <button
-        class="btn-game btn-loading"
-        disabled
-      >
-        <div class="flex items-center space-x-3">
-          <div class="spinner w-6 h-6"></div>
-          <div class="flex flex-col">
-            <span class="text-2xl font-bold">Revealing Shot...</span>
-            <span class="text-sm opacity-80">Confirm in wallet</span>
-          </div>
-        </div>
-      </button>
-    {:else if $hasPendingShot && $canRevealShot}
-      <!-- Ready to Reveal -->
-      <button
-        on:click={handleRevealShot}
-        class="btn-game btn-reveal animate-glow"
-        disabled={false}
-        style="pointer-events: auto; cursor: pointer;"
-      >
-        <span class="text-2xl font-bold">🔓 Reveal Shot</span>
-        <span class="text-sm opacity-80">Click to reveal your committed shot</span>
-      </button>
-    {:else if $hasPendingShot && !$canRevealShot}
-      <!-- Waiting for Reveal Window -->
-      <button
-        class="btn-game btn-waiting"
-        disabled
-      >
-        <span class="text-2xl font-bold">⏳ Waiting...</span>
-        <span class="text-sm opacity-80">Reveal window opens next block</span>
-      </button>
-    {:else if $canCommitShot}
-      <!-- Ready to Commit -->
-      <button
-        on:click={handleCommitShot}
+        on:click={handleTakeShot}
         class="btn-game btn-primary animate-glow"
         disabled={false}
         style="pointer-events: auto; cursor: pointer;"
       >
-        <span class="text-3xl font-black">🎯 COMMIT SHOT</span>
+        <span class="text-3xl font-black">🎯 TAKE SHOT</span>
         <span class="text-sm opacity-90">{formatEth(GAME_CONFIG.SHOT_COST)} ETH • {GAME_CONFIG.WIN_PERCENTAGE}% chance to win</span>
       </button>
     {:else}
-      <!-- Cannot Commit -->
+      <!-- Cannot Take Shot -->
       <button
         class="btn-game btn-disabled"
         disabled
@@ -287,7 +204,7 @@
     {/if}
 
     <!-- Pulse Effect for Ready State -->
-    {#if ($canCommitShot || ($hasPendingShot && $canRevealShot)) && !$isLoading && !$isRevealing && timeRemaining <= 0}
+    {#if $canTakeShot && !$isLoading && timeRemaining <= 0}
       <div class="absolute inset-0 rounded-2xl bg-red-500/20 animate-ping pointer-events-none"></div>
     {/if}
   </div>
