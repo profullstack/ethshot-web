@@ -184,9 +184,9 @@
 
     <!-- Back to Game -->
     <div class="text-center">
-      <a 
+      <a
         href="/"
-        class="inline-block bg-red-600 hover:bg-red-700 text-white py-3 px-6 rounded-lg transition-colors font-semibold"
+        class="inline-flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-3 px-6 rounded-lg transition-colors font-semibold"
       >
         <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
         <span>Back to Game</span>
