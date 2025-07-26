@@ -506,11 +506,11 @@ export const db = {
       });
 
       const updatePromise = supabase.rpc('upsert_user_profile', {
-        wallet_addr_param: profileData.walletAddress.toLowerCase(),
-        nickname_param: profileData.nickname || null,
-        avatar_url_param: profileData.avatarUrl || null,
-        bio_param: profileData.bio || null,
-        notifications_param: profileData.notificationsEnabled ?? true
+        wallet_addr: profileData.walletAddress.toLowerCase(),
+        p_nickname: profileData.nickname || null,
+        p_avatar_url: profileData.avatarUrl || null,
+        p_bio: profileData.bio || null,
+        p_notifications_enabled: profileData.notificationsEnabled ?? true
       });
 
       const { data, error } = await Promise.race([updatePromise, timeoutPromise]);

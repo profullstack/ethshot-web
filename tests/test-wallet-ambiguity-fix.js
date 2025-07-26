@@ -26,10 +26,10 @@ async function testWalletAddressAmbiguityFix() {
     // Test 1: Create a new user profile
     console.log('✅ Test 1: Creating new user profile...');
     const { data: createData, error: createError } = await supabase.rpc('upsert_user_profile', {
-      wallet_addr_param: testWalletAddress,
-      nickname_param: testNickname,
-      bio_param: testBio,
-      notifications_param: true
+      wallet_addr: testWalletAddress,
+      p_nickname: testNickname,
+      p_bio: testBio,
+      p_notifications_enabled: true
     });
 
     if (createError) {
@@ -50,10 +50,10 @@ async function testWalletAddressAmbiguityFix() {
     const updatedBio = 'Updated test bio';
 
     const { data: updateData, error: updateError } = await supabase.rpc('upsert_user_profile', {
-      wallet_addr_param: testWalletAddress,
-      nickname_param: updatedNickname,
-      bio_param: updatedBio,
-      notifications_param: false
+      wallet_addr: testWalletAddress,
+      p_nickname: updatedNickname,
+      p_bio: updatedBio,
+      p_notifications_enabled: false
     });
 
     if (updateError) {
