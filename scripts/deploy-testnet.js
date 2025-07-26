@@ -12,7 +12,34 @@ async function main() {
   // Deploy the contract
   console.log('📝 Deploying contract...');
   const [signer] = await ethers.getSigners();
-  const ethShot = await EthShot.deploy(signer.address);
+  
+  // Contract constructor parameters
+  const initialOwner = signer.address;
+  const shotCost = ethers.parseEther("0.001");      // 0.001 ETH per shot
+  const sponsorCost = ethers.parseEther("0.01");    // 0.01 ETH for sponsorship
+  const cooldownPeriod = 24 * 60 * 60;              // 24 hours in seconds
+  const winPercentage = 90;                         // Winner gets 90% of pot
+  const housePercentage = 10;                       // House gets 10% of pot
+  const winChance = 1;                              // 1% chance to win
+  
+  console.log('📋 Contract parameters:');
+  console.log(`  Initial Owner: ${initialOwner}`);
+  console.log(`  Shot Cost: ${ethers.formatEther(shotCost)} ETH`);
+  console.log(`  Sponsor Cost: ${ethers.formatEther(sponsorCost)} ETH`);
+  console.log(`  Cooldown Period: ${cooldownPeriod} seconds (${cooldownPeriod / 3600} hours)`);
+  console.log(`  Win Percentage: ${winPercentage}%`);
+  console.log(`  House Percentage: ${housePercentage}%`);
+  console.log(`  Win Chance: ${winChance}%\n`);
+  
+  const ethShot = await EthShot.deploy(
+    initialOwner,
+    shotCost,
+    sponsorCost,
+    cooldownPeriod,
+    winPercentage,
+    housePercentage,
+    winChance
+  );
   
   // Wait for deployment to complete
   await ethShot.waitForDeployment();
@@ -23,13 +50,13 @@ async function main() {
 
   // Verify contract configuration
   console.log('🔍 Verifying contract configuration...');
-  const shotCost = await ethShot.SHOT_COST();
-  const sponsorCost = await ethShot.SPONSOR_COST();
-  const cooldownPeriod = await ethShot.COOLDOWN_PERIOD();
+  const contractShotCost = await ethShot.SHOT_COST();
+  const contractSponsorCost = await ethShot.SPONSOR_COST();
+  const contractCooldownPeriod = await ethShot.COOLDOWN_PERIOD();
   
-  console.log(`💰 Shot cost: ${ethers.formatEther(shotCost)} ETH`);
-  console.log(`🎯 Sponsor cost: ${ethers.formatEther(sponsorCost)} ETH`);
-  console.log(`⏰ Cooldown period: ${cooldownPeriod} seconds (${Number(cooldownPeriod) / 3600} hours)\n`);
+  console.log(`💰 Shot cost: ${ethers.formatEther(contractShotCost)} ETH`);
+  console.log(`🎯 Sponsor cost: ${ethers.formatEther(contractSponsorCost)} ETH`);
+  console.log(`⏰ Cooldown period: ${contractCooldownPeriod} seconds (${Number(contractCooldownPeriod) / 3600} hours)\n`);
 
   // Save deployment info
   const deploymentInfo = {
@@ -37,9 +64,9 @@ async function main() {
     contractAddress,
     deploymentTime: new Date().toISOString(),
     deployer: (await ethers.getSigners())[0].address,
-    shotCost: ethers.formatEther(shotCost),
-    sponsorCost: ethers.formatEther(sponsorCost),
-    cooldownPeriod: Number(cooldownPeriod),
+    shotCost: ethers.formatEther(contractShotCost),
+    sponsorCost: ethers.formatEther(contractSponsorCost),
+    cooldownPeriod: Number(contractCooldownPeriod),
     etherscanUrl: `https://sepolia.etherscan.io/address/${contractAddress}`
   };
 
