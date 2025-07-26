@@ -1,7 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 import { NETWORK_CONFIG, WALLET_CONFIG, RPC_URLS, EXPLORER_URLS } from '../config.js';
-import { authenticateWithWallet, signOutFromSupabase } from '../utils/wallet-auth.js';
+import { authenticateWithWallet, signOutFromSupabase, getCurrentSession, isAuthenticated, isAuthenticatedForWallet, getAuthStatus } from '../utils/wallet-auth.js';
 
 // Wallet connection state
 const createWalletStore = () => {
@@ -46,13 +46,22 @@ const createWalletStore = () => {
       const wasConnected = localStorage.getItem('wallet_connected') === 'true';
       if (wasConnected && window.ethereum) {
         console.log('Previous wallet connection found, attempting to reconnect...');
-        // Attempt to reconnect automatically
-        setTimeout(() => {
-          connect('injected').catch(error => {
+        
+        // Check if there's already a valid Supabase session
+        setTimeout(async () => {
+          try {
+            const existingSession = await getCurrentSession();
+            if (existingSession) {
+              console.log('✅ Found existing Supabase session, skipping re-authentication');
+            }
+            
+            // Attempt to reconnect wallet
+            await connect('injected');
+          } catch (error) {
             console.log('Auto-reconnection failed:', error.message);
             // Clear the stored connection state if reconnection fails
             localStorage.removeItem('wallet_connected');
-          });
+          }
         }, 100); // Small delay to ensure everything is initialized
       }
 
@@ -249,9 +258,21 @@ const createWalletStore = () => {
 
       // Authenticate with Supabase using wallet signature verification
       try {
-        console.log('🔐 Authenticating with Supabase using signature verification...');
-        await authenticateWithWallet(address, signer);
-        console.log('✅ Supabase authentication successful');
+        // Check if we already have a valid session for this wallet
+        const authStatus = await getAuthStatus();
+        const isAlreadyAuthenticatedForWallet = await isAuthenticatedForWallet(address);
+        
+        if (isAlreadyAuthenticatedForWallet) {
+          console.log('✅ Already authenticated with Supabase for this wallet');
+        } else {
+          console.log('🔐 Authenticating with Supabase using signature verification...');
+          await authenticateWithWallet(address, signer);
+          console.log('✅ Supabase authentication successful');
+          
+          // Verify authentication was successful
+          const newAuthStatus = await getAuthStatus();
+          console.log('🔍 Post-authentication status:', newAuthStatus);
+        }
       } catch (authError) {
         console.warn('⚠️ Supabase authentication failed:', authError.message);
         // Don't fail the wallet connection if Supabase auth fails

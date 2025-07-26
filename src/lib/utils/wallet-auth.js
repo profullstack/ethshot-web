@@ -175,3 +175,62 @@ export async function isAuthenticated() {
   const session = await getCurrentSession();
   return !!session?.user;
 }
+
+/**
+ * Check if user is authenticated for a specific wallet address
+ * @param {string} walletAddress - The wallet address to check
+ * @returns {Promise<boolean>} True if authenticated for this wallet
+ */
+export async function isAuthenticatedForWallet(walletAddress) {
+  if (!walletAddress) return false;
+  
+  const session = await getCurrentSession();
+  if (!session?.user) return false;
+  
+  // Check if the session email matches the wallet address
+  const sessionEmail = session.user.email?.toLowerCase();
+  const normalizedWallet = walletAddress.toLowerCase();
+  
+  console.log('🔍 Checking authentication for wallet:', {
+    walletAddress: normalizedWallet,
+    sessionEmail,
+    isMatch: sessionEmail === normalizedWallet,
+    hasSession: !!session,
+    hasUser: !!session.user
+  });
+  
+  return sessionEmail === normalizedWallet;
+}
+
+/**
+ * Get authentication status with detailed information
+ * @returns {Promise<Object>} Authentication status details
+ */
+export async function getAuthStatus() {
+  try {
+    const session = await getCurrentSession();
+    
+    const status = {
+      isAuthenticated: !!session?.user,
+      session: session,
+      user: session?.user || null,
+      walletAddress: session?.user?.email || null,
+      expiresAt: session?.expires_at || null,
+      accessToken: session?.access_token ? 'present' : 'missing'
+    };
+    
+    console.log('🔍 Current auth status:', status);
+    return status;
+  } catch (error) {
+    console.error('❌ Failed to get auth status:', error);
+    return {
+      isAuthenticated: false,
+      session: null,
+      user: null,
+      walletAddress: null,
+      expiresAt: null,
+      accessToken: 'missing',
+      error: error.message
+    };
+  }
+}
