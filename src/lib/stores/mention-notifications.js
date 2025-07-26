@@ -170,7 +170,7 @@ export async function loadUnreadMentions(userWalletAddress) {
 
   try {
     // Set the current user context for RLS policies
-    await supabase.rpc('set_config', {
+    await supabase.rpc('rpc_set_config', {
       setting_name: 'app.current_user_wallet',
       setting_value: userWalletAddress.toLowerCase(),
       is_local: true
@@ -221,7 +221,7 @@ export async function markMentionsAsReadInDatabase(userWalletAddress, roomId = n
 
   try {
     // Set the current user context for RLS policies
-    await supabase.rpc('set_config', {
+    await supabase.rpc('rpc_set_config', {
       setting_name: 'app.current_user_wallet',
       setting_value: userWalletAddress.toLowerCase(),
       is_local: true
@@ -257,7 +257,7 @@ export async function getMentionCountFromDatabase(userWalletAddress, roomId = nu
 
   try {
     // Set the current user context for RLS policies
-    await supabase.rpc('set_config', {
+    await supabase.rpc('rpc_set_config', {
       setting_name: 'app.current_user_wallet',
       setting_value: userWalletAddress.toLowerCase(),
       is_local: true
