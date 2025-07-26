@@ -119,8 +119,8 @@ NODE_ENV=production
     console.log(`✅ Current pot: ${ethers.formatEther(currentPot)} ETH`);
     
     const [signer] = await ethers.getSigners();
-    const canShoot = await ethShot.canTakeShot(signer.address);
-    console.log(`✅ Can take shot: ${canShoot}`);
+    const canCommit = await ethShot.canCommitShot(signer.address);
+    console.log(`✅ Can commit shot: ${canCommit}`);
     
     const cooldown = await ethShot.getCooldownRemaining(signer.address);
     console.log(`✅ Cooldown remaining: ${cooldown} seconds`);
