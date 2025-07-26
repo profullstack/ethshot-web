@@ -26,6 +26,7 @@
     getAutocompleteContext,
     formatMessageWithMentions
   } from '$lib/utils/chat-mentions.js';
+  import { sanitizeNickname } from '$lib/utils/html-sanitizer.js';
 
   // Component state
   let messageInput = '';
@@ -479,7 +480,7 @@
               <div class="message-content">
                 <div class="message-header">
                   <span class="message-author">
-                    {message.nickname || formatWalletAddress(message.walletAddress)}
+                    {sanitizeNickname(message.nickname) || formatWalletAddress(message.walletAddress)}
                   </span>
                   {#if $chatSettings.showTimestamps}
                     <span class="message-time">
@@ -489,7 +490,7 @@
                 </div>
                 
                 <div class="message-text">
-                  {@html formatMessageWithMentions(message.content || message.message_content)}
+                  {message.content || message.message_content}
                 </div>
               </div>
             </div>

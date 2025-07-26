@@ -379,6 +379,12 @@ class ChatServer {
       return;
     }
 
+    // Validate message content - reject HTML tags to prevent XSS attacks
+    if (content.includes('<') || content.includes('>')) {
+      this.sendError(clientId, 'Messages cannot contain HTML tags (< or >) for security reasons');
+      return;
+    }
+
     // Check rate limiting
     if (!this.checkRateLimit(client.walletAddress)) {
       this.sendError(clientId, 'Rate limit exceeded. Please slow down.');
