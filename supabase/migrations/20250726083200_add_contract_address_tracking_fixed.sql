@@ -18,8 +18,8 @@ ALTER TABLE sponsors ADD COLUMN IF NOT EXISTS contract_address TEXT;
 -- Add contract_address to game_stats table
 ALTER TABLE game_stats ADD COLUMN IF NOT EXISTS contract_address TEXT;
 
--- Add contract_address to leaderboard table if it exists
-ALTER TABLE leaderboard ADD COLUMN IF NOT EXISTS contract_address TEXT;
+-- Note: leaderboard table doesn't exist in current schema, skipping
+-- ALTER TABLE leaderboard ADD COLUMN IF NOT EXISTS contract_address TEXT;
 
 -- Create indexes for contract_address fields for better query performance
 CREATE INDEX IF NOT EXISTS idx_players_contract_address ON players(contract_address);
@@ -27,7 +27,7 @@ CREATE INDEX IF NOT EXISTS idx_shots_contract_address ON shots(contract_address)
 CREATE INDEX IF NOT EXISTS idx_winners_contract_address ON winners(contract_address);
 CREATE INDEX IF NOT EXISTS idx_sponsors_contract_address ON sponsors(contract_address);
 CREATE INDEX IF NOT EXISTS idx_game_stats_contract_address ON game_stats(contract_address);
-CREATE INDEX IF NOT EXISTS idx_leaderboard_contract_address ON leaderboard(contract_address);
+-- CREATE INDEX IF NOT EXISTS idx_leaderboard_contract_address ON leaderboard(contract_address);
 
 -- Create composite indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_players_contract_total_shots ON players(contract_address, total_shots DESC);
