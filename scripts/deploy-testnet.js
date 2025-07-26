@@ -17,28 +17,34 @@ async function main() {
   const initialOwner = signer.address;
   const shotCost = ethers.parseEther("0.001");      // 0.001 ETH per shot
   const sponsorCost = ethers.parseEther("0.01");    // 0.01 ETH for sponsorship
-  const cooldownPeriod = 24 * 60 * 60;              // 24 hours in seconds
-  const winPercentage = 90;                         // Winner gets 90% of pot
-  const housePercentage = 10;                       // House gets 10% of pot
-  const winChance = 1;                              // 1% chance to win
+  const cooldownPeriod = 1 * 60 * 60;               // 1 hour in seconds
+  const winPercentageBP = 9000;                     // Winner gets 90% of pot (in basis points)
+  const housePercentageBP = 1000;                   // House gets 10% of pot (in basis points)
+  const winChanceBP = 100;                          // 1% chance to win (in basis points)
+  const maxRecentWinners = 100;                     // Maximum number of recent winners to store
+  const minPotSize = ethers.parseEther("0.001");    // Minimum pot size (same as shot cost)
   
   console.log('📋 Contract parameters:');
   console.log(`  Initial Owner: ${initialOwner}`);
   console.log(`  Shot Cost: ${ethers.formatEther(shotCost)} ETH`);
   console.log(`  Sponsor Cost: ${ethers.formatEther(sponsorCost)} ETH`);
   console.log(`  Cooldown Period: ${cooldownPeriod} seconds (${cooldownPeriod / 3600} hours)`);
-  console.log(`  Win Percentage: ${winPercentage}%`);
-  console.log(`  House Percentage: ${housePercentage}%`);
-  console.log(`  Win Chance: ${winChance}%\n`);
+  console.log(`  Win Percentage: ${winPercentageBP / 100}%`);
+  console.log(`  House Percentage: ${housePercentageBP / 100}%`);
+  console.log(`  Win Chance: ${winChanceBP / 100}%`);
+  console.log(`  Max Recent Winners: ${maxRecentWinners}`);
+  console.log(`  Min Pot Size: ${ethers.formatEther(minPotSize)} ETH\n`);
   
   const ethShot = await EthShot.deploy(
     initialOwner,
     shotCost,
     sponsorCost,
     cooldownPeriod,
-    winPercentage,
-    housePercentage,
-    winChance
+    winPercentageBP,
+    housePercentageBP,
+    winChanceBP,
+    maxRecentWinners,
+    minPotSize
   );
   
   // Wait for deployment to complete
