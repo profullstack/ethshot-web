@@ -1,11 +1,11 @@
 [phases.setup]
-nixPkgs = ['nodejs_20', 'pnpm']
+nixPkgs = ['nodejs_20']
 
 [phases.install]
-cmds = ['pnpm install --frozen-lockfile']
+cmds = ['cd server && npm install --only=production']
 
 [phases.build]
 cmds = ['echo "No build step needed for chat server"']
 
 [start]
-cmd = 'node server/chat-server.js'
+cmd = 'cd server && node chat-server.js'
