@@ -2,10 +2,10 @@
 nixPkgs = ['nodejs_20']
 
 [phases.install]
-cmds = ['cd server && npm install --only=production']
+cmds = ['cd servers/chat && npm install --only=production']
 
 [phases.build]
 cmds = ['echo "No build step needed for chat server"']
 
 [start]
-cmd = 'cd server && node chat-server.js'
+cmd = 'cd servers/chat && node chat-server.js'
