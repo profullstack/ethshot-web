@@ -508,6 +508,27 @@ export const db = {
         // Note: wallet address is now obtained from authenticated user, not from client
       });
 
+      // Check current authentication status before attempting update
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('❌ Failed to get session:', sessionError);
+        throw new Error('Authentication error. Please reconnect your wallet and try again.');
+      }
+      
+      if (!session) {
+        console.error('❌ No active session found');
+        throw new Error('You must be logged in with a wallet to update your profile.');
+      }
+      
+      console.log('🔍 Current session info:', {
+        hasSession: !!session,
+        hasUser: !!session.user,
+        userEmail: session.user?.email,
+        expiresAt: session.expires_at,
+        isExpired: session.expires_at ? new Date(session.expires_at * 1000) < new Date() : 'unknown'
+      });
+
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Profile update timed out after 30 seconds')), 30000);
@@ -525,12 +546,20 @@ export const db = {
 
       if (error) {
         console.error('❌ Supabase upsertUserProfile error:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
         
         // Provide more helpful error messages for common authentication issues
         if (error.message?.includes('No authenticated wallet address found')) {
           throw new Error('You must be logged in with a wallet to update your profile.');
         } else if (error.message?.includes('JWT')) {
           throw new Error('Authentication error. Please reconnect your wallet and try again.');
+        } else if (error.message?.includes('permission denied') || error.message?.includes('RLS')) {
+          throw new Error('Permission denied. Please reconnect your wallet and try again.');
         }
         
         throw error;
