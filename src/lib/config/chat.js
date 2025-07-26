@@ -8,14 +8,15 @@ import { browser } from '$app/environment';
 // Environment variables with fallbacks
 const getEnvVar = (name, fallback) => {
   if (browser) {
-    return fallback;
+    // In browser, use Vite environment variables
+    return import.meta.env[name] || fallback;
   }
   return process.env[name] || fallback;
 };
 
 export const CHAT_CONFIG = {
   // WebSocket server configuration
-  SERVER_URL: getEnvVar('CHAT_SERVER_URL', 'ws://localhost:8080/chat'),
+  SERVER_URL: getEnvVar('VITE_CHAT_SERVER_URL', 'ws://localhost:8080/chat'),
   SERVER_PORT: parseInt(getEnvVar('CHAT_SERVER_PORT', '8080')),
   
   // Connection settings

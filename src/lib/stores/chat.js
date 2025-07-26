@@ -6,6 +6,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { getChatClient } from '$lib/utils/chat-client.js';
+import { supabase } from '$lib/supabase.js';
 
 // Chat connection state
 export const chatConnected = writable(false);
@@ -268,33 +269,86 @@ class ChatStore {
    * Load available chat rooms
    */
   async loadChatRooms() {
-    // For now, we'll use the default rooms from the migration
-    // In a real implementation, you might fetch this from the API
-    const defaultRooms = [
-      {
-        id: 'global',
-        name: 'Global Chat',
-        type: 'global',
-        description: 'General discussion for all players',
-        maxUsers: 100
-      },
-      {
-        id: 'trash-talk',
-        name: 'Trash Talk',
-        type: 'global',
-        description: 'Let the trash talking begin!',
-        maxUsers: 50
-      },
-      {
-        id: 'game-discussion',
-        name: 'Game Discussion',
-        type: 'game',
-        description: 'Discuss game strategies and tips',
-        maxUsers: 75
+    try {
+      // Fetch actual rooms from the database
+      const { data: rooms, error } = await supabase
+        .from('chat_rooms')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at');
+
+      if (error) {
+        console.error('Error loading chat rooms:', error);
+        // Fall back to creating default rooms
+        await this.createDefaultRooms();
+        return;
       }
-    ];
-    
-    chatRooms.set(defaultRooms);
+
+      if (rooms && rooms.length > 0) {
+        chatRooms.set(rooms);
+      } else {
+        // If no rooms exist, create default ones
+        await this.createDefaultRooms();
+      }
+    } catch (error) {
+      console.error('Error in loadChatRooms:', error);
+      // Fallback to temporary room for testing
+      const fallbackRooms = [
+        {
+          id: 'temp-global',
+          name: 'Global Chat',
+          type: 'global',
+          description: 'General discussion for all players',
+          max_users: 100
+        }
+      ];
+      chatRooms.set(fallbackRooms);
+    }
+  }
+
+  /**
+   * Create default chat rooms in the database
+   */
+  async createDefaultRooms() {
+    try {
+      const defaultRooms = [
+        {
+          name: 'Global Chat',
+          type: 'global',
+          description: 'General discussion for all players',
+          max_users: 100
+        },
+        {
+          name: 'Trash Talk',
+          type: 'global',
+          description: 'Let the trash talking begin!',
+          max_users: 50
+        },
+        {
+          name: 'Game Discussion',
+          type: 'game',
+          description: 'Discuss game strategies and tips',
+          max_users: 75
+        }
+      ];
+
+      const { data: createdRooms, error } = await supabase
+        .from('chat_rooms')
+        .insert(defaultRooms)
+        .select();
+
+      if (error) {
+        console.error('Error creating default rooms:', error);
+        return;
+      }
+
+      if (createdRooms) {
+        chatRooms.set(createdRooms);
+        console.log('Created default chat rooms:', createdRooms);
+      }
+    } catch (error) {
+      console.error('Error creating default rooms:', error);
+    }
   }
 
   /**

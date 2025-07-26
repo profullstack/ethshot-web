@@ -43,10 +43,25 @@ class ChatServer {
   async start() {
     try {
       // Create HTTP server
-      this.server = createServer();
+      this.server = createServer((req, res) => {
+        // Health check endpoint for Railway/other platforms
+        if (req.url === '/health') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            connections: this.clients.size
+          }));
+          return;
+        }
+        
+        // Default response for other HTTP requests
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('WebSocket server - use /chat endpoint for WebSocket connections');
+      });
       
       // Create WebSocket server
-      this.wss = new WebSocketServer({ 
+      this.wss = new WebSocketServer({
         server: this.server,
         path: '/chat'
       });
