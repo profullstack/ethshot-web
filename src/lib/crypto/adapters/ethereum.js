@@ -635,6 +635,210 @@ export class EthereumAdapter extends BaseCryptoAdapter {
   }
 
   /**
+   * Get game configuration in basis points
+   */
+  async getGameConfig() {
+    const contract = this.getContract();
+    const config = await contract.getGameConfig();
+    
+    return {
+      winPercentageBP: Number(config.winPercentageBP),
+      housePercentageBP: Number(config.housePercentageBP),
+      winChanceBP: Number(config.winChanceBP)
+    };
+  }
+
+  /**
+   * Get cooldown period from contract
+   */
+  async getCooldownPeriod() {
+    const contract = this.getContract();
+    const period = await contract.COOLDOWN_PERIOD();
+    return Number(period);
+  }
+
+  /**
+   * Get win percentage in basis points
+   */
+  async getWinPercentageBP() {
+    const contract = this.getContract();
+    const percentage = await contract.WIN_PERCENTAGE_BP();
+    return Number(percentage);
+  }
+
+  /**
+   * Get house percentage in basis points
+   */
+  async getHousePercentageBP() {
+    const contract = this.getContract();
+    const percentage = await contract.HOUSE_PERCENTAGE_BP();
+    return Number(percentage);
+  }
+
+  /**
+   * Get win chance in basis points
+   */
+  async getWinChanceBP() {
+    const contract = this.getContract();
+    const chance = await contract.WIN_CHANCE_BP();
+    return Number(chance);
+  }
+
+  /**
+   * Get maximum recent winners limit
+   */
+  async getMaxRecentWinners() {
+    const contract = this.getContract();
+    const max = await contract.MAX_RECENT_WINNERS();
+    return Number(max);
+  }
+
+  /**
+   * Get minimum pot size
+   */
+  async getMinPotSize() {
+    const contract = this.getContract();
+    const minSize = await contract.MIN_POT_SIZE();
+    return this.ethers.formatEther(minSize);
+  }
+
+  /**
+   * Withdraw house funds (owner only)
+   */
+  async withdrawHouseFunds() {
+    if (!this.signer) {
+      throw new Error('Wallet not connected');
+    }
+
+    const contract = this.getContract();
+    const contractWithSigner = contract.connect(this.signer);
+    
+    // Check if user has house funds to withdraw
+    const houseFunds = await contract.getHouseFunds();
+    if (houseFunds === 0n) {
+      throw new Error('No house funds to withdraw');
+    }
+
+    // Send withdrawHouseFunds transaction
+    const tx = await contractWithSigner.withdrawHouseFunds();
+
+    console.log('✅ House funds withdrawal transaction sent:', tx.hash);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+    
+    const withdrawnAmount = this.ethers.formatEther(houseFunds);
+
+    return {
+      hash: tx.hash,
+      receipt,
+      withdrawnAmount
+    };
+  }
+
+  /**
+   * Pause the contract (owner only)
+   */
+  async pauseContract() {
+    if (!this.signer) {
+      throw new Error('Wallet not connected');
+    }
+
+    const contract = this.getContract();
+    const contractWithSigner = contract.connect(this.signer);
+    
+    // Send pause transaction
+    const tx = await contractWithSigner.pause();
+
+    console.log('✅ Contract pause transaction sent:', tx.hash);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+
+    return {
+      hash: tx.hash,
+      receipt
+    };
+  }
+
+  /**
+   * Unpause the contract (owner only)
+   */
+  async unpauseContract() {
+    if (!this.signer) {
+      throw new Error('Wallet not connected');
+    }
+
+    const contract = this.getContract();
+    const contractWithSigner = contract.connect(this.signer);
+    
+    // Send unpause transaction
+    const tx = await contractWithSigner.unpause();
+
+    console.log('✅ Contract unpause transaction sent:', tx.hash);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+
+    return {
+      hash: tx.hash,
+      receipt
+    };
+  }
+
+  /**
+   * Set test mode (owner only)
+   */
+  async setTestMode(enabled) {
+    if (!this.signer) {
+      throw new Error('Wallet not connected');
+    }
+
+    const contract = this.getContract();
+    const contractWithSigner = contract.connect(this.signer);
+    
+    // Send setTestMode transaction
+    const tx = await contractWithSigner.setTestMode(enabled);
+
+    console.log('✅ Set test mode transaction sent:', tx.hash);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+
+    return {
+      hash: tx.hash,
+      receipt,
+      testMode: enabled
+    };
+  }
+
+  /**
+   * Set winning number for test mode (owner only)
+   */
+  async setWinningNumber(winningNumber) {
+    if (!this.signer) {
+      throw new Error('Wallet not connected');
+    }
+
+    const contract = this.getContract();
+    const contractWithSigner = contract.connect(this.signer);
+    
+    // Send setWinningNumber transaction
+    const tx = await contractWithSigner.setWinningNumber(winningNumber);
+
+    console.log('✅ Set winning number transaction sent:', tx.hash);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+
+    return {
+      hash: tx.hash,
+      receipt,
+      winningNumber
+    };
+  }
+
+  /**
    * Override formatters to use ethers.js
    */
   parseAmount(amount) {

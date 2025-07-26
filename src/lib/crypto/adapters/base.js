@@ -285,6 +285,104 @@ export class BaseCryptoAdapter {
   }
 
   /**
+   * Get game configuration in basis points
+   * @returns {Promise<{winPercentageBP: number, housePercentageBP: number, winChanceBP: number}>}
+   */
+  async getGameConfig() {
+    throw new Error('getGameConfig() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Get cooldown period from contract
+   * @returns {Promise<number>} Cooldown period in seconds
+   */
+  async getCooldownPeriod() {
+    throw new Error('getCooldownPeriod() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Get win percentage in basis points
+   * @returns {Promise<number>} Win percentage in basis points
+   */
+  async getWinPercentageBP() {
+    throw new Error('getWinPercentageBP() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Get house percentage in basis points
+   * @returns {Promise<number>} House percentage in basis points
+   */
+  async getHousePercentageBP() {
+    throw new Error('getHousePercentageBP() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Get win chance in basis points
+   * @returns {Promise<number>} Win chance in basis points
+   */
+  async getWinChanceBP() {
+    throw new Error('getWinChanceBP() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Get maximum recent winners limit
+   * @returns {Promise<number>} Maximum recent winners
+   */
+  async getMaxRecentWinners() {
+    throw new Error('getMaxRecentWinners() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Get minimum pot size
+   * @returns {Promise<string>} Minimum pot size in native currency units
+   */
+  async getMinPotSize() {
+    throw new Error('getMinPotSize() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Withdraw house funds (owner only)
+   * @returns {Promise<{hash: string, receipt: Object, withdrawnAmount: string}>}
+   */
+  async withdrawHouseFunds() {
+    throw new Error('withdrawHouseFunds() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Pause the contract (owner only)
+   * @returns {Promise<{hash: string, receipt: Object}>}
+   */
+  async pauseContract() {
+    throw new Error('pauseContract() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Unpause the contract (owner only)
+   * @returns {Promise<{hash: string, receipt: Object}>}
+   */
+  async unpauseContract() {
+    throw new Error('unpauseContract() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Set test mode (owner only)
+   * @param {boolean} enabled - Whether to enable test mode
+   * @returns {Promise<{hash: string, receipt: Object, testMode: boolean}>}
+   */
+  async setTestMode(enabled) {
+    throw new Error('setTestMode() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Set winning number for test mode (owner only)
+   * @param {number} winningNumber - The winning number to set
+   * @returns {Promise<{hash: string, receipt: Object, winningNumber: number}>}
+   */
+  async setWinningNumber(winningNumber) {
+    throw new Error('setWinningNumber() must be implemented by crypto adapter');
+  }
+
+  /**
    * Format amount for display
    * @param {string|number} amount - Amount to format
    * @param {number} precision - Decimal precision

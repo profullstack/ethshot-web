@@ -137,28 +137,55 @@ export const ETH_CONFIG = createCryptoConfig({
   
   contractConfig: {
     abi: [
+      // Core game functions
       'function commitShot(bytes32 commitment) external payable',
       'function revealShot(uint256 secret) external',
       'function sponsorRound(string calldata name, string calldata logoUrl) external payable',
+      
+      // View functions - Game state
       'function getCurrentPot() external view returns (uint256)',
       'function getContractBalance() external view returns (uint256)',
       'function getHouseFunds() external view returns (uint256)',
       'function getPlayerStats(address player) external view returns (tuple(uint256 totalShots, uint256 totalSpent, uint256 totalWon, uint256 lastShotTime))',
+      'function getCurrentSponsor() external view returns (tuple(address sponsor, string name, string logoUrl, uint256 timestamp, bool active))',
+      'function getRecentWinners() external view returns (tuple(address winner, uint256 amount, uint256 timestamp, uint256 blockNumber)[])',
+      'function getGameConfig() external view returns (uint256 winPercentageBP, uint256 housePercentageBP, uint256 winChanceBP)',
+      
+      // View functions - Player state
       'function canCommitShot(address player) external view returns (bool)',
       'function canRevealShot(address player) external view returns (bool)',
       'function hasPendingShot(address player) external view returns (bool)',
       'function getPendingShot(address player) external view returns (bool exists, uint256 blockNumber, uint256 amount)',
       'function getPendingPayout(address player) external view returns (uint256)',
       'function getCooldownRemaining(address player) external view returns (uint256)',
+      
+      // Player actions
       'function claimPayout() external',
-      'function getCurrentSponsor() external view returns (tuple(address sponsor, string name, string logoUrl, uint256 timestamp, bool active))',
-      'function getRecentWinners() external view returns (tuple(address winner, uint256 amount, uint256 timestamp, uint256 blockNumber)[])',
+      
+      // Owner functions
+      'function withdrawHouseFunds() external',
+      'function pause() external',
+      'function unpause() external',
+      'function setTestMode(bool _testMode) external',
+      'function setWinningNumber(uint256 _winningNumber) external',
+      
+      // Constants
       'function SHOT_COST() external view returns (uint256)',
       'function SPONSOR_COST() external view returns (uint256)',
+      'function COOLDOWN_PERIOD() external view returns (uint256)',
+      'function WIN_PERCENTAGE_BP() external view returns (uint256)',
+      'function HOUSE_PERCENTAGE_BP() external view returns (uint256)',
+      'function WIN_CHANCE_BP() external view returns (uint256)',
+      'function MAX_RECENT_WINNERS() external view returns (uint256)',
+      'function MIN_POT_SIZE() external view returns (uint256)',
+      
+      // Events
       'event ShotCommitted(address indexed player, bytes32 indexed commitment, uint256 amount)',
       'event ShotRevealed(address indexed player, uint256 indexed amount, bool indexed won)',
       'event JackpotWon(address indexed winner, uint256 indexed amount, uint256 indexed timestamp)',
       'event SponsorshipActivated(address indexed sponsor, string name, string logoUrl)',
+      'event SponsorshipCleared()',
+      'event HouseFundsWithdrawn(address indexed owner, uint256 amount)',
       'event PayoutFailed(address indexed player, uint256 amount)',
       'event PayoutClaimed(address indexed player, uint256 amount)'
     ],
