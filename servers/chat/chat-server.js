@@ -14,16 +14,18 @@ dotenv.config();
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('Missing Supabase configuration');
-  process.exit(1);
+let supabase = null;
+
+if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+  // Initialize Supabase client
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('Supabase client initialized');
+} else {
+  console.warn('Supabase configuration missing - running in limited mode');
 }
 
-// Initialize Supabase client
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
 // Chat server configuration
-const CHAT_SERVER_PORT = process.env.CHAT_SERVER_PORT || 8080;
+const CHAT_SERVER_PORT = process.env.PORT || process.env.CHAT_SERVER_PORT || 8080;
 const MAX_MESSAGE_LENGTH = 500;
 const RATE_LIMIT_MESSAGES = 10; // messages per minute
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute in milliseconds
@@ -73,7 +75,10 @@ class ChatServer {
 
       // Start the server
       this.server.listen(CHAT_SERVER_PORT, () => {
-        console.log(`Chat server running on port ${CHAT_SERVER_PORT}`);
+        console.log(`🚀 Chat server running on port ${CHAT_SERVER_PORT}`);
+        console.log(`📊 Supabase: ${supabase ? 'Connected' : 'Not available (limited mode)'}`);
+        console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`⚡ Server ready for WebSocket connections at /chat`);
       });
 
       // Handle graceful shutdown
@@ -236,21 +241,23 @@ class ChatServer {
     }
 
     try {
-      // Join room in database
-      const { data, error } = await supabase.rpc('join_chat_room', {
-        p_room_id: roomId,
-        p_user_wallet_address: client.walletAddress
-      });
+      // Join room in database (if available)
+      if (supabase) {
+        const { data, error } = await supabase.rpc('join_chat_room', {
+          p_room_id: roomId,
+          p_user_wallet_address: client.walletAddress
+        });
 
-      if (error) {
-        console.error('Database error joining room:', error);
-        this.sendError(clientId, 'Failed to join room');
-        return;
-      }
+        if (error) {
+          console.error('Database error joining room:', error);
+          this.sendError(clientId, 'Failed to join room');
+          return;
+        }
 
-      if (!data) {
-        this.sendError(clientId, 'Room is full or does not exist');
-        return;
+        if (!data) {
+          this.sendError(clientId, 'Room is full or does not exist');
+          return;
+        }
       }
 
       // Add to local room tracking
@@ -301,11 +308,13 @@ class ChatServer {
     }
 
     try {
-      // Leave room in database
-      await supabase.rpc('leave_chat_room', {
-        p_room_id: roomId,
-        p_user_wallet_address: client.walletAddress
-      });
+      // Leave room in database (if available)
+      if (supabase) {
+        await supabase.rpc('leave_chat_room', {
+          p_room_id: roomId,
+          p_user_wallet_address: client.walletAddress
+        });
+      }
 
       // Remove from local room tracking
       if (this.rooms.has(roomId)) {
@@ -375,26 +384,35 @@ class ChatServer {
     }
 
     try {
-      // Save message to database
-      const { data: messageId, error } = await supabase.rpc('send_chat_message', {
-        p_room_id: roomId,
-        p_user_wallet_address: client.walletAddress,
-        p_message_content: content,
-        p_message_type: messageType
-      });
+      let messageId = Date.now(); // Fallback ID
+      let profile = null;
 
-      if (error) {
-        console.error('Database error sending message:', error);
-        this.sendError(clientId, 'Failed to send message');
-        return;
+      // Save message to database (if available)
+      if (supabase) {
+        const { data: dbMessageId, error } = await supabase.rpc('send_chat_message', {
+          p_room_id: roomId,
+          p_user_wallet_address: client.walletAddress,
+          p_message_content: content,
+          p_message_type: messageType
+        });
+
+        if (error) {
+          console.error('Database error sending message:', error);
+          this.sendError(clientId, 'Failed to send message');
+          return;
+        }
+
+        messageId = dbMessageId;
+
+        // Get user profile for the message
+        const { data: profileData } = await supabase
+          .from('user_profiles')
+          .select('nickname, avatar_url')
+          .eq('wallet_address', client.walletAddress)
+          .single();
+        
+        profile = profileData;
       }
-
-      // Get user profile for the message
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('nickname, avatar_url')
-        .eq('wallet_address', client.walletAddress)
-        .single();
 
       // Broadcast message to all room participants
       const messageData = {
@@ -437,17 +455,23 @@ class ChatServer {
     }
 
     try {
-      // Get messages from database
-      const { data: messages, error } = await supabase.rpc('get_chat_messages', {
-        p_room_id: roomId,
-        p_limit: limit,
-        p_offset: offset
-      });
+      let messages = [];
 
-      if (error) {
-        console.error('Database error getting messages:', error);
-        this.sendError(clientId, 'Failed to get messages');
-        return;
+      // Get messages from database (if available)
+      if (supabase) {
+        const { data: dbMessages, error } = await supabase.rpc('get_chat_messages', {
+          p_room_id: roomId,
+          p_limit: limit,
+          p_offset: offset
+        });
+
+        if (error) {
+          console.error('Database error getting messages:', error);
+          this.sendError(clientId, 'Failed to get messages');
+          return;
+        }
+
+        messages = dbMessages || [];
       }
 
       // Send messages to client (reverse order for chronological display)
@@ -547,10 +571,13 @@ class ChatServer {
     for (const roomId of client.rooms) {
       if (client.walletAddress) {
         try {
-          await supabase.rpc('leave_chat_room', {
-            p_room_id: roomId,
-            p_user_wallet_address: client.walletAddress
-          });
+          // Leave room in database (if available)
+          if (supabase) {
+            await supabase.rpc('leave_chat_room', {
+              p_room_id: roomId,
+              p_user_wallet_address: client.walletAddress
+            });
+          }
 
           // Notify other room participants
           this.broadcastToRoom(roomId, {

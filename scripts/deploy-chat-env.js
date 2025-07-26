@@ -97,7 +97,7 @@ function uploadToRailway(envVars) {
       console.log(`📤 Setting ${key}...`);
       execSync(`railway variables --set "${key}=${value}"`, {
         stdio: 'pipe',
-        cwd: rootDir
+        cwd: join(rootDir, 'servers', 'chat')
       });
       successCount++;
       console.log(`✅ ${key} set successfully`);
