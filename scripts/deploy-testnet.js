@@ -2,6 +2,7 @@ import pkg from 'hardhat';
 const { ethers } = pkg;
 import fs from 'fs';
 import path from 'path';
+import 'dotenv/config';
 
 async function main() {
   console.log('🚀 Deploying ETH Shot to Sepolia testnet...\n');
@@ -13,16 +14,16 @@ async function main() {
   console.log('📝 Deploying contract...');
   const [signer] = await ethers.getSigners();
   
-  // Contract constructor parameters
-  const initialOwner = signer.address;
-  const shotCost = ethers.parseEther("0.001");      // 0.001 ETH per shot
-  const sponsorCost = ethers.parseEther("0.01");    // 0.01 ETH for sponsorship
-  const cooldownPeriod = 1 * 60 * 60;               // 1 hour in seconds
-  const winPercentageBP = 9000;                     // Winner gets 90% of pot (in basis points)
-  const housePercentageBP = 1000;                   // House gets 10% of pot (in basis points)
-  const winChanceBP = 100;                          // 1% chance to win (in basis points)
-  const maxRecentWinners = 100;                     // Maximum number of recent winners to store
-  const minPotSize = ethers.parseEther("0.001");    // Minimum pot size (same as shot cost)
+  // Contract constructor parameters (from environment variables)
+  const initialOwner = process.env.HOUSE_COMMISSION_ADDRESS || signer.address;
+  const shotCost = ethers.parseEther(process.env.VITE_SHOT_COST_ETH || "0.001");
+  const sponsorCost = ethers.parseEther(process.env.VITE_SPONSOR_COST_ETH || "0.01");
+  const cooldownPeriod = (parseInt(process.env.VITE_COOLDOWN_HOURS || "1")) * 60 * 60;
+  const winPercentageBP = (parseFloat(process.env.VITE_WINNER_PAYOUT_PERCENTAGE || "90")) * 100;
+  const housePercentageBP = (parseFloat(process.env.VITE_HOUSE_FEE_PERCENTAGE || "10")) * 100;
+  const winChanceBP = (parseFloat(process.env.VITE_WIN_PERCENTAGE || "1")) * 100;
+  const maxRecentWinners = parseInt(process.env.VITE_RECENT_WINNERS_LIMIT || "100");
+  const minPotSize = shotCost; // Minimum pot size same as shot cost
   
   console.log('📋 Contract parameters:');
   console.log(`  Initial Owner: ${initialOwner}`);
@@ -81,8 +82,26 @@ async function main() {
   
   console.log(`📄 Deployment info saved to: ${deploymentPath}`);
 
-  // Create environment file for frontend
-  const envContent = `# ETH Shot Environment Configuration
+  // Update existing .env file with new contract address
+  const envPath = path.join(process.cwd(), '.env');
+  
+  try {
+    let envContent = '';
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, 'utf8');
+      
+      // Update or add VITE_CONTRACT_ADDRESS
+      if (envContent.includes('VITE_CONTRACT_ADDRESS=')) {
+        envContent = envContent.replace(
+          /VITE_CONTRACT_ADDRESS=.*/,
+          `VITE_CONTRACT_ADDRESS=${contractAddress}`
+        );
+      } else {
+        envContent += `\n# Smart Contract Address (Updated ${new Date().toISOString()})\nVITE_CONTRACT_ADDRESS=${contractAddress}\n`;
+      }
+    } else {
+      // Create new .env file if it doesn't exist
+      envContent = `# ETH Shot Environment Configuration
 # Generated on ${new Date().toISOString()}
 
 # Smart Contract Configuration
@@ -91,25 +110,36 @@ VITE_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_KEY
 VITE_NETWORK_NAME=Sepolia Testnet
 VITE_CHAIN_ID=11155111
 
+# Game Configuration
+VITE_SHOT_COST_ETH=0.001
+VITE_SPONSOR_COST_ETH=0.01
+VITE_COOLDOWN_HOURS=1
+VITE_WINNER_PAYOUT_PERCENTAGE=90
+VITE_HOUSE_FEE_PERCENTAGE=10
+VITE_WIN_PERCENTAGE=1
+VITE_RECENT_WINNERS_LIMIT=100
+
 # Supabase Configuration (Update with your values)
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 
 # Application Configuration
 VITE_APP_URL=https://ethshot.io
-NODE_ENV=production
+NODE_ENV=development
 `;
-
-  const envPath = path.join(process.cwd(), '.env.production');
-  fs.writeFileSync(envPath, envContent);
-  
-  console.log(`🔧 Environment file created: ${envPath}`);
+    }
+    
+    fs.writeFileSync(envPath, envContent);
+    console.log(`🔧 Environment file updated: ${envPath}`);
+    
+  } catch (error) {
+    console.error('❌ Error updating .env file:', error.message);
+  }
   console.log('\n📋 Next steps:');
-  console.log('1. Update .env.production with your Supabase and Infura credentials');
-  console.log('2. Verify the contract on Etherscan');
-  console.log('3. Test all contract functions');
-  console.log('4. Deploy frontend to Vercel');
-  console.log('5. Update DNS settings for ethshot.io');
+  console.log('1. Verify the contract on Etherscan');
+  console.log('2. Test all contract functions with the frontend');
+  console.log('3. Deploy frontend to Vercel with updated contract address');
+  console.log('4. Update DNS settings for ethshot.io');
   
   // Test basic contract functionality
   console.log('\n🧪 Testing basic contract functionality...');
