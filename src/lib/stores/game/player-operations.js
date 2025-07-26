@@ -341,12 +341,34 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   const contractWithSigner = contract.connect(wallet.signer);
   const fullShotCost = await contract.SHOT_COST();
   
-  // Use full shot cost for the transaction (discounts are handled at database level)
-  // The contract always expects the full shot cost
+  // Always use full shot cost for the transaction
+  // Discounts are handled at the database/UI level, not contract level
   const transactionValue = fullShotCost;
+
+  console.log('🔍 Pre-transaction validation:', {
+    contractAddress: await contract.getAddress(),
+    shotCost: ethers.formatEther(fullShotCost),
+    userAddress: wallet.address
+  });
+
+  // Check if user can commit a shot
+  const canCommit = await contract.canCommitShot(wallet.address);
+  if (!canCommit) {
+    throw new Error('Cannot commit shot. You may be in cooldown period or have a pending shot.');
+  }
+
+  // Check if user has pending shot
+  const hasPending = await contract.hasPendingShot(wallet.address);
+  if (hasPending) {
+    throw new Error('You have a pending shot. Please wait for the reveal window or reveal your current shot.');
+  }
 
   // Check user balance
   const balance = await wallet.provider.getBalance(wallet.address);
+  console.log('💰 Balance check:', {
+    balance: ethers.formatEther(balance),
+    required: ethers.formatEther(fullShotCost)
+  });
   
   // Generate secret and commitment for commit-reveal
   const secret = ethers.hexlify(ethers.randomBytes(32));
@@ -360,8 +382,18 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
     gasEstimate = await contractWithSigner.commitShot.estimateGas(commitment, {
       value: transactionValue
     });
+    console.log('✅ Gas estimation successful:', gasEstimate.toString());
   } catch (estimateError) {
-    console.warn('Failed to estimate gas for commitShot, using default:', estimateError.message);
+    console.error('❌ Gas estimation failed:', estimateError);
+    
+    // Check if this is a simulation failure
+    if (estimateError.message.includes('execution reverted') ||
+        estimateError.message.includes('transaction may fail') ||
+        estimateError.code === 'UNPREDICTABLE_GAS_LIMIT') {
+      throw new Error('Transaction simulation failed. This may be due to insufficient funds, cooldown period, or contract state. Please check your balance and try again.');
+    }
+    
+    console.warn('Using default gas estimate due to estimation failure');
     gasEstimate = 150000n;
   }
   
