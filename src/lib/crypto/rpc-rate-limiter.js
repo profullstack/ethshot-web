@@ -239,8 +239,15 @@ export class RPCRateLimiter {
     } else if (method === 'eth_getLogs') {
       return await provider.getLogs(params[0]);
     } else {
-      // Generic call for other methods
-      return await provider.send(method, params);
+      // Generic call for other methods - check if provider has send method
+      if (provider.send && typeof provider.send === 'function') {
+        return await provider.send(method, params);
+      } else if (provider.call && typeof provider.call === 'function') {
+        // Fallback to call method for mock providers
+        return await provider.call(method, params);
+      } else {
+        throw new Error(`Provider does not support method: ${method}`);
+      }
     }
   }
 
