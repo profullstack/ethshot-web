@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import { gameStore, currentPot } from '../stores/game-unified.js';
+  import { gameStore, currentPot } from '../stores/game/index.js';
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
   import { db } from '../supabase.js';

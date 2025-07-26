@@ -19,7 +19,7 @@ import {
 import { 
   notificationManager
 } from '../../utils/notifications.js';
-import { db } from '../../supabase.js';
+import { db } from '../../database/index.js';
 import { rpcCache } from './cache.js';
 import { createInitialGameState, updateUSDValues, formatTimeRemaining } from './utils.js';
 import { loadGameState, initializeEthContract, initializeMultiCryptoAdapter } from './contract-operations.js';
