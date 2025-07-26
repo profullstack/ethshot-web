@@ -375,7 +375,7 @@
                 placeholder="Type your message... (Enter to send)"
                 maxlength="500"
                 rows="1"
-                disabled={!canSendMessage && messageInput.trim().length === 0}
+                disabled={!isConnected}
               ></textarea>
               
               <button 
