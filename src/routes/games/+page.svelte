@@ -129,7 +129,7 @@
 					<!-- Game Info -->
 					<h3 class="text-2xl font-bold text-center mb-4 text-orange-400">ETH Crash Game</h3>
 					<p class="text-gray-300 text-center mb-6 leading-relaxed">
-						Watch the multiplier grow! Cash out before it crashes. Hit rare jackpot multipliers for huge ETH rewards.
+						Watch the multiplier grow! Cash out before it crashes. Accumulated pot from all players creates the prize pool.
 					</p>
 					
 					<!-- Features -->
@@ -140,7 +140,7 @@
 						</div>
 						<div class="flex items-center text-sm text-gray-400">
 							<div class="w-2 h-2 bg-orange-500 rounded-full mr-3"></div>
-							Jackpot multiplier bonus
+							Player-funded prize pool
 						</div>
 						<div class="flex items-center text-sm text-gray-400">
 							<div class="w-2 h-2 bg-orange-500 rounded-full mr-3"></div>
@@ -173,14 +173,14 @@
 					<!-- Game Info -->
 					<h3 class="text-2xl font-bold text-center mb-4 text-yellow-400">ETH Dice Jackpot</h3>
 					<p class="text-gray-300 text-center mb-6 leading-relaxed">
-						Roll dice and bet ETH against odds. Hit rare perfect combinations to trigger massive jackpot payouts!
+						Roll dice and bet ETH against odds. Perfect combinations win the accumulated jackpot from all player bets!
 					</p>
 					
 					<!-- Features -->
 					<div class="space-y-2 mb-6">
 						<div class="flex items-center text-sm text-gray-400">
 							<div class="w-2 h-2 bg-yellow-500 rounded-full mr-3"></div>
-							Perfect roll jackpots
+							Player-funded jackpots
 						</div>
 						<div class="flex items-center text-sm text-gray-400">
 							<div class="w-2 h-2 bg-yellow-500 rounded-full mr-3"></div>
@@ -305,7 +305,7 @@
 					<!-- Game Info -->
 					<h3 class="text-2xl font-bold text-center mb-4 text-teal-400">ETH Bingo</h3>
 					<p class="text-gray-300 text-center mb-6 leading-relaxed">
-						Buy digital bingo cards with ETH. Smart contract draws numbers until someone hits BINGO and wins the jackpot!
+						Buy digital bingo cards with ETH. Smart contract draws numbers until someone hits BINGO and wins the card sales jackpot!
 					</p>
 					
 					<!-- Features -->
@@ -316,7 +316,7 @@
 						</div>
 						<div class="flex items-center text-sm text-gray-400">
 							<div class="w-2 h-2 bg-teal-500 rounded-full mr-3"></div>
-							Rare pattern bonuses
+							Card sales fund prizes
 						</div>
 						<div class="flex items-center text-sm text-gray-400">
 							<div class="w-2 h-2 bg-teal-500 rounded-full mr-3"></div>
@@ -349,7 +349,7 @@
 					<!-- Game Info -->
 					<h3 class="text-2xl font-bold text-center mb-4 text-pink-400">ETH Coin Flip</h3>
 					<p class="text-gray-300 text-center mb-6 leading-relaxed">
-						Simple heads or tails with ETH bets. Hit consecutive wins to trigger rare jackpot bonuses!
+						Simple heads or tails with ETH bets. Consecutive wins earn larger shares of the accumulated betting pool!
 					</p>
 					
 					<!-- Features -->
@@ -360,7 +360,7 @@
 						</div>
 						<div class="flex items-center text-sm text-gray-400">
 							<div class="w-2 h-2 bg-pink-500 rounded-full mr-3"></div>
-							Consecutive win bonuses
+							Player-funded prize pool
 						</div>
 						<div class="flex items-center text-sm text-gray-400">
 							<div class="w-2 h-2 bg-pink-500 rounded-full mr-3"></div>
@@ -383,7 +383,7 @@
 					Powered by Smart Contracts
 				</h2>
 				<p class="text-gray-300 mb-6 text-lg">
-					All games use Ethereum smart contracts for transparency, provable fairness, and automatic payouts. No house edge - just pure jackpot excitement!
+					All games use Ethereum smart contracts for transparency, provable fairness, and automatic payouts. No house edge - all prizes come from player contributions only!
 				</p>
 				<div class="flex flex-col sm:flex-row gap-4 justify-center">
 					<a href="/" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold py-3 px-8 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
