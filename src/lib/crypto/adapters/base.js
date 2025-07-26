@@ -74,11 +74,48 @@ export class BaseCryptoAdapter {
   }
 
   /**
-   * Take a shot at the jackpot
-   * @returns {Promise<{hash: string, receipt: Object, won: boolean}>}
+   * Generate a cryptographically secure secret for commit-reveal
+   * @returns {string} Hex-encoded secret
    */
-  async takeShot() {
-    throw new Error('takeShot() must be implemented by crypto adapter');
+  generateSecret() {
+    throw new Error('generateSecret() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Generate commitment hash from secret and player address
+   * @param {string} secret - The secret value
+   * @param {string} playerAddress - Player's wallet address
+   * @returns {string} Commitment hash
+   */
+  generateCommitment(secret, playerAddress) {
+    throw new Error('generateCommitment() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Commit a shot with generated commitment
+   * @param {string} commitment - The commitment hash
+   * @param {string} shotCost - Optional shot cost (uses default if not provided)
+   * @returns {Promise<{hash: string, receipt: Object, committed: boolean, commitBlock: number}>}
+   */
+  async commitShot(commitment, shotCost = null) {
+    throw new Error('commitShot() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Reveal a committed shot
+   * @param {string} secret - The secret used for commitment
+   * @returns {Promise<{hash: string, receipt: Object, won: boolean, randomNumber: string, jackpotAmount: string}>}
+   */
+  async revealShot(secret) {
+    throw new Error('revealShot() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Claim failed payout
+   * @returns {Promise<{hash: string, receipt: Object, claimedAmount: string}>}
+   */
+  async claimPayout() {
+    throw new Error('claimPayout() must be implemented by crypto adapter');
   }
 
   /**

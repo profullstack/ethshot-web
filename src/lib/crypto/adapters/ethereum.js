@@ -248,9 +248,28 @@ export class EthereumAdapter extends BaseCryptoAdapter {
   }
 
   /**
-   * Take a shot at the jackpot
+   * Generate a cryptographically secure secret for commit-reveal
    */
-  async takeShot() {
+  generateSecret() {
+    return this.ethers.hexlify(this.ethers.randomBytes(32));
+  }
+
+  /**
+   * Generate commitment hash from secret and player address
+   */
+  generateCommitment(secret, playerAddress) {
+    return this.ethers.keccak256(
+      this.ethers.solidityPacked(
+        ['uint256', 'address'],
+        [secret, playerAddress]
+      )
+    );
+  }
+
+  /**
+   * Commit a shot with generated commitment
+   */
+  async commitShot(commitment, shotCost = null) {
     if (!this.signer) {
       throw new Error('Wallet not connected');
     }
@@ -258,54 +277,168 @@ export class EthereumAdapter extends BaseCryptoAdapter {
     const contract = this.getContract();
     const contractWithSigner = contract.connect(this.signer);
 
-    // Get shot cost
-    const shotCost = await contract.SHOT_COST();
+    // Get shot cost if not provided
+    const actualShotCost = shotCost || await contract.SHOT_COST();
     
-    // Estimate gas
+    // Estimate gas for commitShot
     let gasEstimate;
     try {
-      gasEstimate = await contractWithSigner.takeShot.estimateGas({
-        value: shotCost
+      gasEstimate = await contractWithSigner.commitShot.estimateGas(commitment, {
+        value: actualShotCost
       });
     } catch (estimateError) {
-      console.warn('Failed to estimate gas, using default:', estimateError.message);
+      console.warn('Failed to estimate gas for commitShot, using default:', estimateError.message);
       gasEstimate = 150000n;
     }
 
     // Add 20% buffer to gas estimate
     const gasLimit = gasEstimate < 120000n ? 150000n : gasEstimate + (gasEstimate * 20n / 100n);
 
-    // Send transaction
-    const tx = await contractWithSigner.takeShot({
-      value: shotCost,
+    // Send commitShot transaction
+    const tx = await contractWithSigner.commitShot(commitment, {
+      value: actualShotCost,
       gasLimit: gasLimit
     });
 
-    console.log('✅ Shot transaction sent:', tx.hash);
+    console.log('✅ Shot commitment transaction sent:', tx.hash);
 
     // Wait for confirmation
     const receipt = await tx.wait();
 
-    // Check if user won by looking at events
-    const shotTakenEvent = receipt.logs.find(log => {
+    // Check for ShotCommitted event
+    const shotCommittedEvent = receipt.logs.find(log => {
       try {
         const parsed = contract.interface.parseLog(log);
-        return parsed.name === 'ShotTaken';
+        return parsed.name === 'ShotCommitted';
       } catch {
         return false;
       }
     });
 
-    let won = false;
-    if (shotTakenEvent) {
-      const parsed = contract.interface.parseLog(shotTakenEvent);
-      won = parsed.args.won;
+    if (!shotCommittedEvent) {
+      throw new Error('Shot commitment failed - no ShotCommitted event found');
+    }
+
+    const parsed = contract.interface.parseLog(shotCommittedEvent);
+    const commitBlock = parsed.args.blockNumber;
+
+    return {
+      hash: tx.hash,
+      receipt,
+      committed: true,
+      commitBlock: Number(commitBlock)
+    };
+  }
+
+  /**
+   * Reveal a committed shot
+   */
+  async revealShot(secret) {
+    if (!this.signer) {
+      throw new Error('Wallet not connected');
+    }
+
+    const contract = this.getContract();
+    const contractWithSigner = contract.connect(this.signer);
+    
+    // Estimate gas for revealShot
+    let gasEstimate;
+    try {
+      gasEstimate = await contractWithSigner.revealShot.estimateGas(secret);
+    } catch (estimateError) {
+      console.warn('Failed to estimate gas for revealShot, using default:', estimateError.message);
+      gasEstimate = 100000n;
+    }
+
+    // Add 20% buffer to gas estimate
+    const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
+
+    // Send revealShot transaction
+    const tx = await contractWithSigner.revealShot(secret, {
+      gasLimit: gasLimit
+    });
+
+    console.log('✅ Shot reveal transaction sent:', tx.hash);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+
+    // Check for ShotRevealed event
+    const shotRevealedEvent = receipt.logs.find(log => {
+      try {
+        const parsed = contract.interface.parseLog(log);
+        return parsed.name === 'ShotRevealed';
+      } catch {
+        return false;
+      }
+    });
+
+    if (!shotRevealedEvent) {
+      throw new Error('Shot reveal failed - no ShotRevealed event found');
+    }
+
+    const parsed = contract.interface.parseLog(shotRevealedEvent);
+    const won = parsed.args.won;
+    const randomNumber = parsed.args.randomNumber;
+
+    // Check for JackpotWon event if player won
+    let jackpotAmount = '0';
+    if (won) {
+      const jackpotEvent = receipt.logs.find(log => {
+        try {
+          const parsed = contract.interface.parseLog(log);
+          return parsed.name === 'JackpotWon';
+        } catch {
+          return false;
+        }
+      });
+      
+      if (jackpotEvent) {
+        const jackpotParsed = contract.interface.parseLog(jackpotEvent);
+        jackpotAmount = this.ethers.formatEther(jackpotParsed.args.amount);
+      }
     }
 
     return {
       hash: tx.hash,
       receipt,
-      won
+      won,
+      randomNumber: randomNumber.toString(),
+      jackpotAmount
+    };
+  }
+
+  /**
+   * Claim failed payout
+   */
+  async claimPayout() {
+    if (!this.signer) {
+      throw new Error('Wallet not connected');
+    }
+
+    const contract = this.getContract();
+    const contractWithSigner = contract.connect(this.signer);
+    
+    // Check if user has pending payout
+    const pendingPayout = await contractWithSigner.getPendingPayout(this.signer.address);
+    if (pendingPayout === 0n) {
+      throw new Error('No pending payout to claim');
+    }
+
+    // Send claimPayout transaction
+    const tx = await contractWithSigner.claimPayout();
+
+    console.log('✅ Payout claim transaction sent:', tx.hash);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+    
+    const claimedAmount = this.ethers.formatEther(pendingPayout);
+
+    return {
+      hash: tx.hash,
+      receipt,
+      claimedAmount
     };
   }
 

@@ -60,7 +60,10 @@ export const db = {
         won: shotData.won || false,
         tx_hash: shotData.txHash,
         block_number: shotData.blockNumber,
-        timestamp: shotData.timestamp || new Date().toISOString()
+        timestamp: shotData.timestamp || new Date().toISOString(),
+        status: shotData.status || 'completed', // For commit-reveal: 'committed', 'revealed', 'completed'
+        commitment_hash: shotData.commitmentHash || null,
+        reveal_tx_hash: shotData.revealTxHash || null
       });
 
       const { data, error } = await supabase
@@ -72,6 +75,9 @@ export const db = {
           tx_hash: shotData.txHash,
           block_number: shotData.blockNumber,
           timestamp: shotData.timestamp || new Date().toISOString(),
+          status: shotData.status || 'completed',
+          commitment_hash: shotData.commitmentHash || null,
+          reveal_tx_hash: shotData.revealTxHash || null,
         })
         .select()
         .single();
@@ -85,6 +91,138 @@ export const db = {
       return data;
     } catch (error) {
       console.error('❌ Error recording shot:', error);
+      throw error;
+    }
+  },
+
+  // Commit-reveal specific shot operations
+  async recordShotCommit(commitData) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for recordShotCommit');
+      return null;
+    }
+
+    try {
+      console.log('🔒 Recording shot commit to Supabase:', {
+        player_address: commitData.playerAddress.toLowerCase(),
+        amount: commitData.amount,
+        commitment_hash: commitData.commitmentHash,
+        tx_hash: commitData.txHash,
+        block_number: commitData.blockNumber,
+        timestamp: commitData.timestamp || new Date().toISOString()
+      });
+
+      const { data, error } = await supabase
+        .from(TABLES.SHOTS)
+        .insert({
+          player_address: commitData.playerAddress.toLowerCase(),
+          amount: commitData.amount,
+          won: false, // Unknown until revealed
+          tx_hash: commitData.txHash,
+          block_number: commitData.blockNumber,
+          timestamp: commitData.timestamp || new Date().toISOString(),
+          status: 'committed',
+          commitment_hash: commitData.commitmentHash,
+          crypto_type: commitData.cryptoType || 'ETH',
+          used_discount: commitData.usedDiscount || false,
+          discount_id: commitData.discountId || null,
+          used_bonus: commitData.usedBonus || false
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase recordShotCommit error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Shot commit recorded successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Error recording shot commit:', error);
+      throw error;
+    }
+  },
+
+  async updateShotResult(updateData) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for updateShotResult');
+      return null;
+    }
+
+    try {
+      console.log('🔓 Updating shot result in Supabase:', {
+        commitment_hash: updateData.commitmentHash,
+        won: updateData.won,
+        reveal_tx_hash: updateData.revealTxHash,
+        reveal_block_number: updateData.revealBlockNumber
+      });
+
+      const { data, error } = await supabase
+        .from(TABLES.SHOTS)
+        .update({
+          won: updateData.won,
+          status: 'revealed',
+          reveal_tx_hash: updateData.revealTxHash,
+          reveal_block_number: updateData.revealBlockNumber,
+          reveal_timestamp: updateData.revealTimestamp || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('commitment_hash', updateData.commitmentHash)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase updateShotResult error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Shot result updated successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Error updating shot result:', error);
+      throw error;
+    }
+  },
+
+  async recordPayoutClaim(claimData) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for recordPayoutClaim');
+      return null;
+    }
+
+    try {
+      console.log('💰 Recording payout claim to Supabase:', {
+        player_address: claimData.playerAddress.toLowerCase(),
+        amount: claimData.amount,
+        tx_hash: claimData.txHash,
+        block_number: claimData.blockNumber,
+        timestamp: claimData.timestamp || new Date().toISOString()
+      });
+
+      // Create a new table entry for payout claims or add to existing shots table
+      const { data, error } = await supabase
+        .from('payout_claims') // Assuming we have a separate table for payout claims
+        .insert({
+          player_address: claimData.playerAddress.toLowerCase(),
+          amount: claimData.amount,
+          tx_hash: claimData.txHash,
+          block_number: claimData.blockNumber,
+          timestamp: claimData.timestamp || new Date().toISOString(),
+          crypto_type: claimData.cryptoType || 'ETH'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase recordPayoutClaim error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Payout claim recorded successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Error recording payout claim:', error);
       throw error;
     }
   },
