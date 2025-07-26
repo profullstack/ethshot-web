@@ -229,6 +229,43 @@ export const processReferralOnLoad = () => {
 };
 
 /**
+ * Processes stored referral code when wallet connects
+ * @param {string} walletAddress - The connected wallet address
+ * @param {Object} db - Database instance
+ * @returns {Promise<boolean>} True if referral was processed successfully
+ */
+export const processStoredReferralCode = async (walletAddress, db) => {
+  if (!browser || !walletAddress || !db) return false;
+  
+  try {
+    const storedCode = getStoredReferralCode();
+    if (!storedCode) {
+      console.log('No stored referral code found');
+      return false;
+    }
+    
+    console.log('Processing stored referral code:', storedCode, 'for wallet:', walletAddress);
+    
+    // Process the referral signup
+    const result = await db.processReferralSignup(storedCode, walletAddress);
+    
+    if (result) {
+      console.log('✅ Referral processed successfully');
+      // Clear the stored code after successful processing
+      clearStoredReferralCode();
+      return true;
+    } else {
+      console.log('❌ Referral processing failed - code may be invalid or already used');
+      // Don't clear the code in case of temporary failure
+      return false;
+    }
+  } catch (error) {
+    console.error('Error processing stored referral code:', error);
+    return false;
+  }
+};
+
+/**
  * Gets referral statistics display data
  * @param {Object} stats - Raw stats from database
  * @returns {Object} Formatted stats for display
