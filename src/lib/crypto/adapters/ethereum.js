@@ -3,6 +3,7 @@
 
 import { BaseCryptoAdapter } from './base.js';
 import { WALLET_PROVIDERS } from '../config.js';
+import { defaultProviderManager, setupProvidersFromEnv } from '../rpc-provider-manager.js';
 
 /**
  * Ethereum adapter for handling ETH transactions and wallet interactions
@@ -13,6 +14,8 @@ export class EthereumAdapter extends BaseCryptoAdapter {
     this.ethers = null;
     this.contract = null;
     this.walletInstance = null;
+    this.providerManager = defaultProviderManager;
+    this.isProviderManagerSetup = false;
   }
 
   /**
@@ -31,6 +34,12 @@ export class EthereumAdapter extends BaseCryptoAdapter {
 
       if (!this.ethers) {
         throw new Error('Failed to load ethers library');
+      }
+
+      // Setup provider manager with fallback providers
+      if (!this.isProviderManagerSetup) {
+        await setupProvidersFromEnv(this.providerManager, this.ethers);
+        this.isProviderManagerSetup = true;
       }
 
       console.log('Ethereum adapter initialized successfully');
@@ -488,150 +497,362 @@ export class EthereumAdapter extends BaseCryptoAdapter {
   }
 
   /**
+   * Make a rate-limited contract call
+   * @param {string} method - Contract method name
+   * @param {Array} params - Method parameters
+   * @returns {Promise<*>} Contract call result
+   */
+  async makeContractCall(method, params = []) {
+    const contractAddress = this.config.contractConfig.address;
+    if (!contractAddress) {
+      throw new Error('Contract address not configured');
+    }
+
+    // Encode the contract call
+    const contract = this.getContract();
+    const data = contract.interface.encodeFunctionData(method, params);
+    
+    // Make rate-limited call
+    const result = await this.providerManager.makeRequest('eth_call', [
+      {
+        to: contractAddress,
+        data: data
+      },
+      'latest'
+    ]);
+
+    // Decode the result
+    return contract.interface.decodeFunctionResult(method, result);
+  }
+
+  /**
+   * Batch multiple contract calls for efficiency
+   * @param {Array} calls - Array of {method, params} objects
+   * @returns {Promise<Array>} Array of decoded results
+   */
+  async batchContractCalls(calls) {
+    const contractAddress = this.config.contractConfig.address;
+    if (!contractAddress) {
+      throw new Error('Contract address not configured');
+    }
+
+    const contract = this.getContract();
+    
+    // Prepare batch requests
+    const requests = calls.map(call => {
+      const data = contract.interface.encodeFunctionData(call.method, call.params || []);
+      return {
+        method: 'eth_call',
+        params: [
+          {
+            to: contractAddress,
+            data: data
+          },
+          'latest'
+        ]
+      };
+    });
+
+    // Execute batch request
+    const results = await this.providerManager.batchRequests(requests);
+    
+    // Decode results
+    return results.map((result, index) => {
+      if (result instanceof Error) {
+        throw result;
+      }
+      return contract.interface.decodeFunctionResult(calls[index].method, result);
+    });
+  }
+
+  /**
    * Get current pot size
    */
   async getCurrentPot() {
-    const contract = this.getContract();
-    const pot = await contract.getCurrentPot();
-    return this.ethers.formatEther(pot);
+    try {
+      const [pot] = await this.makeContractCall('getCurrentPot');
+      return this.ethers.formatEther(pot);
+    } catch (error) {
+      console.warn('Failed to fetch current pot, using cached value:', error.message);
+      return '0'; // Fallback value
+    }
   }
 
   /**
    * Get player statistics
    */
   async getPlayerStats(address) {
-    const contract = this.getContract();
-    const stats = await contract.getPlayerStats(address);
-    
-    return {
-      totalShots: Number(stats.totalShots),
-      totalSpent: this.ethers.formatEther(stats.totalSpent),
-      totalWon: this.ethers.formatEther(stats.totalWon),
-      lastShotTime: new Date(Number(stats.lastShotTime) * 1000).toISOString()
-    };
+    try {
+      const [stats] = await this.makeContractCall('getPlayerStats', [address]);
+      
+      return {
+        totalShots: Number(stats.totalShots),
+        totalSpent: this.ethers.formatEther(stats.totalSpent),
+        totalWon: this.ethers.formatEther(stats.totalWon),
+        lastShotTime: new Date(Number(stats.lastShotTime) * 1000).toISOString()
+      };
+    } catch (error) {
+      console.warn('Failed to fetch player stats:', error.message);
+      return {
+        totalShots: 0,
+        totalSpent: '0',
+        totalWon: '0',
+        lastShotTime: new Date().toISOString()
+      };
+    }
   }
 
   /**
    * Check if player can commit a shot
    */
   async canTakeShot(address) {
-    const contract = this.getContract();
-    return await contract.canCommitShot(address);
+    try {
+      const [canCommit] = await this.makeContractCall('canCommitShot', [address]);
+      return canCommit;
+    } catch (error) {
+      console.warn('Failed to check if player can take shot:', error.message);
+      return false;
+    }
   }
 
   /**
    * Check if player can reveal their shot
    */
   async canRevealShot(address) {
-    const contract = this.getContract();
-    return await contract.canRevealShot(address);
+    try {
+      const [canReveal] = await this.makeContractCall('canRevealShot', [address]);
+      return canReveal;
+    } catch (error) {
+      console.warn('Failed to check if player can reveal shot:', error.message);
+      return false;
+    }
   }
 
   /**
    * Check if player has a pending shot
    */
   async hasPendingShot(address) {
-    const contract = this.getContract();
-    return await contract.hasPendingShot(address);
+    try {
+      const [hasPending] = await this.makeContractCall('hasPendingShot', [address]);
+      return hasPending;
+    } catch (error) {
+      console.warn('Failed to check pending shot:', error.message);
+      return false;
+    }
   }
 
   /**
    * Get pending shot details for player
    */
   async getPendingShot(address) {
-    const contract = this.getContract();
-    const result = await contract.getPendingShot(address);
-    
-    return {
-      exists: result.exists,
-      blockNumber: Number(result.blockNumber),
-      amount: this.ethers.formatEther(result.amount)
-    };
+    try {
+      const result = await this.makeContractCall('getPendingShot', [address]);
+      
+      return {
+        exists: result.exists,
+        blockNumber: Number(result.blockNumber),
+        amount: this.ethers.formatEther(result.amount)
+      };
+    } catch (error) {
+      console.warn('Failed to fetch pending shot details:', error.message);
+      return {
+        exists: false,
+        blockNumber: 0,
+        amount: '0'
+      };
+    }
   }
 
   /**
    * Get pending payout amount for player
    */
   async getPendingPayout(address) {
-    const contract = this.getContract();
-    const payout = await contract.getPendingPayout(address);
-    return this.ethers.formatEther(payout);
+    try {
+      const [payout] = await this.makeContractCall('getPendingPayout', [address]);
+      return this.ethers.formatEther(payout);
+    } catch (error) {
+      console.warn('Failed to fetch pending payout:', error.message);
+      return '0';
+    }
   }
 
   /**
    * Get cooldown remaining for player
    */
   async getCooldownRemaining(address) {
-    const contract = this.getContract();
-    const remaining = await contract.getCooldownRemaining(address);
-    return Number(remaining);
+    try {
+      const [remaining] = await this.makeContractCall('getCooldownRemaining', [address]);
+      return Number(remaining);
+    } catch (error) {
+      console.warn('Failed to fetch cooldown remaining:', error.message);
+      return 0;
+    }
   }
 
   /**
    * Get current sponsor information
    */
   async getCurrentSponsor() {
-    const contract = this.getContract();
-    const sponsor = await contract.getCurrentSponsor();
-    
-    return {
-      sponsor: sponsor.sponsor,
-      name: sponsor.name,
-      logoUrl: sponsor.logoUrl,
-      timestamp: new Date(Number(sponsor.timestamp) * 1000).toISOString(),
-      active: sponsor.active
-    };
+    try {
+      const sponsor = await this.makeContractCall('getCurrentSponsor');
+      
+      return {
+        sponsor: sponsor.sponsor,
+        name: sponsor.name,
+        logoUrl: sponsor.logoUrl,
+        timestamp: new Date(Number(sponsor.timestamp) * 1000).toISOString(),
+        active: sponsor.active
+      };
+    } catch (error) {
+      console.warn('Failed to fetch current sponsor:', error.message);
+      return {
+        sponsor: '0x0000000000000000000000000000000000000000',
+        name: '',
+        logoUrl: '',
+        timestamp: new Date().toISOString(),
+        active: false
+      };
+    }
   }
 
   /**
    * Get recent winners
    */
   async getRecentWinners() {
-    const contract = this.getContract();
-    const winners = await contract.getRecentWinners();
-    
-    return winners.map(winner => ({
-      winner: winner.winner,
-      amount: this.ethers.formatEther(winner.amount),
-      timestamp: new Date(Number(winner.timestamp) * 1000).toISOString(),
-      blockNumber: Number(winner.blockNumber)
-    }));
+    try {
+      const [winners] = await this.makeContractCall('getRecentWinners');
+      
+      return winners.map(winner => ({
+        winner: winner.winner,
+        amount: this.ethers.formatEther(winner.amount),
+        timestamp: new Date(Number(winner.timestamp) * 1000).toISOString(),
+        blockNumber: Number(winner.blockNumber)
+      }));
+    } catch (error) {
+      console.warn('Failed to fetch recent winners:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Get multiple contract values efficiently using batch calls
+   */
+  async getGameData() {
+    try {
+      const calls = [
+        { method: 'getCurrentPot' },
+        { method: 'SHOT_COST' },
+        { method: 'SPONSOR_COST' },
+        { method: 'getContractBalance' },
+        { method: 'getHouseFunds' },
+        { method: 'getRecentWinners' },
+        { method: 'getCurrentSponsor' }
+      ];
+
+      const results = await this.batchContractCalls(calls);
+      
+      return {
+        currentPot: this.ethers.formatEther(results[0][0]),
+        shotCost: this.ethers.formatEther(results[1][0]),
+        sponsorCost: this.ethers.formatEther(results[2][0]),
+        contractBalance: this.ethers.formatEther(results[3][0]),
+        houseFunds: this.ethers.formatEther(results[4][0]),
+        recentWinners: results[5][0].map(winner => ({
+          winner: winner.winner,
+          amount: this.ethers.formatEther(winner.amount),
+          timestamp: new Date(Number(winner.timestamp) * 1000).toISOString(),
+          blockNumber: Number(winner.blockNumber)
+        })),
+        currentSponsor: {
+          sponsor: results[6].sponsor,
+          name: results[6].name,
+          logoUrl: results[6].logoUrl,
+          timestamp: new Date(Number(results[6].timestamp) * 1000).toISOString(),
+          active: results[6].active
+        }
+      };
+    } catch (error) {
+      console.warn('Failed to fetch game data batch, falling back to individual calls:', error.message);
+      
+      // Fallback to individual calls
+      const [currentPot, shotCost, sponsorCost, contractBalance, houseFunds, recentWinners, currentSponsor] = await Promise.allSettled([
+        this.getCurrentPot(),
+        this.getShotCost(),
+        this.getSponsorCost(),
+        this.getContractBalance(),
+        this.getHouseFunds(),
+        this.getRecentWinners(),
+        this.getCurrentSponsor()
+      ]);
+
+      return {
+        currentPot: currentPot.status === 'fulfilled' ? currentPot.value : '0',
+        shotCost: shotCost.status === 'fulfilled' ? shotCost.value : '0.0005',
+        sponsorCost: sponsorCost.status === 'fulfilled' ? sponsorCost.value : '0.001',
+        contractBalance: contractBalance.status === 'fulfilled' ? contractBalance.value : '0',
+        houseFunds: houseFunds.status === 'fulfilled' ? houseFunds.value : '0',
+        recentWinners: recentWinners.status === 'fulfilled' ? recentWinners.value : [],
+        currentSponsor: currentSponsor.status === 'fulfilled' ? currentSponsor.value : {
+          sponsor: '0x0000000000000000000000000000000000000000',
+          name: '',
+          logoUrl: '',
+          timestamp: new Date().toISOString(),
+          active: false
+        }
+      };
+    }
   }
 
   /**
    * Get shot cost
    */
   async getShotCost() {
-    const contract = this.getContract();
-    const cost = await contract.SHOT_COST();
-    return this.ethers.formatEther(cost);
+    try {
+      const [cost] = await this.makeContractCall('SHOT_COST');
+      return this.ethers.formatEther(cost);
+    } catch (error) {
+      console.warn('Failed to fetch shot cost:', error.message);
+      return '0.0005'; // Fallback value
+    }
   }
 
   /**
    * Get sponsor cost
    */
   async getSponsorCost() {
-    const contract = this.getContract();
-    const cost = await contract.SPONSOR_COST();
-    return this.ethers.formatEther(cost);
+    try {
+      const [cost] = await this.makeContractCall('SPONSOR_COST');
+      return this.ethers.formatEther(cost);
+    } catch (error) {
+      console.warn('Failed to fetch sponsor cost:', error.message);
+      return '0.001'; // Fallback value
+    }
   }
 
   /**
    * Get contract balance
    */
   async getContractBalance() {
-    const contract = this.getContract();
-    const balance = await contract.getContractBalance();
-    return this.ethers.formatEther(balance);
+    try {
+      const [balance] = await this.makeContractCall('getContractBalance');
+      return this.ethers.formatEther(balance);
+    } catch (error) {
+      console.warn('Failed to fetch contract balance:', error.message);
+      return '0';
+    }
   }
 
   /**
    * Get house funds
    */
   async getHouseFunds() {
-    const contract = this.getContract();
-    const funds = await contract.getHouseFunds();
-    return this.ethers.formatEther(funds);
+    try {
+      const [funds] = await this.makeContractCall('getHouseFunds');
+      return this.ethers.formatEther(funds);
+    } catch (error) {
+      console.warn('Failed to fetch house funds:', error.message);
+      return '0';
+    }
   }
 
   /**

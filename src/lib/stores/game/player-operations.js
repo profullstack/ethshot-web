@@ -32,34 +32,89 @@ export const loadPlayerData = async ({ address, state, contract, ethers, db, upd
     let playerStats, canShoot, cooldownRemaining;
 
     if (state.isMultiCryptoMode) {
-      // Multi-crypto mode: use adapter
+      // Multi-crypto mode: use adapter with batched calls for efficiency
       const adapter = getActiveAdapter();
       if (!adapter) return;
 
-      [playerStats, canShoot, cooldownRemaining] = await Promise.all([
-        adapter.getPlayerStats(address),
-        adapter.canTakeShot(address), // This calls canCommitShot internally in the adapter
-        adapter.getCooldownRemaining(address)
-      ]);
+      // Use batched contract calls to reduce RPC requests
+      try {
+        const batchCalls = [
+          { method: 'getPlayerStats', params: [address] },
+          { method: 'canCommitShot', params: [address] },
+          { method: 'getCooldownRemaining', params: [address] }
+        ];
+
+        const [playerStatsResult, canShootResult, cooldownResult] = await adapter.batchContractCalls(batchCalls);
+        
+        playerStats = {
+          totalShots: Number(playerStatsResult[0].totalShots),
+          totalSpent: adapter.ethers.formatEther(playerStatsResult[0].totalSpent),
+          totalWon: adapter.ethers.formatEther(playerStatsResult[0].totalWon),
+          lastShotTime: new Date(Number(playerStatsResult[0].lastShotTime) * 1000).toISOString(),
+        };
+        canShoot = canShootResult[0];
+        cooldownRemaining = Number(cooldownResult[0]);
+      } catch (batchError) {
+        console.warn('Batch call failed, falling back to individual calls:', batchError.message);
+        
+        // Fallback to individual calls with error handling
+        [playerStats, canShoot, cooldownRemaining] = await Promise.allSettled([
+          adapter.getPlayerStats(address),
+          adapter.canTakeShot(address),
+          adapter.getCooldownRemaining(address)
+        ]).then(results => [
+          results[0].status === 'fulfilled' ? results[0].value : {
+            totalShots: 0,
+            totalSpent: '0',
+            totalWon: '0',
+            lastShotTime: new Date().toISOString()
+          },
+          results[1].status === 'fulfilled' ? results[1].value : false,
+          results[2].status === 'fulfilled' ? results[2].value : 0
+        ]);
+      }
     } else {
-      // ETH-only mode: direct contract calls
+      // ETH-only mode: direct contract calls with error handling
       if (!contract) return;
 
-      [playerStats, canShoot, cooldownRemaining] = await Promise.all([
-        contract.getPlayerStats(address),
-        contract.canCommitShot(address),
-        contract.getCooldownRemaining(address)
-      ]);
+      try {
+        [playerStats, canShoot, cooldownRemaining] = await Promise.allSettled([
+          contract.getPlayerStats(address),
+          contract.canCommitShot(address),
+          contract.getCooldownRemaining(address)
+        ]).then(results => [
+          results[0].status === 'fulfilled' ? results[0].value : {
+            totalShots: 0n,
+            totalSpent: 0n,
+            totalWon: 0n,
+            lastShotTime: 0n
+          },
+          results[1].status === 'fulfilled' ? results[1].value : false,
+          results[2].status === 'fulfilled' ? results[2].value : 0n
+        ]);
 
-      // Format ETH-specific data
-      playerStats = {
-        totalShots: Number(playerStats.totalShots),
-        totalSpent: ethers.formatEther(playerStats.totalSpent),
-        totalWon: ethers.formatEther(playerStats.totalWon),
-        lastShotTime: new Date(Number(playerStats.lastShotTime) * 1000).toISOString(),
-      };
+        // Format ETH-specific data
+        playerStats = {
+          totalShots: Number(playerStats.totalShots),
+          totalSpent: ethers.formatEther(playerStats.totalSpent),
+          totalWon: ethers.formatEther(playerStats.totalWon),
+          lastShotTime: new Date(Number(playerStats.lastShotTime) * 1000).toISOString(),
+        };
 
-      cooldownRemaining = Number(cooldownRemaining);
+        cooldownRemaining = Number(cooldownRemaining);
+      } catch (error) {
+        console.warn('Failed to load player data from contract:', error.message);
+        
+        // Provide fallback values
+        playerStats = {
+          totalShots: 0,
+          totalSpent: '0',
+          totalWon: '0',
+          lastShotTime: new Date().toISOString(),
+        };
+        canShoot = false;
+        cooldownRemaining = 0;
+      }
     }
 
     // Also load player data from database for additional stats
