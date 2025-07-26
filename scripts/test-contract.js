@@ -1,11 +1,12 @@
 import pkg from 'hardhat';
 const { ethers } = pkg;
+import fs from 'fs';
 
 async function main() {
   console.log('🧪 Testing deployed EthShot contract...\n');
 
   // Get contract address from deployment.json
-  const deploymentInfo = JSON.parse(require('fs').readFileSync('deployment.json', 'utf8'));
+  const deploymentInfo = JSON.parse(fs.readFileSync('deployment.json', 'utf8'));
   const contractAddress = deploymentInfo.contractAddress;
   
   console.log(`📍 Contract Address: ${contractAddress}`);
