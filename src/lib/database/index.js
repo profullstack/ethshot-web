@@ -500,12 +500,12 @@ export const db = {
     }
 
     try {
-      console.log('🔄 Upserting user profile to Supabase:', {
-        wallet_address: profileData.walletAddress.toLowerCase(),
+      console.log('🔄 Upserting user profile to Supabase (secure):', {
         nickname: profileData.nickname,
         avatar_url: profileData.avatarUrl,
         bio: profileData.bio,
         notifications_enabled: profileData.notificationsEnabled
+        // Note: wallet address is now obtained from authenticated user, not from client
       });
 
       // Add timeout to prevent hanging
@@ -513,8 +513,8 @@ export const db = {
         setTimeout(() => reject(new Error('Profile update timed out after 30 seconds')), 30000);
       });
 
-      const updatePromise = supabase.rpc('upsert_user_profile', {
-        wallet_addr: profileData.walletAddress.toLowerCase(),
+      // Use the secure version that gets wallet address from authentication
+      const updatePromise = supabase.rpc('upsert_user_profile_secure', {
         p_nickname: profileData.nickname || null,
         p_avatar_url: profileData.avatarUrl || null,
         p_bio: profileData.bio || null,
@@ -525,6 +525,14 @@ export const db = {
 
       if (error) {
         console.error('❌ Supabase upsertUserProfile error:', error);
+        
+        // Provide more helpful error messages for common authentication issues
+        if (error.message?.includes('No authenticated wallet address found')) {
+          throw new Error('You must be logged in with a wallet to update your profile.');
+        } else if (error.message?.includes('JWT')) {
+          throw new Error('Authentication error. Please reconnect your wallet and try again.');
+        }
+        
         throw error;
       }
       

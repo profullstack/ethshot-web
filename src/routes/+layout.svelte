@@ -7,6 +7,10 @@
   import Footer from '$lib/components/Footer.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import ChatWidget from '$lib/components/ChatWidget.svelte';
+  import UserProfile from '$lib/components/UserProfile.svelte';
+
+  // Profile modal state
+  let showProfileModal = false;
 
   onMount(() => {
     // Initialize wallet connection on app load
@@ -14,7 +18,23 @@
     
     // Initialize game state
     gameStore.init();
+
+    // Global event listener for opening profile modal
+    const handleOpenProfileModal = (event) => {
+      showProfileModal = true;
+    };
+
+    window.addEventListener('OpenProfileModal', handleOpenProfileModal);
+
+    // Cleanup event listener
+    return () => {
+      window.removeEventListener('OpenProfileModal', handleOpenProfileModal);
+    };
   });
+
+  const handleCloseProfile = () => {
+    showProfileModal = false;
+  };
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
@@ -37,6 +57,9 @@
   
   <!-- Chat Widget -->
   <ChatWidget />
+  
+  <!-- Profile Modal -->
+  <UserProfile show={showProfileModal} on:close={handleCloseProfile} />
 </div>
 
 <style>
