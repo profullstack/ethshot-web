@@ -3,6 +3,7 @@
 	import { formatAddress } from '$lib/database/index.js';
 	import UserDisplay from '$lib/components/UserDisplay.svelte';
 	import MetaTags from '$lib/components/MetaTags.svelte';
+	import EditProfileLink from '$lib/components/EditProfileLink.svelte';
 	import { NETWORK_CONFIG } from '$lib/config.js';
 
 	/** @type {import('./$types').PageData} */
@@ -145,7 +146,10 @@
 				</div>
 				
 				<div class="flex-1">
-					<h1 class="text-3xl font-bold mb-2">{displayName}</h1>
+					<div class="flex items-start justify-between mb-2">
+						<h1 class="text-3xl font-bold">{displayName}</h1>
+						<EditProfileLink targetWalletAddress={walletAddress} />
+					</div>
 					<div class="flex items-center gap-2 mb-2">
 						<p class="text-gray-400 font-mono text-sm">{formatAddress(walletAddress)}</p>
 						<button
