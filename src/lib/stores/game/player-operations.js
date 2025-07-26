@@ -341,23 +341,27 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   const contractWithSigner = contract.connect(wallet.signer);
   const fullShotCost = await contract.SHOT_COST();
   
-  // Use discounted cost for the transaction
-  const transactionValue = discountApplied ?
-    ethers.parseEther(actualShotCost) :
-    fullShotCost;
+  // Use full shot cost for the transaction (discounts are handled at database level)
+  // The contract always expects the full shot cost
+  const transactionValue = fullShotCost;
 
   // Check user balance
   const balance = await wallet.provider.getBalance(wallet.address);
   
-  // Estimate gas
+  // Generate secret and commitment for commit-reveal
+  const secret = ethers.hexlify(ethers.randomBytes(32));
+  const commitment = ethers.keccak256(
+    ethers.solidityPacked(['uint256', 'address'], [secret, wallet.address])
+  );
+  
+  // Estimate gas for commitShot
   let gasEstimate;
   try {
-    gasEstimate = await contractWithSigner.commitShot.estimateGas(
-      '0x0000000000000000000000000000000000000000000000000000000000000000', // dummy commitment for gas estimation
-      { value: transactionValue }
-    );
+    gasEstimate = await contractWithSigner.commitShot.estimateGas(commitment, {
+      value: transactionValue
+    });
   } catch (estimateError) {
-    console.warn('Failed to estimate gas, using default:', estimateError.message);
+    console.warn('Failed to estimate gas for commitShot, using default:', estimateError.message);
     gasEstimate = 150000n;
   }
   
@@ -374,12 +378,12 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
     throw new Error(`Insufficient ETH. Need ${shortfall} more ETH for gas fees.`);
   }
 
-  // Send transaction with discounted value
-  // Generate secret and commitment for commit-reveal
-  const secret = ethers.hexlify(ethers.randomBytes(32));
-  const commitment = ethers.keccak256(
-    ethers.solidityPacked(['uint256', 'address'], [secret, wallet.address])
-  );
+  console.log('🎯 Committing shot with:', {
+    commitment,
+    secret: secret.slice(0, 10) + '...',
+    value: ethers.formatEther(transactionValue),
+    gasLimit: gasLimit.toString()
+  });
   
   // First commit the shot
   const commitTx = await contractWithSigner.commitShot(commitment, {
@@ -390,18 +394,28 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   toastStore.info('Shot committed! Waiting for confirmation...');
   const commitReceipt = await commitTx.wait();
   
+  console.log('✅ Commit transaction confirmed:', commitReceipt.hash);
   toastStore.info('Commitment confirmed! Waiting for reveal window...');
   
   // Wait for reveal delay (in practice, this should be handled by UI timing)
   await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
   
+  // Check if we can reveal
+  const canReveal = await contract.canRevealShot(wallet.address);
+  if (!canReveal) {
+    throw new Error('Cannot reveal shot yet. Please wait for the reveal window.');
+  }
+  
+  console.log('🔓 Revealing shot with secret:', secret.slice(0, 10) + '...');
+  
   // Now reveal the shot
   const revealTx = await contractWithSigner.revealShot(secret);
   toastStore.info('Revealing shot...');
-  const tx = revealTx; // For compatibility with existing code
 
   toastStore.info('Shot submitted! Waiting for confirmation...');
-  const receipt = await tx.wait();
+  const receipt = await revealTx.wait();
+  
+  console.log('✅ Reveal transaction confirmed:', receipt.hash);
   
   // Check if user won by looking at ShotRevealed events
   const shotRevealedEvent = receipt.logs.find(log => {
@@ -417,6 +431,7 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   if (shotRevealedEvent) {
     const parsed = contract.interface.parseLog(shotRevealedEvent);
     won = parsed.args.won;
+    console.log('🎲 Shot result:', won ? 'WON!' : 'Lost');
   }
 
   return {
