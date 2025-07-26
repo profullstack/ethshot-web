@@ -1,6 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 import { NETWORK_CONFIG, WALLET_CONFIG, RPC_URLS, EXPLORER_URLS } from '../config.js';
+import { authenticateWithWallet, signOutFromSupabase } from '../utils/wallet-auth.js';
 
 // Wallet connection state
 const createWalletStore = () => {
@@ -246,6 +247,18 @@ const createWalletStore = () => {
       // Store connection state
       localStorage.setItem('wallet_connected', 'true');
 
+      // Authenticate with Supabase using wallet signature verification
+      try {
+        console.log('🔐 Authenticating with Supabase using signature verification...');
+        await authenticateWithWallet(address, signer);
+        console.log('✅ Supabase authentication successful');
+      } catch (authError) {
+        console.warn('⚠️ Supabase authentication failed:', authError.message);
+        // Don't fail the wallet connection if Supabase auth fails
+        // The user can still use the wallet, but profile editing won't work
+        // Common reasons: user rejected signature, wallet doesn't support signing
+      }
+
       update(state => ({
         ...state,
         connected: true,
@@ -295,6 +308,16 @@ const createWalletStore = () => {
 
       if (provider?.connection?.close) {
         await provider.connection.close();
+      }
+
+      // Sign out from Supabase
+      try {
+        console.log('🔐 Signing out from Supabase...');
+        await signOutFromSupabase();
+        console.log('✅ Supabase sign out successful');
+      } catch (authError) {
+        console.warn('⚠️ Supabase sign out failed:', authError.message);
+        // Don't fail the wallet disconnection if Supabase sign out fails
       }
 
       // Clear localStorage
