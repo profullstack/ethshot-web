@@ -396,6 +396,34 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   const contractWithSigner = contract.connect(wallet.signer);
   const fullShotCost = await contract.SHOT_COST();
   
+  // Check if the pot is big enough for a successful shot - MUST happen before gas estimation
+  let currentPot;
+  try {
+    // Get current pot size
+    currentPot = await contract.getCurrentPot();
+    
+    // For debugging
+    console.log('🔍 Current pot size check:', {
+      potSize: ethers.formatEther(currentPot),
+      minRequired: ethers.formatEther(fullShotCost)
+    });
+  } catch (potReadError) {
+    console.error('❌ Failed to read pot size:', potReadError);
+    throw new Error('Unable to verify game state. Please try again later.');
+  }
+  
+  // Explicit check with clear error message
+  if (currentPot < fullShotCost) {
+    console.warn('⚠️ Pot too small for shot - aborting transaction');
+    
+    // Special case for empty pot (first player)
+    if (currentPot === 0n) {
+      throw new Error(`You appear to be the first player! To start the game, you need to fund the pot with at least ${ethers.formatEther(fullShotCost)} ETH by taking the first shot. This shot will establish the minimum required pot size.`);
+    } else {
+      throw new Error(`Pot is currently ${ethers.formatEther(currentPot)} ETH, which is too small for payout precision. The pot needs at least ${ethers.formatEther(fullShotCost)} ETH to function properly.`);
+    }
+  }
+
   // Always use full shot cost for the transaction
   // Discounts are handled at the database/UI level, not contract level
   const transactionValue = fullShotCost;
@@ -405,6 +433,8 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
     shotCost: ethers.formatEther(fullShotCost),
     userAddress: wallet.address
   });
+  
+  // We'll run a validation check after setting up the signed contract
 
   // Check if user can commit a shot
   const canCommit = await contract.canCommitShot(wallet.address);
@@ -481,7 +511,14 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   toastStore.info('Shot committed! Waiting for confirmation...');
   const commitReceipt = await commitTx.wait();
   
-  console.log('✅ Commit transaction confirmed:', commitReceipt.hash);
+  // Check if pot was updated after commit
+  const potAfterCommit = await contract.getCurrentPot();
+  console.log('✅ Commit transaction confirmed:', commitReceipt.hash, {
+    potSizeBefore: ethers.formatEther(currentPot),
+    potSizeAfterCommit: ethers.formatEther(potAfterCommit),
+    shotCost: ethers.formatEther(fullShotCost)
+  });
+  
   toastStore.info('Commitment confirmed! Waiting for reveal window...');
   
   // Wait for reveal delay (in practice, this should be handled by UI timing)

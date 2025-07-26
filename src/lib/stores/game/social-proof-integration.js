@@ -15,7 +15,8 @@ import {
   trackPotGrowth,
   updateSocialMetrics,
   addActivity,
-  ACTIVITY_TYPES
+  ACTIVITY_TYPES,
+  socialMetrics
 } from '../social-proof.js';
 import { db } from '../../database/index.js';
 
@@ -255,7 +256,7 @@ function startPeriodicUpdates() {
       const activeCount = await getActiveUserCount();
       
       // Update peak concurrent users if needed
-      const currentMetrics = get({ subscribe: (fn) => fn({ peakConcurrentUsers: 0 }) });
+      const currentMetrics = get(socialMetrics);
       if (activeCount > (currentMetrics.peakConcurrentUsers || 0)) {
         await updateSocialMetricsInDb({
           peak_concurrent_users: activeCount
