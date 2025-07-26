@@ -183,6 +183,13 @@
             Game
           </a>
           <a
+            href="/games"
+            class="text-gray-300 hover:text-yellow-400 transition-colors flex items-center space-x-1"
+          >
+            <span>🎮</span>
+            <span>Games</span>
+          </a>
+          <a
             href="/referrals"
             class="text-gray-300 hover:text-purple-400 transition-colors font-semibold flex items-center space-x-1"
           >
@@ -384,6 +391,16 @@
                 >
                   <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
                   <span>Game</span>
+                </a>
+                <a
+                  href="/games"
+                  class="block px-4 py-3 text-gray-300 hover:text-yellow-400 hover:bg-gray-700 rounded-lg transition-colors text-base flex items-center space-x-2"
+                  on:click={(e) => handleNavLinkClick('/games', e)}
+                  on:touchstart={(e) => handleNavLinkTouch('/games', e)}
+                  style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
+                >
+                  <span>🎮</span>
+                  <span>Games</span>
                 </a>
                 <a
                   href="/referrals"
