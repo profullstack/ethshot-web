@@ -95,9 +95,11 @@ function uploadToRailway(envVars) {
   for (const [key, value] of Object.entries(envVars)) {
     try {
       console.log(`📤 Setting ${key}...`);
-      execSync(`railway variables set ${key}="${value}"`, { 
+      // Escape values that contain spaces or special characters
+      const escapedValue = value.includes(' ') || value.includes(',') ? `"${value}"` : value;
+      execSync(`railway variables set ${key}=${escapedValue}`, {
         stdio: 'pipe',
-        cwd: rootDir 
+        cwd: rootDir
       });
       successCount++;
       console.log(`✅ ${key} set successfully`);
