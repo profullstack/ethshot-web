@@ -433,7 +433,7 @@ class ChatServer {
         roomId,
         walletAddress: client.walletAddress,
         nickname: profile?.nickname || `${client.walletAddress.substring(0, 8)}...`,
-        avatarUrl: profile?.avatar_url,
+        avatar_url: profile?.avatar_url,
         content,
         messageType,
         timestamp: new Date().toISOString()
