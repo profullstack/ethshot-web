@@ -96,8 +96,8 @@ All existing imports continue to work without changes:
 
 ```javascript
 // ✅ Still works - no changes needed
-import { gameStore, currentPot } from '../stores/game-unified.js';
-import { db, supabase } from '../supabase.js';
+import { gameStore, currentPot } from '../stores/game/index.js';
+import { db } from '../database/index.js';
 ```
 
 ### Recommended New Imports

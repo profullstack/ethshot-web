@@ -33,7 +33,7 @@ vi.mock('../src/lib/stores/toast.js', () => ({
 }));
 
 // Mock game store
-vi.mock('../src/lib/stores/game-unified.js', () => ({
+vi.mock('../src/lib/stores/game/index.js', () => ({
   gameStore: {
     subscribe: vi.fn((callback) => {
       callback({});

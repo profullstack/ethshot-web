@@ -149,7 +149,7 @@ describe('Commit-Reveal Integration Flow', function() {
     };
 
     // Import the store
-    const storeModule = await import('../../src/lib/stores/game-unified.js');
+    const storeModule = await import('../../src/lib/stores/game/index.js');
     gameStore = storeModule.gameStore;
     toastSpy = mocks['./toast.js'].toastStore;
 

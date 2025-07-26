@@ -163,7 +163,7 @@ describe('Unified Game Store', () => {
     };
 
     // Import the store after mocking
-    const storeModule = await import('../../src/lib/stores/game-unified.js');
+    const storeModule = await import('../../src/lib/stores/game/index.js');
     gameStore = storeModule.gameStore;
   });
 
@@ -275,7 +275,7 @@ describe('Unified Game Store', () => {
 
   describe('Derived Stores', () => {
     it('should export all required derived stores', async () => {
-      const storeModule = await import('../../src/lib/stores/game-unified.js');
+      const storeModule = await import('../../src/lib/stores/game/index.js');
       
       expect(storeModule).to.have.property('currentPot');
       expect(storeModule).to.have.property('currentPotUSD');
@@ -302,7 +302,7 @@ describe('Unified Game Store', () => {
     });
 
     it('should provide backward compatibility exports', async () => {
-      const storeModule = await import('../../src/lib/stores/game-unified.js');
+      const storeModule = await import('../../src/lib/stores/game/index.js');
       
       expect(storeModule).to.have.property('multiCryptoGameStore');
       expect(storeModule.multiCryptoGameStore).to.equal(storeModule.gameStore);

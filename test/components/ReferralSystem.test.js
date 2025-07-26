@@ -4,7 +4,7 @@ import { render, fireEvent, waitFor, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import ReferralSystem from '../../src/lib/components/ReferralSystem.svelte';
 import { walletStore } from '../../src/lib/stores/wallet.js';
-import { gameStore } from '../../src/lib/stores/game-unified.js';
+import { gameStore } from '../../src/lib/stores/game/index.js';
 import { toastStore } from '../../src/lib/stores/toast.js';
 import { db } from '../../src/lib/supabase.js';
 

@@ -12,7 +12,7 @@ vi.mock('../src/lib/stores/wallet.js', () => ({
   walletBalance: { subscribe: vi.fn(cb => cb('1.5')) }
 }));
 
-vi.mock('../src/lib/stores/game-unified.js', () => ({
+vi.mock('../src/lib/stores/game/index.js', () => ({
   gameStore: {},
   currentPot: { subscribe: vi.fn(cb => cb('10.5')) }
 }));

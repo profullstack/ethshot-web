@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect } from 'chai';
-import { gameStore } from '../../src/lib/stores/game-unified.js';
-import { db } from '../../src/lib/supabase.js';
+import { gameStore } from '../../src/lib/stores/game/index.js';
+import { db } from '../../src/lib/database/index.js';
 import {
   generateReferralURL,
   validateReferralCode,

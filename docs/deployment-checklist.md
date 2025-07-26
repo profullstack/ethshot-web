@@ -25,8 +25,8 @@ This checklist ensures that all components of the commit-reveal randomness imple
 
 ### Game Store Logic
 
-- [x] Update game-unified.js with commit-reveal state management
-- [x] Implement commitShot function with proper validation
+- [x] Refactor game-unified.js to modular game store architecture
+- [x] Implement takeShot function with proper validation
 - [x] Implement revealShot function with outcome handling
 - [x] Add support for bonus shots in commit-reveal flow
 - [x] Add support for discounts in commit-reveal flow
