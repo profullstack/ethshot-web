@@ -1,10 +1,10 @@
 {
   "network": "sepolia",
-  "contractAddress": "0xc5c5cAe838b57feE9F7Ce42286949e902fCC734a",
-  "deploymentTime": "2025-07-26T09:15:01.766Z",
+  "contractAddress": "0x3ef11b06f058C7efBbD0019759f34B53D95a8dB9",
+  "deploymentTime": "2025-07-26T09:32:38.459Z",
   "deployer": "0x6eE8FbD7b699D3dA2942562Ffa526920CE784D8A",
   "shotCost": "0.0005",
   "sponsorCost": "0.001",
   "cooldownPeriod": 3600,
-  "etherscanUrl": "https://sepolia.etherscan.io/address/0xc5c5cAe838b57feE9F7Ce42286949e902fCC734a"
+  "etherscanUrl": "https://sepolia.etherscan.io/address/0x3ef11b06f058C7efBbD0019759f34B53D95a8dB9"
 }
