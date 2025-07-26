@@ -3,6 +3,7 @@
 	import { formatAddress } from '$lib/database/index.js';
 	import UserDisplay from '$lib/components/UserDisplay.svelte';
 	import MetaTags from '$lib/components/MetaTags.svelte';
+	import { NETWORK_CONFIG } from '$lib/config.js';
 
 	/** @type {import('./$types').PageData} */
 	export let data;
@@ -13,6 +14,45 @@
 	$: referralStats = userStats?.referral_stats;
 	$: achievements = userStats?.achievements;
 	$: recentActivity = userStats?.recent_activity || [];
+
+	// Copy functionality
+	let copySuccess = false;
+	let copyTimeout;
+
+	async function copyWalletAddress() {
+		try {
+			await navigator.clipboard.writeText(walletAddress);
+			copySuccess = true;
+			
+			// Clear any existing timeout
+			if (copyTimeout) {
+				clearTimeout(copyTimeout);
+			}
+			
+			// Reset the success state after 2 seconds
+			copyTimeout = setTimeout(() => {
+				copySuccess = false;
+			}, 2000);
+		} catch (error) {
+			console.error('Failed to copy wallet address:', error);
+			// Fallback for older browsers
+			try {
+				const textArea = document.createElement('textarea');
+				textArea.value = walletAddress;
+				document.body.appendChild(textArea);
+				textArea.select();
+				document.execCommand('copy');
+				document.body.removeChild(textArea);
+				copySuccess = true;
+				
+				copyTimeout = setTimeout(() => {
+					copySuccess = false;
+				}, 2000);
+			} catch (fallbackError) {
+				console.error('Fallback copy failed:', fallbackError);
+			}
+		}
+	}
 
 	// Helper functions
 	function formatEth(amount) {
@@ -106,7 +146,27 @@
 				
 				<div class="flex-1">
 					<h1 class="text-3xl font-bold mb-2">{displayName}</h1>
-					<p class="text-gray-400 font-mono text-sm mb-2">{formatAddress(walletAddress)}</p>
+					<div class="flex items-center gap-2 mb-2">
+						<p class="text-gray-400 font-mono text-sm">{formatAddress(walletAddress)}</p>
+						<button
+							on:click={copyWalletAddress}
+							class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors duration-200"
+							title="Copy full wallet address"
+						>
+							{#if copySuccess}
+								<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+									<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+								</svg>
+								<span>Copied!</span>
+							{:else}
+								<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+									<path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path>
+									<path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path>
+								</svg>
+								<span>Copy</span>
+							{/if}
+						</button>
+					</div>
 					{#if profile?.bio}
 						<p class="text-gray-300">{profile.bio}</p>
 					{/if}
@@ -198,8 +258,8 @@
 											{activity.won ? '+' : '-'}{formatEth(activity.amount)} ETH
 										</div>
 										{#if activity.tx_hash}
-											<a 
-												href="https://etherscan.io/tx/{activity.tx_hash}"
+											<a
+												href="{NETWORK_CONFIG.BLOCK_EXPLORER_URL}/tx/{activity.tx_hash}"
 												target="_blank"
 												rel="noopener noreferrer"
 												class="text-xs text-blue-400 hover:text-blue-300"
@@ -240,8 +300,8 @@
 											+{formatEth(win.amount)} ETH
 										</div>
 										{#if win.tx_hash}
-											<a 
-												href="https://etherscan.io/tx/{win.tx_hash}"
+											<a
+												href="{NETWORK_CONFIG.BLOCK_EXPLORER_URL}/tx/{win.tx_hash}"
 												target="_blank"
 												rel="noopener noreferrer"
 												class="text-xs text-blue-400 hover:text-blue-300"

@@ -67,6 +67,24 @@ export const nextDiscount = derived(gameStore, $game => {
 // Legacy exports for backward compatibility
 export const multiCryptoGameStore = gameStore;
 
+// Export core game functions for direct access
+export const takeShot = (...args) => gameStore.takeShot(...args);
+export const sponsorRound = (...args) => gameStore.sponsorRound(...args);
+export const loadGameState = (...args) => gameStore.loadGameState(...args);
+export const loadPlayerData = (...args) => gameStore.loadPlayerData(...args);
+export const shareOnTwitter = (...args) => gameStore.shareOnTwitter(...args);
+export const copyLink = (...args) => gameStore.copyLink(...args);
+export const init = (...args) => gameStore.init(...args);
+export const switchCrypto = (...args) => gameStore.switchCrypto(...args);
+
+// Auto-initialize the game store for backward compatibility
+if (typeof window !== 'undefined') {
+  // Initialize the game store automatically when imported
+  gameStore.init().catch(error => {
+    console.warn('Auto-initialization failed:', error.message);
+  });
+}
+
 // Re-export individual modules for advanced usage
 export * as GameCache from './cache.js';
 export * as GameUtils from './utils.js';

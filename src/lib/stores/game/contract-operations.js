@@ -91,15 +91,24 @@ export const loadGameState = async ({ state, contract, ethers, db, updateState }
       // Calculate actual pot using adapter
       const actualPot = await adapter.getCurrentPot();
       
-      // Update USD values for multi-crypto mode
-      const updatedState = await updateUSDValues({
-        ...state,
+      // Update state with contract values
+      updateState(currentState => ({
+        ...currentState,
         currentPot: actualPot || '0',
         shotCost: shotCost || '0',
         sponsorCost: sponsorCost || '0',
-      });
+      }));
+
+      // Update USD values for multi-crypto mode
+      const currentStateForUSD = { ...state, currentPot: actualPot || '0', shotCost: shotCost || '0', sponsorCost: sponsorCost || '0' };
+      const updatedStateWithUSD = await updateUSDValues(currentStateForUSD);
       
-      updateState(updatedState);
+      updateState(currentState => ({
+        ...currentState,
+        currentPotUSD: updatedStateWithUSD.currentPotUSD,
+        shotCostUSD: updatedStateWithUSD.shotCostUSD,
+        sponsorCostUSD: updatedStateWithUSD.sponsorCostUSD,
+      }));
 
     } else {
       // ETH-only mode: direct contract calls
@@ -185,15 +194,29 @@ export const loadGameState = async ({ state, contract, ethers, db, updateState }
       // Check for pot milestones
       checkPotMilestones(previousPot, newPotAmount, notifyPotMilestone);
 
+      // Update state with contract values
+      updateState(currentState => ({
+        ...currentState,
+        currentPot: newPotAmount,
+        shotCost: ethers.formatEther(shotCost || ethers.parseEther('0.001')),
+        sponsorCost: ethers.formatEther(sponsorCost || ethers.parseEther('0.001')),
+      }));
+
       // Update USD values for ETH-only mode
-      const updatedState = await updateUSDValues({
+      const currentStateForUSD = {
         ...state,
         currentPot: newPotAmount,
         shotCost: ethers.formatEther(shotCost || ethers.parseEther('0.001')),
         sponsorCost: ethers.formatEther(sponsorCost || ethers.parseEther('0.001')),
-      });
+      };
+      const updatedStateWithUSD = await updateUSDValues(currentStateForUSD);
       
-      updateState(updatedState);
+      updateState(currentState => ({
+        ...currentState,
+        currentPotUSD: updatedStateWithUSD.currentPotUSD,
+        shotCostUSD: updatedStateWithUSD.shotCostUSD,
+        sponsorCostUSD: updatedStateWithUSD.sponsorCostUSD,
+      }));
     }
 
     // Load database data (common for both modes)
