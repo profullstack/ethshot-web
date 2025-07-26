@@ -989,6 +989,21 @@ export const CONTRACT_ABI = [
   }
 ];
 
+// Cryptocurrency types
+export const CRYPTO_TYPES = {
+  ETH: 'ETH',
+  SOL: 'SOL'
+};
+
+// Wallet provider types
+export const WALLET_PROVIDERS = {
+  METAMASK: 'metamask',
+  WALLETCONNECT: 'walletconnect',
+  COINBASE: 'coinbase',
+  PHANTOM: 'phantom',
+  SOLFLARE: 'solflare'
+};
+
 // Network configurations
 export const NETWORKS = {
   ethereum: {
@@ -1024,4 +1039,69 @@ export const DEFAULT_CONFIG = {
   shotCost: import.meta.env.VITE_SHOT_COST_ETH || '0.0005',
   sponsorCost: import.meta.env.VITE_SPONSOR_COST_ETH || '0.001',
   cooldownPeriod: parseInt(import.meta.env.VITE_COOLDOWN_HOURS || '1') * 3600 // Convert hours to seconds
+};
+
+/**
+ * Get cryptocurrency configuration
+ * @param {string} cryptoType - Type of cryptocurrency (ETH, SOL, etc.)
+ * @returns {Object} Configuration object for the specified cryptocurrency
+ */
+export const getCryptoConfig = (cryptoType) => {
+  switch (cryptoType) {
+    case CRYPTO_TYPES.ETH:
+      return {
+        type: CRYPTO_TYPES.ETH,
+        name: 'Ethereum',
+        symbol: 'ETH',
+        decimals: 18,
+        contractAbi: CONTRACT_ABI,
+        contractAddress: DEFAULT_CONFIG.contractAddress,
+        network: DEFAULT_CONFIG.network,
+        networks: NETWORKS,
+        shotCost: DEFAULT_CONFIG.shotCost,
+        sponsorCost: DEFAULT_CONFIG.sponsorCost,
+        cooldownPeriod: DEFAULT_CONFIG.cooldownPeriod
+      };
+    case CRYPTO_TYPES.SOL:
+      return {
+        type: CRYPTO_TYPES.SOL,
+        name: 'Solana',
+        symbol: 'SOL',
+        decimals: 9,
+        // Solana-specific configuration would go here
+        network: 'devnet', // or mainnet-beta
+        shotCost: '0.001', // SOL equivalent
+        sponsorCost: '0.002', // SOL equivalent
+        cooldownPeriod: DEFAULT_CONFIG.cooldownPeriod
+      };
+    default:
+      throw new Error(`Unsupported cryptocurrency type: ${cryptoType}`);
+  }
+};
+
+/**
+ * Get current cryptocurrency (defaults to ETH)
+ * @returns {Object} Current cryptocurrency configuration
+ */
+export const getCurrentCrypto = () => {
+  // For now, default to ETH. This could be made dynamic later
+  return getCryptoConfig(CRYPTO_TYPES.ETH);
+};
+
+/**
+ * Get game configuration for a specific cryptocurrency
+ * @param {string} cryptoType - Type of cryptocurrency
+ * @returns {Object} Game configuration for the specified cryptocurrency
+ */
+export const getCryptoGameConfig = (cryptoType) => {
+  const cryptoConfig = getCryptoConfig(cryptoType);
+  return {
+    shotCost: cryptoConfig.shotCost,
+    sponsorCost: cryptoConfig.sponsorCost,
+    cooldownPeriod: cryptoConfig.cooldownPeriod,
+    contractAddress: cryptoConfig.contractAddress,
+    network: cryptoConfig.network,
+    symbol: cryptoConfig.symbol,
+    decimals: cryptoConfig.decimals
+  };
 };
