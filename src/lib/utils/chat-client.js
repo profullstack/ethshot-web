@@ -33,37 +33,45 @@ export class ChatClient {
     try {
       this.ws = new WebSocket(CHAT_SERVER_URL);
       
-      this.ws.onopen = () => {
-        console.log('Connected to chat server');
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-        this.startPing();
-        this.emit('connected');
-      };
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Connection timeout'));
+        }, 10000);
 
-      this.ws.onmessage = (event) => {
-        this.handleMessage(event.data);
-      };
+        this.ws.onopen = () => {
+          clearTimeout(timeout);
+          console.log('Connected to chat server');
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          this.startPing();
+          this.emit('connected');
+          resolve(true);
+        };
 
-      this.ws.onclose = (event) => {
-        console.log('Disconnected from chat server:', event.code, event.reason);
-        this.isConnected = false;
-        this.isAuthenticated = false;
-        this.stopPing();
-        this.emit('disconnected', { code: event.code, reason: event.reason });
-        
-        // Attempt to reconnect if not a clean close
-        if (event.code !== 1000 && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-          this.scheduleReconnect();
-        }
-      };
+        this.ws.onmessage = (event) => {
+          this.handleMessage(event.data);
+        };
 
-      this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        this.emit('error', error);
-      };
+        this.ws.onclose = (event) => {
+          console.log('Disconnected from chat server:', event.code, event.reason);
+          this.isConnected = false;
+          this.isAuthenticated = false;
+          this.stopPing();
+          this.emit('disconnected', { code: event.code, reason: event.reason });
+          
+          // Attempt to reconnect if not a clean close
+          if (event.code !== 1000 && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            this.scheduleReconnect();
+          }
+        };
 
-      return true;
+        this.ws.onerror = (error) => {
+          clearTimeout(timeout);
+          console.error('WebSocket error:', error);
+          this.emit('error', error);
+          reject(error);
+        };
+      });
     } catch (error) {
       console.error('Failed to connect to chat server:', error);
       this.emit('error', error);
@@ -278,15 +286,24 @@ export class ChatClient {
    * Send a message to the server
    */
   send(message) {
-    if (!this.isConnected || !this.ws) {
+    if (!this.ws) {
+      throw new Error('WebSocket not initialized');
+    }
+
+    if (!this.isConnected) {
       throw new Error('Not connected to chat server');
     }
 
     if (this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket connection is not open');
+      throw new Error(`WebSocket connection is not open (state: ${this.ws.readyState})`);
     }
 
-    this.ws.send(JSON.stringify(message));
+    try {
+      this.ws.send(JSON.stringify(message));
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      throw new Error(`Failed to send message: ${error.message}`);
+    }
   }
 
   /**
