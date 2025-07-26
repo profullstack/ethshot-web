@@ -1,5 +1,5 @@
 <script>
-  import { gameStore, availableDiscounts, discountCount, canUseDiscount, canCommitShot, hasPendingShot, isLoading, isRevealing, nextDiscount } from '../stores/game-unified.js';
+  import { gameStore, availableDiscounts, discountCount, canUseDiscount, isLoading, nextDiscount } from '../stores/game-unified.js';
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
 

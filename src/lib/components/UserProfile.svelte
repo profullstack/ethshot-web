@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher, onMount } from 'svelte';
-  import { profileStore, userProfile, profileLoading, profileError, uploadingAvatar } from '../stores/profile.js';
+  import { profileStore, userProfile, profileLoading, profileError, uploadingAvatar, notificationsEnabled } from '../stores/profile.js';
   import { walletAddress } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
 
@@ -12,8 +12,12 @@
   let formData = {
     nickname: '',
     bio: '',
-    avatarFile: null
+    avatarFile: null,
+    notificationsEnabled: true
   };
+
+  // Separate reactive variable for notifications to avoid reset issues
+  let notificationsToggle = true;
 
   // Form state
   let saving = false;
@@ -35,11 +39,16 @@
     formData = {
       nickname: $userProfile.nickname || '',
       bio: $userProfile.bio || '',
-      avatarFile: null
+      avatarFile: null,
+      notificationsEnabled: $userProfile.notifications_enabled ?? true
     };
+    notificationsToggle = $userProfile.notifications_enabled ?? true;
     avatarPreview = $userProfile.avatar_url;
     clearErrors();
   }
+
+  // Sync the separate notification toggle with formData
+  $: formData.notificationsEnabled = notificationsToggle;
 
   // Watch nickname changes for availability checking
   $: if (formData.nickname && formData.nickname !== ($userProfile?.nickname || '')) {
@@ -159,7 +168,8 @@
         walletAddress: $walletAddress,
         nickname: formData.nickname || null,
         bio: formData.bio || null,
-        avatarUrl: avatarUrl
+        avatarUrl: avatarUrl,
+        notificationsEnabled: formData.notificationsEnabled
       });
 
       toastStore.success('Profile updated successfully!');
@@ -180,8 +190,10 @@
     formData = {
       nickname: '',
       bio: '',
-      avatarFile: null
+      avatarFile: null,
+      notificationsEnabled: true
     };
+    notificationsToggle = true;
     avatarPreview = null;
     clearErrors();
     
@@ -340,6 +352,37 @@
               <div></div>
             {/if}
             <p class="text-gray-400 text-xs">{formData.bio.length}/500</p>
+          </div>
+        </div>
+
+        <!-- Notification Settings -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-3">
+            Notification Settings
+          </label>
+          <div class="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-600">
+            <div class="flex items-center space-x-3">
+              <div class="text-yellow-400">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-white text-sm font-medium">Push Notifications</p>
+                <p class="text-gray-400 text-xs">Get notified about game events and updates</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {notificationsToggle ? 'bg-blue-600' : 'bg-gray-600'}"
+              disabled={saving || $uploadingAvatar}
+              on:click={() => notificationsToggle = !notificationsToggle}
+            >
+              <span class="sr-only">Toggle notifications</span>
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {notificationsToggle ? 'translate-x-6' : 'translate-x-1'}"
+              ></span>
+            </button>
           </div>
         </div>
 

@@ -1,0 +1,22 @@
+{
+  "name": "ethshot-chat-server",
+  "version": "1.0.0",
+  "description": "WebSocket chat server for ETH Shot",
+  "main": "chat-server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node chat-server.js",
+    "dev": "node chat-server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.3",
+    "dotenv": "^16.3.1",
+    "ws": "^8.14.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": ["websocket", "chat", "ethereum", "gaming"],
+  "author": "ETH Shot",
+  "license": "MIT"
+}

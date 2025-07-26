@@ -1,5 +1,5 @@
 <script>
-  import { gameStore } from '../stores/game-unified.js';
+  import { gameStore } from '../stores/game/index.js';
   import { GAME_CONFIG, SOCIAL_CONFIG, NETWORK_CONFIG, formatEth, formatCooldownTime } from '../config.js';
 </script>
 
@@ -9,9 +9,11 @@
       <!-- Brand -->
       <div class="space-y-4">
         <div class="flex items-center space-x-2">
-          <div class="w-6 h-6 bg-gradient-to-br from-red-500 to-purple-600 rounded flex items-center justify-center">
-            <span class="text-white font-bold text-sm">🎯</span>
-          </div>
+          <img
+            src="/logo.svg"
+            alt="ETH Shot Logo"
+            class="w-6 h-6"
+          />
           <span class="text-lg font-bold gradient-text">ETH SHOT</span>
         </div>
         <p class="text-gray-400 text-sm">

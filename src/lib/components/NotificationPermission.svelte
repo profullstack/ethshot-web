@@ -1,18 +1,68 @@
 <script>
   import { onMount } from 'svelte';
-  import { gameStore } from '../stores/game-unified.js';
+  import { gameStore } from '../stores/game/index.js';
+  import { walletStore } from '../stores/wallet.js';
+  import { db } from '../database/index.js';
 
   let permissionStatus = 'default';
+  let userNotificationsEnabled = true; // Default to true for new users
   let showPrompt = false;
   let isLoading = false;
+  let userProfile = null;
 
-  onMount(() => {
-    // Check initial permission status
+  // Reactive statement to determine actual notification status
+  $: actualNotificationStatus = getActualNotificationStatus(permissionStatus, userNotificationsEnabled);
+
+  function getActualNotificationStatus(browserPermission, userSetting) {
+    // If browser permission is denied or unsupported, notifications are disabled
+    if (browserPermission === 'denied' || browserPermission === 'unsupported') {
+      return 'denied';
+    }
+    
+    // If browser permission is granted but user disabled in profile, show as disabled
+    if (browserPermission === 'granted' && !userSetting) {
+      return 'user-disabled';
+    }
+    
+    // If browser permission is granted and user enabled, show as enabled
+    if (browserPermission === 'granted' && userSetting) {
+      return 'granted';
+    }
+    
+    // Default case (browser permission is 'default')
+    return 'default';
+  }
+
+  async function loadUserProfile() {
+    if (!$walletStore.connected || !$walletStore.address) {
+      return;
+    }
+
+    try {
+      userProfile = await db.getUserProfile($walletStore.address);
+      if (userProfile) {
+        userNotificationsEnabled = userProfile.notifications_enabled ?? true;
+      }
+    } catch (error) {
+      console.error('Failed to load user profile for notifications:', error);
+    }
+  }
+
+  onMount(async () => {
+    // Check initial browser permission status
     permissionStatus = gameStore.getNotificationPermissionStatus();
     
+    // Load user profile to check notification preference
+    await loadUserProfile();
+    
     // Show prompt if notifications are not enabled and user hasn't denied
-    showPrompt = permissionStatus === 'default';
+    showPrompt = actualNotificationStatus === 'default';
   });
+
+  // Watch for wallet connection changes
+  $: if ($walletStore.connected && $walletStore.address) {
+    loadUserProfile();
+  }
 
   async function requestPermission() {
     isLoading = true;
@@ -60,12 +110,20 @@
   </div>
 {/if}
 
-{#if permissionStatus === 'granted'}
+{#if actualNotificationStatus === 'granted'}
   <div class="notification-status enabled">
     <span class="status-icon">✅</span>
     <span class="status-text">Notifications enabled</span>
   </div>
-{:else if permissionStatus === 'denied'}
+{:else if actualNotificationStatus === 'user-disabled'}
+  <div class="notification-status disabled">
+    <span class="status-icon">🔕</span>
+    <span class="status-text">Notifications disabled in profile</span>
+    <a href="/users/{$walletStore.address}" class="btn-link">
+      Enable in profile settings
+    </a>
+  </div>
+{:else if actualNotificationStatus === 'denied'}
   <div class="notification-status disabled">
     <span class="status-icon">🔕</span>
     <span class="status-text">Notifications disabled</span>

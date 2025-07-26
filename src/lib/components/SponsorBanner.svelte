@@ -1,5 +1,5 @@
 <script>
-  import { currentSponsor } from '../stores/game-unified.js';
+  import { currentSponsor } from '../stores/game/index.js';
   import { GAME_CONFIG, formatEth } from '../config.js';
 
   // Use real sponsor data from store

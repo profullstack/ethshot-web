@@ -1,10 +1,10 @@
 <script>
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import { gameStore, currentPot } from '../stores/game-unified.js';
+  import { gameStore, currentPot } from '../stores/game/index.js';
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
-  import { db } from '../supabase.js';
+  import { db } from '../database/index.js';
   import {
     generateReferralURL,
     copyReferralURL,
@@ -13,7 +13,8 @@
     shareReferralOnBluesky,
     formatReferralStats,
     getReferralAchievement,
-    processReferralOnLoad
+    processReferralOnLoad,
+    processStoredReferralCode
   } from '../utils/referral.js';
 
   // Component state
@@ -45,6 +46,13 @@
 
     try {
       loading = true;
+      
+      // First, try to process any stored referral code
+      const referralProcessed = await processStoredReferralCode(wallet.address, db);
+      if (referralProcessed) {
+        toastStore.success('Welcome! Your referral has been processed and you\'ve earned a discount!');
+      }
+      
       const stats = await db.getReferralStats(wallet.address);
       
       // If no referral code exists, create one

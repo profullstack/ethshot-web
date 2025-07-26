@@ -1,23 +1,35 @@
 <script>
   import { onMount } from 'svelte';
-  import { db } from '$lib/supabase.js';
-  import { formatAddress, formatEther } from '$lib/supabase.js';
+  import { db } from '$lib/database/index.js';
+  import { formatAddress, formatEther, formatTimeAgo } from '$lib/database/index.js';
   import MetaTags from '$lib/components/MetaTags.svelte';
   import UserDisplay from '$lib/components/UserDisplay.svelte';
 
   let topPlayers = [];
+  let recentShots = [];
   let userProfiles = new Map();
   let loading = true;
   let error = null;
 
   onMount(async () => {
     try {
-      topPlayers = await db.getTopPlayers(50, 'total_shots');
+      // Fetch top players and recent shots in parallel
+      const [playersData, shotsData] = await Promise.all([
+        db.getTopPlayers(50, 'total_shots'),
+        db.getRecentShots(10)
+      ]);
       
-      // Fetch user profiles for all players
-      if (topPlayers.length > 0) {
-        const addresses = topPlayers.map(player => player.address);
-        const profiles = await db.getUserProfiles(addresses);
+      topPlayers = playersData;
+      recentShots = shotsData;
+      
+      // Collect all unique addresses from both players and shots
+      const allAddresses = new Set();
+      topPlayers.forEach(player => allAddresses.add(player.address));
+      recentShots.forEach(shot => allAddresses.add(shot.player_address));
+      
+      // Fetch user profiles for all addresses
+      if (allAddresses.size > 0) {
+        const profiles = await db.getUserProfiles(Array.from(allAddresses));
         
         // Create a map for quick profile lookup
         userProfiles = new Map();
@@ -91,7 +103,7 @@
     </div>
   {:else if topPlayers.length === 0}
     <div class="text-center py-12">
-      <div class="text-6xl mb-4">🎯</div>
+      <img src="/logo.svg" alt="ETH Shot" class="w-16 h-16 mx-auto mb-4" />
       <h3 class="text-2xl font-bold text-gray-300 mb-2">No Players Yet</h3>
       <p class="text-gray-400">Be the first to take a shot and claim the top spot!</p>
       <a href="/" class="inline-block mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg transition-colors">
@@ -158,13 +170,82 @@
       </div>
     </div>
 
+    <!-- Recent Shots Section -->
+    <div class="space-y-6">
+      <div class="text-center space-y-2">
+        <h2 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+          🎯 Last 10 Shots
+        </h2>
+        <p class="text-lg text-gray-300">
+          The most recent shots taken at the ETH jackpot
+        </p>
+      </div>
+
+      {#if recentShots.length === 0}
+        <div class="text-center py-8">
+          <div class="text-gray-400 text-lg">No recent shots yet</div>
+          <p class="text-gray-500 mt-2">Be the first to take a shot!</p>
+        </div>
+      {:else}
+        <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-900/50">
+                <tr>
+                  <th class="px-6 py-4 text-left text-sm font-semibold text-gray-300">Player</th>
+                  <th class="px-6 py-4 text-right text-sm font-semibold text-gray-300">Amount</th>
+                  <th class="px-6 py-4 text-center text-sm font-semibold text-gray-300">Result</th>
+                  <th class="px-6 py-4 text-right text-sm font-semibold text-gray-300">Time</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-700">
+                {#each recentShots as shot}
+                  <tr class="hover:bg-gray-700/30 transition-colors">
+                    <td class="px-6 py-4">
+                      <UserDisplay
+                        walletAddress={shot.player_address}
+                        profile={getPlayerProfile(shot.player_address)}
+                        size="sm"
+                        showAddress={true}
+                      />
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                      <div class="font-mono text-white">
+                        {formatEther(shot.amount)} ETH
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                      {#if shot.won}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/50 text-green-300 border border-green-700">
+                          🏆 Won
+                        </span>
+                      {:else}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-900/50 text-gray-400 border border-gray-600">
+                          💥 Miss
+                        </span>
+                      {/if}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                      <div class="text-sm text-gray-400">
+                        {formatTimeAgo(shot.timestamp)}
+                      </div>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {/if}
+    </div>
+
     <!-- Back to Game -->
     <div class="text-center">
-      <a 
-        href="/" 
+      <a
+        href="/"
         class="inline-flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg transition-colors font-semibold"
       >
-        <span>🎯</span>
+        <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
         <span>Back to Game</span>
       </a>
     </div>

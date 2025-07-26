@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
-  import { gameStore, winnerEventStore } from '$lib/stores/game-unified.js';
+  import { gameStore, winnerEventStore } from '$lib/stores/game/index.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatCooldownTime } from '$lib/config.js';
   import GameButton from '$lib/components/GameButton.svelte';
   import PotDisplay from '$lib/components/PotDisplay.svelte';
@@ -99,7 +99,10 @@
 
         <!-- Game Rules -->
         <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
-          <h3 class="text-xl font-bold mb-4 text-center">🎯 How to Play</h3>
+          <h3 class="text-xl font-bold mb-4 text-center flex items-center justify-center space-x-2">
+            <img src="/logo.svg" alt="ETH Shot" class="w-5 h-5" />
+            <span>How to Play</span>
+          </h3>
           <div class="grid md:grid-cols-2 gap-4 text-sm">
             <div class="space-y-2">
               <div class="flex items-center space-x-2">

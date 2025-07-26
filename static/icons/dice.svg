@@ -1,0 +1,39 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="diceGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e5e7eb;stop-opacity:1" />
+    </linearGradient>
+    <filter id="diceShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Dice cube -->
+  <g filter="url(#diceShadow)">
+    <!-- Top face -->
+    <path d="M12 20 L32 8 L52 20 L32 32 Z" fill="url(#diceGradient)" stroke="#d1d5db" stroke-width="1"/>
+    
+    <!-- Left face -->
+    <path d="M12 20 L12 40 L32 52 L32 32 Z" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1"/>
+    
+    <!-- Right face -->
+    <path d="M32 32 L32 52 L52 40 L52 20 Z" fill="#e5e7eb" stroke="#d1d5db" stroke-width="1"/>
+    
+    <!-- Dots on top face -->
+    <circle cx="20" cy="18" r="2" fill="#374151"/>
+    <circle cx="32" cy="20" r="2" fill="#374151"/>
+    <circle cx="44" cy="22" r="2" fill="#374151"/>
+    <circle cx="20" cy="26" r="2" fill="#374151"/>
+    <circle cx="44" cy="30" r="2" fill="#374151"/>
+    
+    <!-- Dots on left face -->
+    <circle cx="18" cy="30" r="1.5" fill="#4b5563"/>
+    <circle cx="26" cy="42" r="1.5" fill="#4b5563"/>
+    
+    <!-- Dots on right face -->
+    <circle cx="38" cy="30" r="1.5" fill="#6b7280"/>
+    <circle cx="46" cy="26" r="1.5" fill="#6b7280"/>
+    <circle cx="46" cy="34" r="1.5" fill="#6b7280"/>
+  </g>
+</svg>

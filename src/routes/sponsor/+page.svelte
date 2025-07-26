@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { gameStore, currentSponsor } from '$lib/stores/game.js';
+  import { gameStore, currentSponsor } from '$lib/stores/game/index.js';
   import { walletStore } from '$lib/stores/wallet.js';
   import { toastStore } from '$lib/stores/toast.js';
   import { GAME_CONFIG, formatEth } from '$lib/config.js';

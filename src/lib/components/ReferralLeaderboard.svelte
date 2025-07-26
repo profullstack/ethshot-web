@@ -3,7 +3,7 @@
   import { browser } from '$app/environment';
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
-  import { db } from '../supabase.js';
+  import { db } from '../database/index.js';
   import UserDisplay from './UserDisplay.svelte';
 
   // Component state

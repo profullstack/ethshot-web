@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
-  import { gameStore } from '$lib/stores/game-unified.js';
+  import { gameStore } from '$lib/stores/game/index.js';
   import ReferralLeaderboard from '$lib/components/ReferralLeaderboard.svelte';
   import ReferralSystem from '$lib/components/ReferralSystem.svelte';
   import WalletConnect from '$lib/components/WalletConnect.svelte';
@@ -44,8 +44,9 @@
   <div class="max-w-6xl mx-auto space-y-8">
     <!-- Header -->
     <div class="text-center space-y-4">
-      <h1 class="text-4xl md:text-6xl font-black bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 bg-clip-text text-transparent">
-        🎯 REFERRAL SYSTEM
+      <h1 class="text-4xl md:text-6xl font-black bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 bg-clip-text text-transparent flex items-center justify-center space-x-3">
+        <img src="/logo.svg" alt="ETH Shot" class="w-12 h-12 md:w-16 md:h-16" />
+        <span>REFERRAL SYSTEM</span>
       </h1>
       <p class="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto">
         Invite friends and earn <span class="text-purple-400 font-semibold">20% discounts</span>!
@@ -183,11 +184,12 @@
 
     <!-- Back to Game -->
     <div class="text-center">
-      <a 
+      <a
         href="/"
-        class="inline-block bg-red-600 hover:bg-red-700 text-white py-3 px-6 rounded-lg transition-colors font-semibold"
+        class="inline-flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-3 px-6 rounded-lg transition-colors font-semibold"
       >
-        🎯 Back to Game
+        <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
+        <span>Back to Game</span>
       </a>
     </div>
   </div>

@@ -1,6 +1,6 @@
 import { writable, derived } from 'svelte/store';
 import { walletAddress, isConnected } from './wallet.js';
-import { db } from '../supabase.js';
+import { db } from '../database/index.js';
 
 // Profile store state
 const createProfileStore = () => {
@@ -153,6 +153,11 @@ export const displayName = derived(
 // Derived store for avatar URL with fallback
 export const avatarUrl = derived(userProfile, $userProfile => {
   return $userProfile?.avatar_url || null;
+});
+
+// Derived store for notification preferences
+export const notificationsEnabled = derived(userProfile, $userProfile => {
+  return $userProfile?.notifications_enabled ?? true; // Default to true if not set
 });
 
 // Auto-load profile when wallet connects

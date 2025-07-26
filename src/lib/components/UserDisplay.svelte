@@ -1,5 +1,5 @@
 <script>
-  import { formatAddress } from '../supabase.js';
+  import { formatAddress } from '../database/index.js';
 
   // Props
   export let walletAddress = '';
@@ -8,10 +8,12 @@
   export let showAddress = true;
   export let showAvatar = true;
   export let className = '';
+  export let linkToProfile = true; // New prop to control linking
 
   // Reactive statements
   $: displayName = profile?.nickname || formatAddress(walletAddress);
   $: avatarUrl = profile?.avatar_url;
+  $: profileUrl = `/users/${walletAddress}`;
   
   // Size configurations
   $: sizeClasses = {
@@ -36,7 +38,11 @@
   $: initials = walletAddress ? walletAddress.slice(2, 4).toUpperCase() : '??';
 </script>
 
-<div class="user-display flex items-center {sizeClasses.container} {className}">
+<svelte:element 
+  this={linkToProfile && walletAddress ? 'a' : 'div'}
+  href={linkToProfile && walletAddress ? profileUrl : undefined}
+  class="user-display flex items-center {sizeClasses.container} {className} {linkToProfile && walletAddress ? 'interactive hover:bg-gray-700/30 transition-colors rounded-lg p-1 -m-1 cursor-pointer' : ''}"
+>
   {#if showAvatar}
     <div class="user-avatar {sizeClasses.avatar} rounded-full overflow-hidden flex-shrink-0">
       {#if avatarUrl}
@@ -65,7 +71,7 @@
       </div>
     {/if}
   </div>
-</div>
+</svelte:element>
 
 <style>
   .user-display {
@@ -78,11 +84,6 @@
 
   .user-info {
     @apply overflow-hidden;
-  }
-
-  /* Hover effects for interactive contexts */
-  .user-display.interactive {
-    @apply hover:bg-gray-700/30 transition-colors rounded-lg p-1 -m-1;
   }
 
   /* Special styling for current user */

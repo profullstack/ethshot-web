@@ -2,10 +2,11 @@
   import '../styles/global.css';
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
-  import { gameStore } from '$lib/stores/game.js';
+  import { gameStore } from '$lib/stores/game/index.js';
   import Header from '$lib/components/Header.svelte';
   import Footer from '$lib/components/Footer.svelte';
   import Toast from '$lib/components/Toast.svelte';
+  import ChatWidget from '$lib/components/ChatWidget.svelte';
 
   onMount(() => {
     // Initialize wallet connection on app load
@@ -33,6 +34,9 @@
   
   <!-- Toast Notifications -->
   <Toast />
+  
+  <!-- Chat Widget -->
+  <ChatWidget />
 </div>
 
 <style>

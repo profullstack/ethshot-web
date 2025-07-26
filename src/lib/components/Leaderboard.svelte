@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { gameStore } from '../stores/game-unified.js';
-  import { db, formatAddress } from '../supabase.js';
+  import { gameStore } from '../stores/game/index.js';
+  import { db, formatAddress } from '../database/index.js';
   import UserDisplay from './UserDisplay.svelte';
 
   let topPlayers = [];

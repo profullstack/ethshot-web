@@ -1,6 +1,7 @@
 <script>
+  import { onMount } from 'svelte';
   import { walletStore, isConnected, walletAddress, walletBalance } from '../stores/wallet.js';
-  import { gameStore, currentPot } from '../stores/game-unified.js';
+  import { gameStore, currentPot } from '../stores/game/index.js';
   import { displayName, avatarUrl, userProfile } from '../stores/profile.js';
   import { formatEth } from '../config.js';
   import WalletConnect from './WalletConnect.svelte';
@@ -9,6 +10,7 @@
   let showWalletModal = false;
   let showWalletDropdown = false;
   let showProfileModal = false;
+  let showMobileMenu = false;
 
   // Truncate address for display
   const truncateAddress = (address) => {
@@ -42,10 +44,60 @@
     showWalletDropdown = !showWalletDropdown;
   };
 
+  // Toggle mobile menu with iOS/Safari compatibility
+  const toggleMobileMenu = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showMobileMenu = !showMobileMenu;
+    console.log('Mobile menu toggled:', showMobileMenu);
+  };
+
+  // Handle mobile menu button with multiple event types
+  const handleMobileMenuClick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleMobileMenu(event);
+  };
+
+  const handleMobileMenuTouch = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleMobileMenu(event);
+  };
+
+  // Handle navigation link clicks with iOS/Safari compatibility
+  const handleNavLinkClick = (href, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showMobileMenu = false;
+    console.log('Navigating to:', href);
+    
+    // Use window.location for better iOS/Safari compatibility
+    window.location.href = href;
+  };
+
+  const handleNavLinkTouch = (href, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showMobileMenu = false;
+    console.log('Touch navigating to:', href);
+    
+    // Use window.location for better iOS/Safari compatibility
+    window.location.href = href;
+  };
+
   // Close dropdown when clicking outside
   const handleClickOutside = (event) => {
+    // Don't handle clicks on the mobile menu button itself
+    if (event.target.closest('.mobile-menu-button')) {
+      return;
+    }
+    
     if (showWalletDropdown && !event.target.closest('.wallet-dropdown-container')) {
       showWalletDropdown = false;
+    }
+    if (showMobileMenu && !event.target.closest('.mobile-menu-container')) {
+      showMobileMenu = false;
     }
   };
 
@@ -66,17 +118,48 @@
   $: if ($isConnected && showWalletModal) {
     showWalletModal = false;
   }
+
+  // Add click outside handler to document with iOS/Safari compatibility
+  onMount(() => {
+    const handleDocumentClick = (event) => {
+      // Don't handle clicks on the mobile menu button itself
+      if (event.target.closest('.mobile-menu-button') || event.target.closest('.mobile-menu-container')) {
+        return;
+      }
+      
+      if (showWalletDropdown && !event.target.closest('.wallet-dropdown-container')) {
+        showWalletDropdown = false;
+      }
+      if (showMobileMenu) {
+        showMobileMenu = false;
+        console.log('Mobile menu closed by outside click');
+      }
+    };
+
+    // Add multiple event listeners for better iOS/Safari compatibility
+    document.addEventListener('click', handleDocumentClick, { passive: false });
+    document.addEventListener('touchstart', handleDocumentClick, { passive: false });
+    document.addEventListener('touchend', handleDocumentClick, { passive: false });
+
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+      document.removeEventListener('touchstart', handleDocumentClick);
+      document.removeEventListener('touchend', handleDocumentClick);
+    };
+  });
 </script>
 
-<header class="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800" on:click={handleClickOutside}>
+<header class="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
   <div class="container mx-auto px-4 py-4">
     <div class="flex items-center justify-between">
       <!-- Logo -->
       <div class="flex items-center space-x-4">
         <a href="/" class="flex items-center space-x-2">
-          <div class="w-8 h-8 bg-gradient-to-br from-red-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold text-lg">🎯</span>
-          </div>
+          <img
+            src="/logo.svg"
+            alt="ETH Shot Logo"
+            class="w-8 h-8"
+          />
           <span class="text-xl font-bold gradient-text">ETH SHOT</span>
         </a>
         
@@ -100,10 +183,18 @@
             Game
           </a>
           <a
-            href="/referrals"
-            class="text-gray-300 hover:text-purple-400 transition-colors font-semibold"
+            href="/games"
+            class="text-gray-300 hover:text-yellow-400 transition-colors flex items-center space-x-1"
           >
-            🎯 Referrals
+            <span>🎮</span>
+            <span>Games</span>
+          </a>
+          <a
+            href="/referrals"
+            class="text-gray-300 hover:text-purple-400 transition-colors font-semibold flex items-center space-x-1"
+          >
+            <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
+            <span>Referrals</span>
           </a>
           <a
             href="/leaderboard"
@@ -251,11 +342,98 @@
         {/if}
 
         <!-- Mobile Menu Button -->
-        <button class="md:hidden p-2 text-gray-400 hover:text-white">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-          </svg>
-        </button>
+        <div class="mobile-menu-container relative">
+          <button
+            on:click={handleMobileMenuClick}
+            on:touchstart={handleMobileMenuTouch}
+            on:touchend={handleMobileMenuTouch}
+            class="mobile-menu-button md:hidden p-3 text-gray-400 hover:text-white transition-colors z-[60] relative bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-600 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            aria-label="Toggle mobile menu"
+            style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
+            type="button"
+          >
+            <svg
+              class="w-6 h-6 transition-transform {showMobileMenu ? 'rotate-90' : ''}"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              {#if showMobileMenu}
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              {:else}
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+              {/if}
+            </svg>
+          </button>
+
+          <!-- Mobile Navigation Menu -->
+          {#if showMobileMenu}
+            <!-- Backdrop -->
+            <div
+              class="fixed inset-0 bg-black bg-opacity-25 z-[9998]"
+              on:click={() => showMobileMenu = false}
+              on:touchstart={() => showMobileMenu = false}
+            ></div>
+            
+            <!-- Menu -->
+            <div
+              class="fixed right-4 top-20 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[9999] backdrop-blur-sm"
+              on:click|stopPropagation
+              on:touchstart|stopPropagation
+            >
+              <nav class="p-4 space-y-3">
+                <a
+                  href="/"
+                  class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-base flex items-center space-x-2"
+                  on:click={(e) => handleNavLinkClick('/', e)}
+                  on:touchstart={(e) => handleNavLinkTouch('/', e)}
+                  style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
+                >
+                  <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
+                  <span>Game</span>
+                </a>
+                <a
+                  href="/games"
+                  class="block px-4 py-3 text-gray-300 hover:text-yellow-400 hover:bg-gray-700 rounded-lg transition-colors text-base flex items-center space-x-2"
+                  on:click={(e) => handleNavLinkClick('/games', e)}
+                  on:touchstart={(e) => handleNavLinkTouch('/games', e)}
+                  style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
+                >
+                  <span>🎮</span>
+                  <span>Games</span>
+                </a>
+                <a
+                  href="/referrals"
+                  class="block px-4 py-3 text-gray-300 hover:text-purple-400 hover:bg-gray-700 rounded-lg transition-colors font-semibold text-base flex items-center space-x-2"
+                  on:click={(e) => handleNavLinkClick('/referrals', e)}
+                  on:touchstart={(e) => handleNavLinkTouch('/referrals', e)}
+                  style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
+                >
+                  <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
+                  <span>Referrals</span>
+                </a>
+                <a
+                  href="/leaderboard"
+                  class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-base"
+                  on:click={(e) => handleNavLinkClick('/leaderboard', e)}
+                  on:touchstart={(e) => handleNavLinkTouch('/leaderboard', e)}
+                  style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
+                >
+                  🏆 Leaderboard
+                </a>
+                <a
+                  href="/about"
+                  class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-base"
+                  on:click={(e) => handleNavLinkClick('/about', e)}
+                  on:touchstart={(e) => handleNavLinkTouch('/about', e)}
+                  style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
+                >
+                  ℹ️ About
+                </a>
+              </nav>
+            </div>
+          {/if}
+        </div>
       </div>
     </div>
 
