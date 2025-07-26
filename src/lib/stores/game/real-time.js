@@ -1,11 +1,16 @@
 /**
  * Real-time Updates Module
- * 
+ *
  * Handles real-time subscriptions and periodic updates for the game store
  */
 
 import { get } from 'svelte/store';
 import { notifyShotTaken } from '../../utils/notifications.js';
+import {
+  handleShotEvent,
+  handleWinnerEvent,
+  handlePotUpdate
+} from './social-proof-integration.js';
 
 /**
  * Start real-time updates
@@ -34,6 +39,15 @@ export const startRealTimeUpdates = ({
       recentWinners: [payload.new, ...state.recentWinners.slice(0, 9)],
       lastUpdate: new Date().toISOString()
     }));
+    
+    // Handle social proof for winner events
+    if (payload.new) {
+      handleWinnerEvent({
+        winnerAddress: payload.new.winner_address,
+        amount: payload.new.amount,
+        txHash: payload.new.tx_hash
+      });
+    }
   });
 
   const shotsSubscription = db.subscribeToShots((payload) => {
@@ -45,6 +59,16 @@ export const startRealTimeUpdates = ({
     if (payload.new && payload.new.player_address !== wallet.address?.toLowerCase()) {
       const currentState = get({ subscribe });
       notifyShotTaken(currentState.currentPot || 'the current pot');
+    }
+    
+    // Handle social proof for shot events
+    if (payload.new) {
+      handleShotEvent({
+        playerAddress: payload.new.player_address,
+        amount: payload.new.amount,
+        won: payload.new.won,
+        txHash: payload.new.tx_hash
+      });
     }
     
     // Refresh game state when new shots are taken
@@ -62,7 +86,17 @@ export const startRealTimeUpdates = ({
 
   // Update every 60 seconds as fallback
   const timer = setInterval(async () => {
+    const previousState = get({ subscribe });
+    const previousPot = previousState.currentPot;
+    
     await loadGameState();
+    
+    // Check for pot updates for social proof
+    const currentState = get({ subscribe });
+    const currentPot = currentState.currentPot;
+    if (currentPot && currentPot !== previousPot) {
+      handlePotUpdate(currentPot);
+    }
     
     const walletStore = getWalletStore();
     const wallet = get(walletStore);

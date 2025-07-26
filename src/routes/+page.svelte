@@ -14,10 +14,24 @@
   import MetaTags from '$lib/components/MetaTags.svelte';
   import ReferralSystem from '$lib/components/ReferralSystem.svelte';
   import DiscountButton from '$lib/components/DiscountButton.svelte';
+  
+  // Social Proof Components
+  import LiveActivityFeed from '$lib/components/LiveActivityFeed.svelte';
+  import CrowdPressureIndicator from '$lib/components/CrowdPressureIndicator.svelte';
+  import FomoAlert from '$lib/components/FomoAlert.svelte';
+  
+  // Social Proof Integration
+  import {
+    initializeSocialProofIntegration,
+    handleUserActivity,
+    subscribeSocialProofUpdates,
+    stopSocialProofIntegration
+  } from '$lib/stores/game/social-proof-integration.js';
 
   let mounted = false;
   let showWinnerAnimation = false;
   let winnerAmount = '0';
+  let socialProofSubscription = null;
 
   // Listen for winner events from the winner event store
   $: if ($winnerEventStore && $walletStore.address) {
@@ -40,13 +54,37 @@
     showWinnerAnimation = false;
   };
 
-  onMount(() => {
+  onMount(async () => {
     mounted = true;
     // Initialize game store for real-time updates
     gameStore.init();
     // Process any referral code from URL
     gameStore.processReferralOnLoad();
+    
+    // Initialize social proof system
+    await initializeSocialProofIntegration();
+    
+    // Subscribe to real-time social proof updates
+    socialProofSubscription = subscribeSocialProofUpdates();
+    
+    // Track user activity if wallet is connected
+    if ($walletStore.connected && $walletStore.address) {
+      await handleUserActivity($walletStore.address, 'login');
+    }
+    
+    return () => {
+      // Cleanup on component destroy
+      if (socialProofSubscription) {
+        socialProofSubscription.unsubscribe();
+      }
+      stopSocialProofIntegration();
+    };
   });
+  
+  // Track user activity when wallet connects
+  $: if (mounted && $walletStore.connected && $walletStore.address) {
+    handleUserActivity($walletStore.address, 'login');
+  }
 </script>
 
 <MetaTags
@@ -138,6 +176,15 @@
 
       <!-- Right Column - Stats & Leaderboard -->
       <div class="space-y-6">
+        <!-- Social Proof Section -->
+        <div class="space-y-4">
+          <!-- Crowd Pressure Indicator -->
+          <CrowdPressureIndicator />
+          
+          <!-- Live Activity Feed -->
+          <LiveActivityFeed maxItems={5} />
+        </div>
+        
         <!-- Recent Winners -->
         <RecentWinners />
         
@@ -238,6 +285,9 @@
 
 <!-- Notification Permission Component -->
 <NotificationPermission />
+
+<!-- FOMO Alert Component -->
+<FomoAlert position="top-right" />
 
 <style>
   @keyframes pulse {
