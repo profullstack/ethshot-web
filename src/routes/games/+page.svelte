@@ -23,47 +23,47 @@
 
 		<!-- Games Grid -->
 		<div class="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-			<!-- ETH Jackpot Roulette -->
+			<!-- ETH Shot (Current Game) -->
 			<div class="group relative">
-				<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 hover:border-green-500 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl">
-					<!-- Coming Soon Badge -->
-					<div class="absolute -top-3 -right-3 bg-gradient-to-r from-green-400 to-emerald-500 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg">
-						Coming Soon
+				<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 hover:border-red-500 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl">
+					<!-- Live Badge -->
+					<div class="absolute -top-3 -right-3 bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg animate-pulse">
+						🔴 LIVE
 					</div>
 					
 					<!-- Game Icon -->
 					<div class="flex justify-center mb-6">
-						<div class="w-24 h-24 bg-gradient-to-br from-white to-gray-200 rounded-2xl p-4 shadow-lg group-hover:shadow-green-500/20 transition-all duration-300 flex items-center justify-center">
+						<div class="w-24 h-24 bg-gradient-to-br from-white to-gray-200 rounded-2xl p-4 shadow-lg group-hover:shadow-red-500/20 transition-all duration-300 flex items-center justify-center">
 							<span class="text-4xl">🎯</span>
 						</div>
 					</div>
 					
 					<!-- Game Info -->
-					<h3 class="text-2xl font-bold text-center mb-4 text-green-400">ETH Jackpot Roulette</h3>
+					<h3 class="text-2xl font-bold text-center mb-4 text-red-400">ETH Shot</h3>
 					<p class="text-gray-300 text-center mb-6 leading-relaxed">
-						Bet ETH on roulette numbers. Smart contract picks the winner. Winner takes all the ETH pot!
+						The original ETH jackpot game! Take your shot for 0.001 ETH with a 1% chance to win the entire pot.
 					</p>
 					
 					<!-- Features -->
 					<div class="space-y-2 mb-6">
 						<div class="flex items-center text-sm text-gray-400">
-							<div class="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-							Winner takes all pot
+							<div class="w-2 h-2 bg-red-500 rounded-full mr-3"></div>
+							0.001 ETH per shot
 						</div>
 						<div class="flex items-center text-sm text-gray-400">
-							<div class="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-							Smart contract randomness
+							<div class="w-2 h-2 bg-red-500 rounded-full mr-3"></div>
+							1% chance to win
 						</div>
 						<div class="flex items-center text-sm text-gray-400">
-							<div class="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-							Provably fair results
+							<div class="w-2 h-2 bg-red-500 rounded-full mr-3"></div>
+							Winner takes 90% of pot
 						</div>
 					</div>
 					
 					<!-- Play Button -->
-					<button disabled class="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-xl opacity-50 cursor-not-allowed">
+					<a href="/" class="block w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-400 hover:to-orange-400 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg text-center">
 						Play Now
-					</button>
+					</a>
 				</div>
 			</div>
 
