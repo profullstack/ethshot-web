@@ -55,12 +55,10 @@ function filterChatEnvVars(envVars) {
     'ALLOWED_ORIGINS'
   ];
   
-  // Add all required variables with proper mapping
+  // Add all required variables
   requiredVars.forEach(key => {
     if (envVars[key]) {
-      // Map VITE_ prefixed variables to server environment variable names
-      const serverKey = key.startsWith('VITE_') ? key.replace('VITE_', '') : key;
-      chatVars[serverKey] = envVars[key];
+      chatVars[key] = envVars[key];
     } else {
       console.warn(`⚠️  Warning: Required variable ${key} not found in .env`);
     }
@@ -97,9 +95,7 @@ function uploadToRailway(envVars) {
   for (const [key, value] of Object.entries(envVars)) {
     try {
       console.log(`📤 Setting ${key}...`);
-      // Escape values that contain spaces or special characters
-      const escapedValue = value.includes(' ') || value.includes(',') ? `"${value}"` : value;
-      execSync(`railway variables set ${key}=${escapedValue}`, {
+      execSync(`railway variables --set "${key}=${value}"`, {
         stdio: 'pipe',
         cwd: rootDir
       });
