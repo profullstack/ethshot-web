@@ -30,7 +30,7 @@
     "server:start": "node server/index.js",
     "chat:dev": "nodemon servers/chat/chat-server.js",
     "chat:start": "node servers/chat/chat-server.js",
-    "deploy:chat": "echo '🚀 Deploying chat server to Railway...' && cd servers/chat && npm install && echo '✅ Dependencies installed' && echo '📦 Deploying to Railway...' && railway up && echo '✅ Chat server deployed successfully!'",
+    "deploy:chat": "echo '🚀 Deploying chat server to Railway...' && cd servers/chat && npm install && echo '✅ Dependencies installed' && cd ../.. && echo '📦 Committing and pushing to trigger Railway deployment...' && git add . && git commit -m 'Deploy chat server updates' && git push origin master && echo '✅ Pushed to GitHub - Railway will auto-deploy!'",
     "deploy:chat:setup": "node scripts/deploy-chat-env.js",
     "db:migrate": "supabase db push --linked",
     "db:reset": "supabase db reset --linked",
