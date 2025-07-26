@@ -466,8 +466,8 @@
             <div class="message" class:own-message={message.walletAddress === $walletAddress}>
               <!-- Avatar -->
               <div class="message-avatar">
-                {#if message.avatarUrl}
-                  <img src={message.avatarUrl} alt={message.nickname} />
+                {#if message.avatar_url}
+                  <img src={message.avatar_url} alt={message.nickname} />
                 {:else}
                   <div class="default-avatar">
                     {message.nickname ? message.nickname.charAt(0).toUpperCase() : '?'}

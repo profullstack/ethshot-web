@@ -6,6 +6,12 @@
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { supabase } from '$lib/supabase.js';
+import {
+  showMentionNotification,
+  requestNotificationPermission,
+  canShowNotifications
+} from '$lib/utils/browser-notifications.js';
+import { chatVisible } from '$lib/stores/chat.js';
 
 // Core stores for mention notifications
 export const mentionNotifications = writable([]);
@@ -66,6 +72,21 @@ export function addMentionNotification(mention) {
       updated.set(mention.id, mention);
       return updated;
     });
+
+    // Show browser notification if chat is not visible or user is not in the room
+    const isChatVisible = get(chatVisible);
+    if (!isChatVisible && canShowNotifications()) {
+      showMentionNotification({
+        mentionedByNickname: mention.mentionedByNickname,
+        roomName: mention.roomName,
+        messageContent: mention.messageContent,
+        mentionedByAvatar: mention.mentionedByAvatar
+      }, (mentionData) => {
+        // When notification is clicked, open chat and focus on the room
+        // This callback will be handled by the ChatWidget component
+        console.log('Mention notification clicked:', mentionData);
+      });
+    }
   }
 }
 
@@ -334,4 +355,33 @@ export function handleNewMentionFromRealtime(mentionData) {
   };
 
   addMentionNotification(mention);
+}
+
+/**
+ * Request notification permissions and show test notification
+ * @returns {Promise<boolean>} True if permissions were granted
+ */
+export async function enableBrowserNotifications() {
+  try {
+    const permission = await requestNotificationPermission();
+    
+    if (permission === 'granted') {
+      // Show a test notification to confirm it's working
+      setTimeout(() => {
+        showMentionNotification({
+          mentionedByNickname: 'System',
+          roomName: 'Test',
+          messageContent: 'Browser notifications are now enabled! You\'ll receive notifications when someone mentions you.',
+          mentionedByAvatar: '/favicon.png'
+        });
+      }, 500);
+      
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Failed to enable browser notifications:', error);
+    return false;
+  }
 }
