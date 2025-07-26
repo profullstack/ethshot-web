@@ -1,9 +1,9 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
-  import { 
-    chatVisible, 
-    chatMinimized, 
-    chatConnected, 
+  import {
+    chatVisible,
+    chatMinimized,
+    chatConnected,
     chatAuthenticated,
     chatError,
     activeRoom,
@@ -16,13 +16,30 @@
     chat
   } from '$lib/stores/chat.js';
   import { walletAddress } from '$lib/stores/wallet.js';
+  import {
+    totalPendingMentions,
+    initializeMentionNotifications,
+    markRoomMentionsAsRead,
+    searchNicknamesInRoom
+  } from '$lib/stores/mention-notifications.js';
+  import {
+    getAutocompleteContext,
+    formatMessageWithMentions
+  } from '$lib/utils/chat-mentions.js';
 
   // Component state
   let messageInput = '';
   let messagesContainer;
+  let messageInputElement;
   let isLoading = false;
   let showRoomList = false;
   let selectedRoom = null;
+  
+  // Mention autocomplete state
+  let showMentionSuggestions = false;
+  let mentionSuggestions = [];
+  let selectedSuggestionIndex = -1;
+  let autocompleteContext = null;
 
   // Reactive statements
   $: currentMessages = $activeRoom ? ($roomMessages.get($activeRoom) || []) : [];
@@ -125,10 +142,104 @@
    * Handle key press in message input
    */
   function handleKeyPress(event) {
+    if (showMentionSuggestions) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, mentionSuggestions.length - 1);
+        return;
+      }
+      
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, 0);
+        return;
+      }
+      
+      if (event.key === 'Tab' || event.key === 'Enter') {
+        if (selectedSuggestionIndex >= 0 && mentionSuggestions[selectedSuggestionIndex]) {
+          event.preventDefault();
+          selectMentionSuggestion(mentionSuggestions[selectedSuggestionIndex]);
+          return;
+        }
+      }
+      
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        hideMentionSuggestions();
+        return;
+      }
+    }
+    
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       sendMessage();
     }
+  }
+
+  /**
+   * Handle input changes for mention detection
+   */
+  async function handleInputChange() {
+    if (!messageInputElement || !$activeRoom) return;
+    
+    const cursorPosition = messageInputElement.selectionStart;
+    autocompleteContext = getAutocompleteContext(messageInput, cursorPosition);
+    
+    if (autocompleteContext && autocompleteContext.isActive) {
+      await searchMentions(autocompleteContext.query);
+    } else {
+      hideMentionSuggestions();
+    }
+  }
+
+  /**
+   * Search for mention suggestions
+   */
+  async function searchMentions(query) {
+    if (!$activeRoom) return;
+    
+    try {
+      const suggestions = await searchNicknamesInRoom(query, $activeRoom, 5);
+      mentionSuggestions = suggestions;
+      showMentionSuggestions = suggestions.length > 0;
+      selectedSuggestionIndex = suggestions.length > 0 ? 0 : -1;
+    } catch (error) {
+      console.error('Failed to search mentions:', error);
+      hideMentionSuggestions();
+    }
+  }
+
+  /**
+   * Select a mention suggestion
+   */
+  function selectMentionSuggestion(suggestion) {
+    if (!autocompleteContext || !suggestion) return;
+    
+    const beforeMention = messageInput.substring(0, autocompleteContext.startIndex);
+    const afterMention = messageInput.substring(autocompleteContext.endIndex);
+    const newMessage = beforeMention + '@' + suggestion.nickname + ' ' + afterMention;
+    
+    messageInput = newMessage;
+    hideMentionSuggestions();
+    
+    // Set cursor position after the mention
+    tick().then(() => {
+      if (messageInputElement) {
+        const newCursorPos = autocompleteContext.startIndex + suggestion.nickname.length + 2;
+        messageInputElement.setSelectionRange(newCursorPos, newCursorPos);
+        messageInputElement.focus();
+      }
+    });
+  }
+
+  /**
+   * Hide mention suggestions
+   */
+  function hideMentionSuggestions() {
+    showMentionSuggestions = false;
+    mentionSuggestions = [];
+    selectedSuggestionIndex = -1;
+    autocompleteContext = null;
   }
 
   /**
@@ -204,6 +315,16 @@
   // Auto-connect when wallet connects
   $: if ($walletAddress && !$chatAuthenticated) {
     connectAndAuthenticate();
+  }
+
+  // Initialize mention notifications when wallet connects
+  $: if ($walletAddress) {
+    initializeMentionNotifications($walletAddress);
+  }
+
+  // Mark room mentions as read when switching rooms
+  $: if ($activeRoom && $chatVisible) {
+    markRoomMentionsAsRead($activeRoom);
   }
 </script>
 
@@ -368,7 +489,7 @@
                 </div>
                 
                 <div class="message-text">
-                  {message.content || message.message_content}
+                  {@html formatMessageWithMentions(message.content || message.message_content)}
                 </div>
               </div>
             </div>
@@ -380,13 +501,39 @@
           <div class="message-input-container">
             <div class="input-wrapper">
               <textarea
+                bind:this={messageInputElement}
                 bind:value={messageInput}
                 on:keydown={handleKeyPress}
-                placeholder="Type your message... (Enter to send)"
+                on:input={handleInputChange}
+                placeholder="Type your message... (Enter to send, @ to mention)"
                 maxlength="500"
                 rows="1"
                 disabled={!isConnected}
               ></textarea>
+              
+              <!-- Mention Autocomplete Suggestions -->
+              {#if showMentionSuggestions && mentionSuggestions.length > 0}
+                <div class="mention-suggestions">
+                  {#each mentionSuggestions as suggestion, index}
+                    <button
+                      class="mention-suggestion"
+                      class:selected={index === selectedSuggestionIndex}
+                      on:click={() => selectMentionSuggestion(suggestion)}
+                    >
+                      <div class="suggestion-avatar">
+                        {#if suggestion.avatar_url}
+                          <img src={suggestion.avatar_url} alt={suggestion.nickname} />
+                        {:else}
+                          <div class="default-suggestion-avatar">
+                            {suggestion.nickname.charAt(0).toUpperCase()}
+                          </div>
+                        {/if}
+                      </div>
+                      <span class="suggestion-nickname">@{suggestion.nickname}</span>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
               
               <button 
                 class="send-button"
@@ -423,9 +570,13 @@
       <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="currentColor"/>
     </svg>
     
-    {#if $totalUnreadCount > 0}
+    {#if $totalUnreadCount > 0 || $totalPendingMentions > 0}
       <div class="unread-badge">
-        {$totalUnreadCount > 99 ? '99+' : $totalUnreadCount}
+        {#if $totalPendingMentions > 0}
+          <span class="mention-count">@{$totalPendingMentions > 99 ? '99+' : $totalPendingMentions}</span>
+        {:else}
+          {$totalUnreadCount > 99 ? '99+' : $totalUnreadCount}
+        {/if}
       </div>
     {/if}
   </button>
@@ -904,6 +1055,88 @@
     100% { transform: rotate(360deg); }
   }
 
+  /* Mention styles */
+  .mention {
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .mention-suggestions {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1001;
+    margin-bottom: 4px;
+  }
+
+  .mention-suggestion {
+    width: 100%;
+    background: none;
+    border: none;
+    color: white;
+    padding: 8px 12px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s;
+  }
+
+  .mention-suggestion:hover,
+  .mention-suggestion.selected {
+    background: rgba(59, 130, 246, 0.2);
+  }
+
+  .suggestion-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .suggestion-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .default-suggestion-avatar {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  .suggestion-nickname {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .mention-count {
+    color: #f59e0b;
+    font-weight: 700;
+  }
+
+  .input-wrapper {
+    position: relative;
+  }
+
   /* Mobile responsiveness */
   @media (max-width: 768px) {
     .chat-widget {
@@ -917,6 +1150,10 @@
     .chat-toggle-btn {
       bottom: 10px;
       right: 10px;
+    }
+
+    .mention-suggestions {
+      max-height: 150px;
     }
   }
 </style>
