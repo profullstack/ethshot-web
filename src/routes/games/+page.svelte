@@ -60,9 +60,9 @@
 						</div>
 					</div>
 					
-					<!-- Notify Button -->
-					<button class="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-						Notify Me
+					<!-- Play Button -->
+					<button disabled class="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-xl opacity-50 cursor-not-allowed">
+						Play Now
 					</button>
 				</div>
 			</div>
@@ -104,9 +104,9 @@
 						</div>
 					</div>
 					
-					<!-- Notify Button -->
-					<button class="w-full bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-						Notify Me
+					<!-- Play Button -->
+					<button disabled class="w-full bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold py-3 px-6 rounded-xl opacity-50 cursor-not-allowed">
+						Play Now
 					</button>
 				</div>
 			</div>
@@ -149,8 +149,8 @@
 					</div>
 					
 					<!-- Notify Button -->
-					<button class="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-						Notify Me
+					<button disabled class="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-3 px-6 rounded-xl opacity-50 cursor-not-allowed">
+						Play Now
 					</button>
 				</div>
 			</div>
@@ -193,8 +193,8 @@
 					</div>
 					
 					<!-- Notify Button -->
-					<button class="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-						Notify Me
+					<button class="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-bold py-3 px-6 rounded-xl opacity-50 cursor-not-allowed">
+						Play Now
 					</button>
 				</div>
 			</div>
@@ -237,8 +237,8 @@
 					</div>
 					
 					<!-- Notify Button -->
-					<button class="w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-						Notify Me
+					<button class="w-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold py-3 px-6 rounded-xl opacity-50 cursor-not-allowed">
+						Play Now
 					</button>
 				</div>
 			</div>
@@ -281,8 +281,8 @@
 					</div>
 					
 					<!-- Notify Button -->
-					<button class="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-						Notify Me
+					<button disabled class="w-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold py-3 px-6 rounded-xl opacity-50 cursor-not-allowed">
+						Play Now
 					</button>
 				</div>
 			</div>
@@ -325,8 +325,8 @@
 					</div>
 					
 					<!-- Notify Button -->
-					<button class="w-full bg-gradient-to-r from-teal-500 to-green-500 hover:from-teal-400 hover:to-green-400 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-						Notify Me
+					<button disabled class="w-full bg-gradient-to-r from-teal-500 to-green-500 text-white font-bold py-3 px-6 rounded-xl opacity-50 cursor-not-allowed">
+						Play Now
 					</button>
 				</div>
 			</div>
@@ -369,8 +369,8 @@
 					</div>
 					
 					<!-- Notify Button -->
-					<button class="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-						Notify Me
+					<button disabled class="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold py-3 px-6 rounded-xl opacity-50 cursor-not-allowed">
+						Play Now
 					</button>
 				</div>
 			</div>
