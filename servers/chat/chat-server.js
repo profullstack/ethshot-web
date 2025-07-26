@@ -250,7 +250,7 @@ class ChatServer {
 
         if (error) {
           console.error('Database error joining room:', error);
-          this.sendError(clientId, 'Failed to join room');
+          this.sendError(clientId, `Failed to join room: ${error.message}`);
           return;
         }
 
@@ -258,6 +258,10 @@ class ChatServer {
           this.sendError(clientId, 'Room is full or does not exist');
           return;
         }
+      } else {
+        // If no Supabase connection, reject room joining
+        this.sendError(clientId, 'Chat service unavailable - database connection required');
+        return;
       }
 
       // Add to local room tracking
@@ -314,6 +318,10 @@ class ChatServer {
           p_room_id: roomId,
           p_user_wallet_address: client.walletAddress
         });
+      } else {
+        // If no Supabase connection, reject room operations
+        this.sendError(clientId, 'Chat service unavailable - database connection required');
+        return;
       }
 
       // Remove from local room tracking
@@ -412,6 +420,10 @@ class ChatServer {
           .single();
         
         profile = profileData;
+      } else {
+        // If no Supabase connection, reject message sending
+        this.sendError(clientId, 'Chat service unavailable - database connection required');
+        return;
       }
 
       // Broadcast message to all room participants
@@ -472,6 +484,10 @@ class ChatServer {
         }
 
         messages = dbMessages || [];
+      } else {
+        // If no Supabase connection, reject message history requests
+        this.sendError(clientId, 'Chat service unavailable - database connection required');
+        return;
       }
 
       // Send messages to client (reverse order for chronological display)

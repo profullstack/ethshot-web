@@ -76,11 +76,21 @@
       // Authenticate with wallet address
       await chat.authenticate($walletAddress);
 
-      // Join default room (Global Chat)
-      const globalRoom = $chatRooms.find(room => room.type === 'global');
-      if (globalRoom) {
-        await chat.joinRoom(globalRoom.id);
-      }
+      // Wait a bit for rooms to be loaded, then join default room
+      setTimeout(async () => {
+        try {
+          const globalRoom = $chatRooms.find(room => room.type === 'global' && room.name === 'Global Chat');
+          if (globalRoom && globalRoom.id) {
+            console.log('Attempting to join room:', globalRoom.id, globalRoom.name);
+            await chat.joinRoom(globalRoom.id);
+          } else {
+            console.warn('Global Chat room not found in available rooms:', $chatRooms);
+          }
+        } catch (error) {
+          console.error('Failed to join default room:', error);
+          // Don't throw here - user can manually join rooms
+        }
+      }, 1000);
 
     } catch (error) {
       console.error('Failed to connect to chat:', error);

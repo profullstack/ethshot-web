@@ -285,24 +285,18 @@ class ChatStore {
       }
 
       if (rooms && rooms.length > 0) {
+        console.log('Loaded chat rooms from database:', rooms);
         chatRooms.set(rooms);
       } else {
         // If no rooms exist, create default ones
+        console.log('No rooms found, creating default rooms');
         await this.createDefaultRooms();
       }
     } catch (error) {
       console.error('Error in loadChatRooms:', error);
-      // Fallback to temporary room for testing
-      const fallbackRooms = [
-        {
-          id: 'temp-global',
-          name: 'Global Chat',
-          type: 'global',
-          description: 'General discussion for all players',
-          max_users: 100
-        }
-      ];
-      chatRooms.set(fallbackRooms);
+      // Don't provide fallback rooms - chat requires Supabase
+      chatRooms.set([]);
+      throw error;
     }
   }
 
