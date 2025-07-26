@@ -81,13 +81,6 @@ export class SolanaAdapter extends BaseCryptoAdapter {
   }
 
   /**
-   * Take a shot at the jackpot
-   */
-  async takeShot() {
-    throw new Error('Solana support not yet implemented.');
-  }
-
-  /**
    * Sponsor a round
    */
   async sponsorRound(name, logoUrl) {
@@ -109,7 +102,7 @@ export class SolanaAdapter extends BaseCryptoAdapter {
   }
 
   /**
-   * Check if player can take a shot
+   * Check if player can take a shot (commit phase)
    */
   async canTakeShot(address) {
     throw new Error('Solana support not yet implemented.');

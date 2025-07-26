@@ -38,7 +38,7 @@ export const loadPlayerData = async ({ address, state, contract, ethers, db, upd
 
       [playerStats, canShoot, cooldownRemaining] = await Promise.all([
         adapter.getPlayerStats(address),
-        adapter.canTakeShot(address),
+        adapter.canTakeShot(address), // This calls canCommitShot internally in the adapter
         adapter.getCooldownRemaining(address)
       ]);
     } else {
