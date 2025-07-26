@@ -116,6 +116,62 @@ export class SolanaAdapter extends BaseCryptoAdapter {
   }
 
   /**
+   * Generate a cryptographically secure secret for commit-reveal
+   */
+  generateSecret() {
+    throw new Error('Solana support not yet implemented.');
+  }
+
+  /**
+   * Generate commitment hash from secret and player address
+   */
+  generateCommitment(secret, playerAddress) {
+    throw new Error('Solana support not yet implemented.');
+  }
+
+  /**
+   * Commit a shot with generated commitment
+   */
+  async commitShot(commitment, shotCost = null) {
+    throw new Error('Solana support not yet implemented.');
+  }
+
+  /**
+   * Reveal a committed shot
+   */
+  async revealShot(secret) {
+    throw new Error('Solana support not yet implemented.');
+  }
+
+  /**
+   * Check if player can reveal their shot
+   */
+  async canRevealShot(address) {
+    throw new Error('Solana support not yet implemented.');
+  }
+
+  /**
+   * Check if player has a pending shot
+   */
+  async hasPendingShot(address) {
+    throw new Error('Solana support not yet implemented.');
+  }
+
+  /**
+   * Get pending shot details for player
+   */
+  async getPendingShot(address) {
+    throw new Error('Solana support not yet implemented.');
+  }
+
+  /**
+   * Get pending payout amount for player
+   */
+  async getPendingPayout(address) {
+    throw new Error('Solana support not yet implemented.');
+  }
+
+  /**
    * Get cooldown remaining for player
    */
   async getCooldownRemaining(address) {

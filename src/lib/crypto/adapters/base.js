@@ -196,6 +196,79 @@ export class BaseCryptoAdapter {
   }
 
   /**
+   * Generate a cryptographically secure secret for commit-reveal
+   * @returns {string} Hex-encoded secret
+   */
+  generateSecret() {
+    throw new Error('generateSecret() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Generate commitment hash from secret and player address
+   * @param {string} secret - The secret value
+   * @param {string} playerAddress - Player's address
+   * @returns {string} Commitment hash
+   */
+  generateCommitment(secret, playerAddress) {
+    throw new Error('generateCommitment() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Commit a shot with generated commitment
+   * @param {string} commitment - Commitment hash
+   * @param {string} shotCost - Optional shot cost override
+   * @returns {Promise<{hash: string, receipt: Object, committed: boolean, commitBlock: number}>}
+   */
+  async commitShot(commitment, shotCost = null) {
+    throw new Error('commitShot() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Reveal a committed shot
+   * @param {string} secret - The secret used in commitment
+   * @returns {Promise<{hash: string, receipt: Object, won: boolean, randomNumber: string, jackpotAmount: string}>}
+   */
+  async revealShot(secret) {
+    throw new Error('revealShot() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Check if player can reveal their shot
+   * @param {string} address - Player address
+   * @returns {Promise<boolean>}
+   */
+  async canRevealShot(address) {
+    throw new Error('canRevealShot() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Check if player has a pending shot
+   * @param {string} address - Player address
+   * @returns {Promise<boolean>}
+   */
+  async hasPendingShot(address) {
+    throw new Error('hasPendingShot() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Get pending shot details for player
+   * @param {string} address - Player address
+   * @returns {Promise<{exists: boolean, blockNumber: number, amount: string}>}
+   */
+  async getPendingShot(address) {
+    throw new Error('getPendingShot() must be implemented by crypto adapter');
+  }
+
+  /**
+   * Get pending payout amount for player
+   * @param {string} address - Player address
+   * @returns {Promise<string>} Pending payout amount
+   */
+  async getPendingPayout(address) {
+    throw new Error('getPendingPayout() must be implemented by crypto adapter');
+  }
+
+  /**
    * Get contract balance
    * @returns {Promise<string>} Contract balance in native currency units
    */

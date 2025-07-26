@@ -137,21 +137,30 @@ export const ETH_CONFIG = createCryptoConfig({
   
   contractConfig: {
     abi: [
-      'function takeShot() external payable',
+      'function commitShot(bytes32 commitment) external payable',
+      'function revealShot(uint256 secret) external',
       'function sponsorRound(string calldata name, string calldata logoUrl) external payable',
       'function getCurrentPot() external view returns (uint256)',
       'function getContractBalance() external view returns (uint256)',
       'function getHouseFunds() external view returns (uint256)',
       'function getPlayerStats(address player) external view returns (tuple(uint256 totalShots, uint256 totalSpent, uint256 totalWon, uint256 lastShotTime))',
-      'function canTakeShot(address player) external view returns (bool)',
+      'function canCommitShot(address player) external view returns (bool)',
+      'function canRevealShot(address player) external view returns (bool)',
+      'function hasPendingShot(address player) external view returns (bool)',
+      'function getPendingShot(address player) external view returns (bool exists, uint256 blockNumber, uint256 amount)',
+      'function getPendingPayout(address player) external view returns (uint256)',
       'function getCooldownRemaining(address player) external view returns (uint256)',
+      'function claimPayout() external',
       'function getCurrentSponsor() external view returns (tuple(address sponsor, string name, string logoUrl, uint256 timestamp, bool active))',
       'function getRecentWinners() external view returns (tuple(address winner, uint256 amount, uint256 timestamp, uint256 blockNumber)[])',
       'function SHOT_COST() external view returns (uint256)',
       'function SPONSOR_COST() external view returns (uint256)',
-      'event ShotTaken(address indexed player, uint256 amount, bool won)',
-      'event JackpotWon(address indexed winner, uint256 amount, uint256 timestamp)',
-      'event SponsorshipActivated(address indexed sponsor, string name, string logoUrl)'
+      'event ShotCommitted(address indexed player, bytes32 indexed commitment, uint256 amount)',
+      'event ShotRevealed(address indexed player, uint256 indexed amount, bool indexed won)',
+      'event JackpotWon(address indexed winner, uint256 indexed amount, uint256 indexed timestamp)',
+      'event SponsorshipActivated(address indexed sponsor, string name, string logoUrl)',
+      'event PayoutFailed(address indexed player, uint256 amount)',
+      'event PayoutClaimed(address indexed player, uint256 amount)'
     ],
     address: import.meta.env.VITE_ETH_CONTRACT_ADDRESS || import.meta.env.VITE_CONTRACT_ADDRESS || '',
     deploymentBlock: 0

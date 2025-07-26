@@ -512,11 +512,50 @@ export class EthereumAdapter extends BaseCryptoAdapter {
   }
 
   /**
-   * Check if player can take a shot
+   * Check if player can commit a shot
    */
   async canTakeShot(address) {
     const contract = this.getContract();
-    return await contract.canTakeShot(address);
+    return await contract.canCommitShot(address);
+  }
+
+  /**
+   * Check if player can reveal their shot
+   */
+  async canRevealShot(address) {
+    const contract = this.getContract();
+    return await contract.canRevealShot(address);
+  }
+
+  /**
+   * Check if player has a pending shot
+   */
+  async hasPendingShot(address) {
+    const contract = this.getContract();
+    return await contract.hasPendingShot(address);
+  }
+
+  /**
+   * Get pending shot details for player
+   */
+  async getPendingShot(address) {
+    const contract = this.getContract();
+    const result = await contract.getPendingShot(address);
+    
+    return {
+      exists: result.exists,
+      blockNumber: Number(result.blockNumber),
+      amount: this.ethers.formatEther(result.amount)
+    };
+  }
+
+  /**
+   * Get pending payout amount for player
+   */
+  async getPendingPayout(address) {
+    const contract = this.getContract();
+    const payout = await contract.getPendingPayout(address);
+    return this.ethers.formatEther(payout);
   }
 
   /**

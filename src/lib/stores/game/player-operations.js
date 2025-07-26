@@ -47,7 +47,7 @@ export const loadPlayerData = async ({ address, state, contract, ethers, db, upd
 
       [playerStats, canShoot, cooldownRemaining] = await Promise.all([
         contract.getPlayerStats(address),
-        contract.canTakeShot(address),
+        contract.canCommitShot(address),
         contract.getCooldownRemaining(address)
       ]);
 
@@ -229,9 +229,23 @@ export const takeShot = async ({
         throw new Error('No active cryptocurrency adapter');
       }
 
-      // For multi-crypto mode, we need to implement discount logic in the adapter
-      // For now, we'll use the regular takeShot and handle refunds separately
-      result = await adapter.takeShot();
+      // For multi-crypto mode, we need to implement commit-reveal logic in the adapter
+      // For now, we'll use the regular commitShot and handle discounts separately
+      const secret = adapter.generateSecret();
+      const commitment = adapter.generateCommitment(secret, wallet.address);
+      
+      // First commit the shot
+      const commitResult = await adapter.commitShot(commitment, actualShotCost);
+      console.log('✅ Shot committed:', commitResult.hash);
+      
+      // Wait for reveal delay (this should be handled by the UI in practice)
+      toastStore.info('Shot committed! Waiting for reveal window...');
+      
+      // For now, we'll immediately try to reveal (in production, this should be delayed)
+      // TODO: Implement proper reveal timing in UI
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      
+      result = await adapter.revealShot(secret);
     } else {
       // ETH-only mode: direct contract interaction
       if (!contract || !ethers || !wallet.signer) {
@@ -338,9 +352,10 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   // Estimate gas
   let gasEstimate;
   try {
-    gasEstimate = await contractWithSigner.takeShot.estimateGas({
-      value: transactionValue
-    });
+    gasEstimate = await contractWithSigner.commitShot.estimateGas(
+      '0x0000000000000000000000000000000000000000000000000000000000000000', // dummy commitment for gas estimation
+      { value: transactionValue }
+    );
   } catch (estimateError) {
     console.warn('Failed to estimate gas, using default:', estimateError.message);
     gasEstimate = 150000n;
@@ -360,27 +375,47 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   }
 
   // Send transaction with discounted value
-  const tx = await contractWithSigner.takeShot({
+  // Generate secret and commitment for commit-reveal
+  const secret = ethers.hexlify(ethers.randomBytes(32));
+  const commitment = ethers.keccak256(
+    ethers.solidityPacked(['uint256', 'address'], [secret, wallet.address])
+  );
+  
+  // First commit the shot
+  const commitTx = await contractWithSigner.commitShot(commitment, {
     value: transactionValue,
     gasLimit: gasLimit
   });
+  
+  toastStore.info('Shot committed! Waiting for confirmation...');
+  const commitReceipt = await commitTx.wait();
+  
+  toastStore.info('Commitment confirmed! Waiting for reveal window...');
+  
+  // Wait for reveal delay (in practice, this should be handled by UI timing)
+  await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+  
+  // Now reveal the shot
+  const revealTx = await contractWithSigner.revealShot(secret);
+  toastStore.info('Revealing shot...');
+  const tx = revealTx; // For compatibility with existing code
 
   toastStore.info('Shot submitted! Waiting for confirmation...');
   const receipt = await tx.wait();
   
-  // Check if user won by looking at events
-  const shotTakenEvent = receipt.logs.find(log => {
+  // Check if user won by looking at ShotRevealed events
+  const shotRevealedEvent = receipt.logs.find(log => {
     try {
       const parsed = contract.interface.parseLog(log);
-      return parsed.name === 'ShotTaken';
+      return parsed.name === 'ShotRevealed';
     } catch {
       return false;
     }
   });
 
   let won = false;
-  if (shotTakenEvent) {
-    const parsed = contract.interface.parseLog(shotTakenEvent);
+  if (shotRevealedEvent) {
+    const parsed = contract.interface.parseLog(shotRevealedEvent);
     won = parsed.args.won;
   }
 
