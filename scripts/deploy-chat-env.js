@@ -41,8 +41,8 @@ function filterChatEnvVars(envVars) {
   
   // Essential variables for chat server
   const requiredVars = [
-    'SUPABASE_URL',
-    'SUPABASE_ANON_KEY',
+    'VITE_SUPABASE_URL',
+    'VITE_SUPABASE_ANON_KEY',
     'VITE_CHAT_SERVER_URL',
     'CHAT_SERVER_PORT',
     'VITE_CHAT_ENABLED'
@@ -55,10 +55,12 @@ function filterChatEnvVars(envVars) {
     'ALLOWED_ORIGINS'
   ];
   
-  // Add all required variables
+  // Add all required variables with proper mapping
   requiredVars.forEach(key => {
     if (envVars[key]) {
-      chatVars[key] = envVars[key];
+      // Map VITE_ prefixed variables to server environment variable names
+      const serverKey = key.startsWith('VITE_') ? key.replace('VITE_', '') : key;
+      chatVars[serverKey] = envVars[key];
     } else {
       console.warn(`⚠️  Warning: Required variable ${key} not found in .env`);
     }
