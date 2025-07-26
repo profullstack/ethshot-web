@@ -7,6 +7,7 @@
 
 import { supabase, TABLES, isSupabaseAvailable, getSupabaseClient } from './client.js';
 import { getPlayer, upsertPlayer, getTopPlayers, getLeaderboard } from './players.js';
+import { NETWORK_CONFIG } from '../config.js';
 
 // Re-export client utilities
 export { supabase, TABLES, isSupabaseAvailable, getSupabaseClient };
@@ -61,9 +62,8 @@ export const db = {
         tx_hash: shotData.txHash,
         block_number: shotData.blockNumber,
         timestamp: shotData.timestamp || new Date().toISOString(),
-        status: shotData.status || 'completed', // For commit-reveal: 'committed', 'revealed', 'completed'
-        commitment_hash: shotData.commitmentHash || null,
-        reveal_tx_hash: shotData.revealTxHash || null
+        crypto_type: shotData.cryptoType || 'ETH',
+        contract_address: shotData.contractAddress
       });
 
       const { data, error } = await supabase
@@ -75,9 +75,8 @@ export const db = {
           tx_hash: shotData.txHash,
           block_number: shotData.blockNumber,
           timestamp: shotData.timestamp || new Date().toISOString(),
-          status: shotData.status || 'completed',
-          commitment_hash: shotData.commitmentHash || null,
-          reveal_tx_hash: shotData.revealTxHash || null,
+          crypto_type: shotData.cryptoType || 'ETH',
+          contract_address: shotData.contractAddress
         })
         .select()
         .single();
@@ -95,7 +94,7 @@ export const db = {
     }
   },
 
-  // Commit-reveal specific shot operations
+  // Commit-reveal specific shot operations (simplified for current schema)
   async recordShotCommit(commitData) {
     if (!supabase) {
       console.warn('Supabase not configured - returning null for recordShotCommit');
@@ -106,10 +105,11 @@ export const db = {
       console.log('🔒 Recording shot commit to Supabase:', {
         player_address: commitData.playerAddress.toLowerCase(),
         amount: commitData.amount,
-        commitment_hash: commitData.commitmentHash,
         tx_hash: commitData.txHash,
         block_number: commitData.blockNumber,
-        timestamp: commitData.timestamp || new Date().toISOString()
+        timestamp: commitData.timestamp || new Date().toISOString(),
+        crypto_type: commitData.cryptoType || 'ETH',
+        contract_address: commitData.contractAddress
       });
 
       const { data, error } = await supabase
@@ -121,12 +121,8 @@ export const db = {
           tx_hash: commitData.txHash,
           block_number: commitData.blockNumber,
           timestamp: commitData.timestamp || new Date().toISOString(),
-          status: 'committed',
-          commitment_hash: commitData.commitmentHash,
           crypto_type: commitData.cryptoType || 'ETH',
-          used_discount: commitData.usedDiscount || false,
-          discount_id: commitData.discountId || null,
-          used_bonus: commitData.usedBonus || false
+          contract_address: commitData.contractAddress
         })
         .select()
         .single();
@@ -234,11 +230,20 @@ export const db = {
     }
 
     try {
-      const { data, error } = await supabase
+      const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS;
+      
+      let query = supabase
         .from(TABLES.SHOTS)
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(limit);
+
+      // Filter by contract address if available
+      if (contractAddress) {
+        query = query.eq('contract_address', contractAddress);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data || [];
@@ -264,6 +269,8 @@ export const db = {
           tx_hash: winnerData.txHash,
           block_number: winnerData.blockNumber,
           timestamp: winnerData.timestamp || new Date().toISOString(),
+          crypto_type: winnerData.cryptoType || 'ETH',
+          contract_address: winnerData.contractAddress
         })
         .select()
         .single();
@@ -283,11 +290,20 @@ export const db = {
     }
 
     try {
-      const { data, error } = await supabase
+      const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS;
+      
+      let query = supabase
         .from(TABLES.WINNERS)
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(limit);
+
+      // Filter by contract address if available
+      if (contractAddress) {
+        query = query.eq('contract_address', contractAddress);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data || [];
@@ -316,6 +332,8 @@ export const db = {
           tx_hash: sponsorData.txHash,
           active: true,
           timestamp: sponsorData.timestamp || new Date().toISOString(),
+          crypto_type: sponsorData.cryptoType || 'ETH',
+          contract_address: sponsorData.contractAddress
         })
         .select()
         .single();
@@ -335,12 +353,21 @@ export const db = {
     }
 
     try {
-      const { data, error } = await supabase
+      const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS;
+      
+      let query = supabase
         .from(TABLES.SPONSORS)
         .select('*')
         .eq('active', true)
         .order('timestamp', { ascending: false })
         .limit(1);
+
+      // Filter by contract address if available
+      if (contractAddress) {
+        query = query.eq('contract_address', contractAddress);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         throw error;
@@ -361,10 +388,19 @@ export const db = {
     }
 
     try {
-      const { error } = await supabase
+      const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS;
+      
+      let query = supabase
         .from(TABLES.SPONSORS)
         .update({ active: false })
         .eq('active', true);
+
+      // Filter by contract address if available
+      if (contractAddress) {
+        query = query.eq('contract_address', contractAddress);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
     } catch (error) {

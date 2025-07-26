@@ -1,10 +1,11 @@
 /**
  * Players Database Operations
- * 
+ *
  * Handles all player-related database operations
  */
 
 import { supabase, TABLES } from './client.js';
+import { NETWORK_CONFIG } from '../config.js';
 
 /**
  * Get player by wallet address
@@ -54,7 +55,9 @@ export const upsertPlayer = async (playerData) => {
       total_shots: playerData.totalShots || 0,
       total_spent: playerData.totalSpent || '0',
       total_won: playerData.totalWon || '0',
-      last_shot_time: playerData.lastShotTime || null
+      last_shot_time: playerData.lastShotTime || null,
+      crypto_type: playerData.cryptoType || 'ETH',
+      contract_address: playerData.contractAddress
     });
 
     const { data, error } = await supabase
@@ -65,6 +68,8 @@ export const upsertPlayer = async (playerData) => {
         total_spent: playerData.totalSpent || '0',
         total_won: playerData.totalWon || '0',
         last_shot_time: playerData.lastShotTime || null,
+        crypto_type: playerData.cryptoType || 'ETH',
+        contract_address: playerData.contractAddress,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'address',
@@ -98,11 +103,20 @@ export const getTopPlayers = async (limit = 10, orderBy = 'total_shots') => {
   }
 
   try {
-    const { data, error } = await supabase
+    const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS;
+    
+    let query = supabase
       .from(TABLES.PLAYERS)
       .select('*')
       .order(orderBy, { ascending: false })
       .limit(limit);
+
+    // Filter by contract address if available
+    if (contractAddress) {
+      query = query.eq('contract_address', contractAddress);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.warn('Supabase getTopPlayers query error (expected if no data yet):', error);
@@ -127,11 +141,20 @@ export const getLeaderboard = async (limit = 10) => {
   }
 
   try {
-    const { data, error } = await supabase
+    const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS;
+    
+    let query = supabase
       .from(TABLES.LEADERBOARD)
       .select('*')
       .order('score', { ascending: false })
       .limit(limit);
+
+    // Filter by contract address if available
+    if (contractAddress) {
+      query = query.eq('contract_address', contractAddress);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.warn('Supabase leaderboard query error (expected if no data yet):', error);

@@ -396,17 +396,20 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
  * Log shot transaction to database
  * @param {Object} params - Logging parameters
  */
-const logShotToDatabase = async ({ 
-  result, 
-  wallet, 
-  actualShotCost, 
-  state, 
-  discountApplied, 
-  discountPercentage, 
-  db 
+const logShotToDatabase = async ({
+  result,
+  wallet,
+  actualShotCost,
+  state,
+  discountApplied,
+  discountPercentage,
+  db
 }) => {
   try {
     console.log('📝 Recording shot to database...');
+
+    // Get contract address from environment or state
+    const contractAddress = state.contractAddress || process.env.PUBLIC_CONTRACT_ADDRESS;
 
     const shotRecord = await db.recordShot({
       playerAddress: wallet.address,
@@ -416,8 +419,7 @@ const logShotToDatabase = async ({
       blockNumber: result.receipt.blockNumber,
       timestamp: new Date().toISOString(),
       cryptoType: state.activeCrypto,
-      isDiscountShot: result.isDiscountShot || false,
-      discountPercentage: discountApplied ? discountPercentage : 0
+      contractAddress: contractAddress
     });
 
     console.log('✅ Shot recorded successfully:', shotRecord?.id);
@@ -431,7 +433,7 @@ const logShotToDatabase = async ({
         blockNumber: result.receipt.blockNumber,
         timestamp: new Date().toISOString(),
         cryptoType: state.activeCrypto,
-        isDiscountShot: result.isDiscountShot || false
+        contractAddress: contractAddress
       });
       console.log('✅ Winner recorded successfully:', winnerRecord?.id);
     }
@@ -452,7 +454,8 @@ const logShotToDatabase = async ({
       totalSpent: newTotalSpent.toString(),
       totalWon: newTotalWon.toString(),
       lastShotTime: new Date().toISOString(),
-      cryptoType: state.activeCrypto
+      cryptoType: state.activeCrypto,
+      contractAddress: contractAddress
     };
 
     const playerRecord = await db.upsertPlayer(playerData);
