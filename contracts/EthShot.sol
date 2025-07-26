@@ -9,20 +9,47 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @title EthShot
  * @dev A viral, pay-to-play, Ethereum-powered game where users take a chance to win an ETH jackpot
  * @author ETH Shot Team
+ * @notice This contract uses commit-reveal scheme for secure on-chain randomness
  */
 contract EthShot is Ownable, Pausable, ReentrancyGuard {
     // Configurable parameters (set in constructor)
     uint256 public immutable SHOT_COST;
     uint256 public immutable SPONSOR_COST;
     uint256 public immutable COOLDOWN_PERIOD;
-    uint256 public immutable WIN_PERCENTAGE;
-    uint256 public immutable HOUSE_PERCENTAGE;
-    uint256 public immutable WIN_CHANCE;
+    uint256 public immutable WIN_PERCENTAGE_BP; // Basis points (10000 = 100%)
+    uint256 public immutable HOUSE_PERCENTAGE_BP; // Basis points
+    uint256 public immutable WIN_CHANCE_BP; // Basis points
+    uint256 public immutable MAX_RECENT_WINNERS;
+    uint256 public immutable MIN_POT_SIZE;
+    
+    // Commit-reveal scheme variables
+    uint256 private constant REVEAL_DELAY = 1; // blocks
+    uint256 private constant MAX_REVEAL_DELAY = 256; // blocks (block hash limit)
+    
+    // Constants
+    uint256 private constant BASIS_POINTS = 10000;
+    uint256 private constant MAX_COOLDOWN = 24 hours;
+    uint256 private constant MAX_SPONSOR_NAME_LENGTH = 50;
+    uint256 private constant MAX_SPONSOR_URL_LENGTH = 200;
     
     // State variables
     uint256 private currentPot;
     uint256 private houseFunds;
+    
+    // Commit-reveal scheme tracking
+    struct PendingShot {
+        bytes32 commitment;
+        uint256 blockNumber;
+        uint256 amount;
+        bool exists;
+    }
+    
+    mapping(address => PendingShot) private pendingShots;
+    mapping(address => uint256) private pendingPayouts; // player => pending payout amount
+    
+    // Enhanced randomness sources
     uint256 private nonce;
+    mapping(address => uint256) private playerNonces;
     
     // Test mode variables (for testing only)
     bool public testMode = false;
@@ -62,17 +89,35 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     SponsorInfo public currentSponsor;
     
     // Events
-    event ShotTaken(address indexed player, uint256 amount, bool won);
-    event JackpotWon(address indexed winner, uint256 amount, uint256 timestamp);
+    event ShotCommitted(address indexed player, bytes32 indexed commitment, uint256 amount);
+    event ShotRevealed(address indexed player, uint256 indexed amount, bool indexed won);
+    event JackpotWon(address indexed winner, uint256 indexed amount, uint256 indexed timestamp);
     event SponsorshipActivated(address indexed sponsor, string name, string logoUrl);
     event SponsorshipCleared();
     event HouseFundsWithdrawn(address indexed owner, uint256 amount);
+    event PayoutFailed(address indexed player, uint256 amount);
+    event PayoutClaimed(address indexed player, uint256 amount);
     
     // Modifiers
-    modifier canShoot(address player) {
+    modifier canCommit(address player) {
         require(
             block.timestamp >= lastShotTime[player] + COOLDOWN_PERIOD,
             "Cooldown period not elapsed"
+        );
+        require(!pendingShots[player].exists, "Previous shot still pending");
+        require(tx.origin == msg.sender, "Must be called directly by EOA");
+        _;
+    }
+    
+    modifier canReveal(address player) {
+        require(pendingShots[player].exists, "No pending shot to reveal");
+        require(
+            block.number > pendingShots[player].blockNumber + REVEAL_DELAY,
+            "Reveal delay not elapsed"
+        );
+        require(
+            block.number <= pendingShots[player].blockNumber + MAX_REVEAL_DELAY,
+            "Reveal window expired"
         );
         _;
     }
@@ -87,31 +132,42 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         _;
     }
     
+    modifier validPotSize() {
+        require(currentPot >= MIN_POT_SIZE, "Pot too small for payout precision");
+        _;
+    }
+    
     constructor(
         address initialOwner,
         uint256 _shotCost,
         uint256 _sponsorCost,
         uint256 _cooldownPeriod,
-        uint256 _winPercentage,
-        uint256 _housePercentage,
-        uint256 _winChance
+        uint256 _winPercentageBP,
+        uint256 _housePercentageBP,
+        uint256 _winChanceBP,
+        uint256 _maxRecentWinners,
+        uint256 _minPotSize
     ) Ownable(initialOwner) {
         // Validate parameters
         require(_shotCost > 0, "Shot cost must be greater than 0");
         require(_sponsorCost > 0, "Sponsor cost must be greater than 0");
-        require(_cooldownPeriod > 0, "Cooldown period must be greater than 0");
-        require(_winPercentage > 0 && _winPercentage <= 100, "Win percentage must be between 1-100");
-        require(_housePercentage > 0 && _housePercentage <= 100, "House percentage must be between 1-100");
-        require(_winPercentage + _housePercentage == 100, "Win and house percentages must sum to 100");
-        require(_winChance > 0 && _winChance <= 100, "Win chance must be between 1-100");
+        require(_cooldownPeriod > 0 && _cooldownPeriod <= MAX_COOLDOWN, "Invalid cooldown period");
+        require(_winPercentageBP > 0 && _winPercentageBP <= BASIS_POINTS, "Invalid win percentage");
+        require(_housePercentageBP > 0 && _housePercentageBP <= BASIS_POINTS, "Invalid house percentage");
+        require(_winPercentageBP + _housePercentageBP == BASIS_POINTS, "Percentages must sum to 100%");
+        require(_winChanceBP > 0 && _winChanceBP <= BASIS_POINTS, "Invalid win chance");
+        require(_maxRecentWinners > 0 && _maxRecentWinners <= 1000, "Invalid max recent winners");
+        require(_minPotSize >= _shotCost, "Min pot size too small");
         
         // Set immutable parameters
         SHOT_COST = _shotCost;
         SPONSOR_COST = _sponsorCost;
         COOLDOWN_PERIOD = _cooldownPeriod;
-        WIN_PERCENTAGE = _winPercentage;
-        HOUSE_PERCENTAGE = _housePercentage;
-        WIN_CHANCE = _winChance;
+        WIN_PERCENTAGE_BP = _winPercentageBP;
+        HOUSE_PERCENTAGE_BP = _housePercentageBP;
+        WIN_CHANCE_BP = _winChanceBP;
+        MAX_RECENT_WINNERS = _maxRecentWinners;
+        MIN_POT_SIZE = _minPotSize;
         
         // Initialize state
         currentPot = 0;
@@ -120,29 +176,73 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     }
     
     /**
-     * @dev Take a shot at winning the jackpot
-     * @notice Costs 0.001 ETH per shot, 1% chance to win
+     * @dev Commit to taking a shot (step 1 of commit-reveal)
+     * @param commitment Hash of (secret + player address)
+     * @notice Costs SHOT_COST ETH per shot, uses commit-reveal for randomness
      */
-    function takeShot() 
+    function commitShot(bytes32 commitment) 
         external 
         payable 
         whenNotPaused 
         nonReentrant 
-        canShoot(msg.sender)
+        canCommit(msg.sender)
         correctPayment(SHOT_COST)
+        validPotSize
     {
+        require(commitment != bytes32(0), "Invalid commitment");
+        
+        // Store pending shot
+        pendingShots[msg.sender] = PendingShot({
+            commitment: commitment,
+            blockNumber: block.number,
+            amount: SHOT_COST,
+            exists: true
+        });
+        
         // Update player stats
-        playerStats[msg.sender].totalShots++;
-        playerStats[msg.sender].totalSpent += SHOT_COST;
+        PlayerStats storage stats = playerStats[msg.sender];
+        unchecked {
+            stats.totalShots++;
+            stats.totalSpent += SHOT_COST;
+        }
         lastShotTime[msg.sender] = block.timestamp;
         
         // Add to pot
-        currentPot += SHOT_COST;
+        unchecked {
+            currentPot += SHOT_COST;
+        }
         
-        // Check if player wins
-        bool won = _checkWin();
+        emit ShotCommitted(msg.sender, commitment, SHOT_COST);
+    }
+    
+    /**
+     * @dev Reveal the shot and determine outcome (step 2 of commit-reveal)
+     * @param secret The secret used in the commitment
+     */
+    function revealShot(uint256 secret)
+        external
+        whenNotPaused
+        nonReentrant
+        canReveal(msg.sender)
+    {
+        PendingShot storage shot = pendingShots[msg.sender];
         
-        emit ShotTaken(msg.sender, SHOT_COST, won);
+        // Verify commitment
+        bytes32 hash = keccak256(abi.encodePacked(secret, msg.sender));
+        require(hash == shot.commitment, "Invalid secret");
+        
+        // Generate randomness using multiple entropy sources
+        bool won;
+        if (testMode) {
+            won = _checkWinTest();
+        } else {
+            won = _checkWin(secret, shot.blockNumber);
+        }
+        
+        // Clean up pending shot
+        delete pendingShots[msg.sender];
+        
+        emit ShotRevealed(msg.sender, shot.amount, won);
         
         if (won) {
             _handleWin(msg.sender);
@@ -179,12 +279,26 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     }
     
     /**
-     * @dev Check if a player can take a shot (cooldown elapsed)
+     * @dev Check if a player can commit a shot (cooldown elapsed and no pending shots)
      * @param player Address to check
-     * @return bool True if player can take a shot
+     * @return bool True if player can commit a shot
      */
-    function canTakeShot(address player) external view returns (bool) {
-        return block.timestamp >= lastShotTime[player] + COOLDOWN_PERIOD;
+    function canCommitShot(address player) external view returns (bool) {
+        return block.timestamp >= lastShotTime[player] + COOLDOWN_PERIOD && 
+               !pendingShots[player].exists;
+    }
+    
+    /**
+     * @dev Check if a player can reveal their shot
+     * @param player Address to check
+     * @return bool True if player can reveal
+     */
+    function canRevealShot(address player) external view returns (bool) {
+        if (!pendingShots[player].exists) return false;
+        
+        uint256 commitBlock = pendingShots[player].blockNumber;
+        return block.number > commitBlock + REVEAL_DELAY && 
+               block.number <= commitBlock + MAX_REVEAL_DELAY;
     }
     
     /**
@@ -272,19 +386,18 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     }
     
     /**
-     * @dev Emergency withdrawal of entire contract balance (owner only)
-     * @notice Only for emergency situations
+     * @dev Claim failed payout (for players whose payout failed)
      */
-    function emergencyWithdraw() external onlyOwner {
-        uint256 balance = address(this).balance;
-        require(balance > 0, "No funds to withdraw");
+    function claimPayout() external nonReentrant {
+        uint256 amount = pendingPayouts[msg.sender];
+        require(amount > 0, "No pending payout");
         
-        (bool success, ) = payable(owner()).call{value: balance}("");
-        require(success, "Emergency withdrawal failed");
+        pendingPayouts[msg.sender] = 0;
         
-        // Reset state
-        currentPot = 0;
-        houseFunds = 0;
+        (bool success, ) = payable(msg.sender).call{value: amount, gas: 2300}("");
+        require(success, "Payout claim failed");
+        
+        emit PayoutClaimed(msg.sender, amount);
     }
     
     // Test functions (only available in test mode)
@@ -298,29 +411,61 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     }
     
     /**
-     * @dev Internal function to check if current shot wins
-     * @return bool True if shot wins
+     * @dev Generate secure randomness using commit-reveal scheme
+     * @param secret Player's secret from reveal
+     * @param commitBlock Block number when commitment was made
+     * @return bool True if player wins
      */
-    function _checkWin() private returns (bool) {
-        if (testMode) {
-            return testWinningNumber == 1;
+    function _checkWin(uint256 secret, uint256 commitBlock) private returns (bool) {
+        // Increment global nonce for additional entropy
+        unchecked {
+            nonce++;
+            playerNonces[msg.sender]++;
         }
         
-        // Generate pseudo-random number
-        nonce++;
+        // Use multiple entropy sources:
+        // 1. Player's secret (prevents miner manipulation)
+        // 2. Future block hash (prevents player prediction)
+        // 3. Global nonce (prevents replay attacks)
+        // 4. Player nonce (prevents player-specific replay)
+        // 5. Player address (prevents cross-player attacks)
+        // 6. Current block data (additional entropy)
+        
+        uint256 revealBlock = commitBlock + REVEAL_DELAY;
+        bytes32 futureBlockHash = blockhash(revealBlock);
+        
+        // If block hash is not available, use current block data
+        if (futureBlockHash == bytes32(0)) {
+            futureBlockHash = keccak256(abi.encodePacked(
+                block.timestamp,
+                block.prevrandao,
+                block.coinbase
+            ));
+        }
+        
         uint256 randomNumber = uint256(
             keccak256(
                 abi.encodePacked(
-                    block.timestamp,
-                    block.prevrandao,
-                    msg.sender,
+                    secret,
+                    futureBlockHash,
                     nonce,
-                    blockhash(block.number - 1)
+                    playerNonces[msg.sender],
+                    msg.sender,
+                    block.timestamp,
+                    block.prevrandao
                 )
             )
-        ) % 100;
+        ) % BASIS_POINTS;
         
-        return randomNumber < WIN_CHANCE;
+        return randomNumber < WIN_CHANCE_BP;
+    }
+    
+    /**
+     * @dev Internal function to check win in test mode
+     * @return bool True if shot wins
+     */
+    function _checkWinTest() private view returns (bool) {
+        return testWinningNumber == 1;
     }
     
     /**
@@ -329,14 +474,19 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
      */
     function _handleWin(address winner) private {
         uint256 potAmount = currentPot;
-        uint256 winnerAmount = (potAmount * WIN_PERCENTAGE) / 100;
+        uint256 winnerAmount = (potAmount * WIN_PERCENTAGE_BP) / BASIS_POINTS;
         uint256 houseAmount = potAmount - winnerAmount;
         
         // Update player stats
-        playerStats[winner].totalWon += winnerAmount;
+        PlayerStats storage stats = playerStats[winner];
+        unchecked {
+            stats.totalWon += winnerAmount;
+        }
         
         // Add to house funds
-        houseFunds += houseAmount;
+        unchecked {
+            houseFunds += houseAmount;
+        }
         
         // Reset pot
         currentPot = 0;
@@ -347,19 +497,44 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
             emit SponsorshipCleared();
         }
         
-        // Record winner
-        recentWinners.push(Winner({
+        // Record winner with bounded array
+        _addWinner(Winner({
             winner: winner,
             amount: winnerAmount,
             timestamp: block.timestamp,
             blockNumber: block.number
         }));
         
-        // Send winnings to winner
-        (bool success, ) = payable(winner).call{value: winnerAmount}("");
-        require(success, "Winner payout failed");
+        // Send winnings to winner with gas limit and fallback
+        (bool success, ) = payable(winner).call{value: winnerAmount, gas: 2300}("");
+        if (!success) {
+            // Store failed payout for manual claim
+            unchecked {
+                pendingPayouts[winner] += winnerAmount;
+            }
+            emit PayoutFailed(winner, winnerAmount);
+        }
         
         emit JackpotWon(winner, winnerAmount, block.timestamp);
+    }
+    
+    /**
+     * @dev Add winner to bounded array
+     * @param newWinner Winner to add
+     */
+    function _addWinner(Winner memory newWinner) private {
+        recentWinners.push(newWinner);
+        
+        // Keep array bounded
+        if (recentWinners.length > MAX_RECENT_WINNERS) {
+            // Remove oldest winner
+            unchecked {
+                for (uint256 i = 0; i < recentWinners.length - 1; i++) {
+                    recentWinners[i] = recentWinners[i + 1];
+                }
+            }
+            recentWinners.pop();
+        }
     }
     
     /**
@@ -376,6 +551,54 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
      */
     function getHouseFunds() external view returns (uint256) {
         return houseFunds;
+    }
+    
+    /**
+     * @dev Get pending payout for a player
+     * @param player Address to check
+     * @return uint256 Pending payout amount
+     */
+    function getPendingPayout(address player) external view returns (uint256) {
+        return pendingPayouts[player];
+    }
+    
+    /**
+     * @dev Get pending shot info for a player
+     * @param player Address to check
+     * @return exists Whether player has a pending shot
+     * @return blockNumber Block number when shot was committed
+     * @return amount Amount paid for the shot
+     */
+    function getPendingShot(address player) external view returns (
+        bool exists,
+        uint256 blockNumber,
+        uint256 amount
+    ) {
+        PendingShot storage shot = pendingShots[player];
+        return (shot.exists, shot.blockNumber, shot.amount);
+    }
+    
+    /**
+     * @dev Check if player has a pending shot
+     * @param player Address to check
+     * @return bool True if player has pending shot
+     */
+    function hasPendingShot(address player) external view returns (bool) {
+        return pendingShots[player].exists;
+    }
+    
+    /**
+     * @dev Get game configuration in basis points
+     * @return winPercentageBP Winner percentage in basis points
+     * @return housePercentageBP House percentage in basis points
+     * @return winChanceBP Win chance in basis points
+     */
+    function getGameConfig() external view returns (
+        uint256 winPercentageBP,
+        uint256 housePercentageBP,
+        uint256 winChanceBP
+    ) {
+        return (WIN_PERCENTAGE_BP, HOUSE_PERCENTAGE_BP, WIN_CHANCE_BP);
     }
     
     /**

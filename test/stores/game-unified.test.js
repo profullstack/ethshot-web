@@ -280,6 +280,8 @@ describe('Unified Game Store', () => {
       expect(storeModule).to.have.property('currentPot');
       expect(storeModule).to.have.property('currentPotUSD');
       expect(storeModule).to.have.property('canTakeShot');
+      expect(storeModule).to.have.property('canCommitShot');
+      expect(storeModule).to.have.property('canRevealShot');
       expect(storeModule).to.have.property('cooldownRemaining');
       expect(storeModule).to.have.property('isLoading');
       expect(storeModule).to.have.property('currentSponsor');
@@ -294,6 +296,9 @@ describe('Unified Game Store', () => {
       expect(storeModule).to.have.property('sponsorCost');
       expect(storeModule).to.have.property('sponsorCostUSD');
       expect(storeModule).to.have.property('isMultiCryptoMode');
+      expect(storeModule).to.have.property('bonusShotsAvailable');
+      expect(storeModule).to.have.property('canUseBonusShot');
+      expect(storeModule).to.have.property('pendingShot');
     });
 
     it('should provide backward compatibility exports', async () => {
@@ -345,6 +350,142 @@ describe('Unified Game Store', () => {
       // Should complete without errors
       const state = get(gameStore);
       expect(state.error).to.be.null;
+    });
+  });
+
+  describe('Commit-Reveal Flow', () => {
+    beforeEach(async () => {
+      await gameStore.init();
+      
+      // Mock the contract interface for commit-reveal
+      mockEthers.Contract = class {
+        constructor() {
+          this.commitShot = async () => ({ hash: '0xcommitHash' });
+          this.revealShot = async () => ({ hash: '0xrevealHash' });
+          this.SHOT_COST = async () => mockEthers.parseEther('0.001');
+          this.SPONSOR_COST = async () => mockEthers.parseEther('0.001');
+          this.getBalance = async () => mockEthers.parseEther('1');
+          this.HOUSE_FUNDS = async () => mockEthers.parseEther('0.1');
+          this.cooldownPeriod = async () => 3600;
+          this.playerCooldowns = async () => Math.floor(Date.now() / 1000) - 7200; // No cooldown
+        }
+      };
+    });
+
+    it('should initialize with no pending shot', async () => {
+      const state = get(gameStore);
+      expect(state.pendingShot).to.be.null;
+    });
+
+    it('should commit a shot successfully', async () => {
+      // Mock db recording
+      mockDb.recordShotCommit = async () => ({ id: 'test-commit' });
+      
+      await gameStore.commitShot(false, null, false);
+      
+      const state = get(gameStore);
+      expect(state.pendingShot).to.not.be.null;
+      expect(state.pendingShot).to.have.property('commitHash', '0xcommitHash');
+      expect(state.takingShot).to.be.false;
+    });
+
+    it('should handle commit shot errors', async () => {
+      // Mock failing contract call
+      mockEthers.Contract = class {
+        constructor() {
+          this.commitShot = async () => { throw new Error('Commit failed'); };
+          this.SHOT_COST = async () => mockEthers.parseEther('0.001');
+          this.cooldownPeriod = async () => 3600;
+          this.playerCooldowns = async () => Math.floor(Date.now() / 1000) - 7200; // No cooldown
+        }
+      };
+      
+      await gameStore.commitShot(false, null, false);
+      
+      const state = get(gameStore);
+      expect(state.pendingShot).to.be.null;
+      expect(state.error).to.not.be.null;
+    });
+
+    it('should reveal a shot successfully', async () => {
+      // Set up a pending shot first
+      mockDb.recordShotCommit = async () => ({ id: 'test-commit' });
+      await gameStore.commitShot(false, null, false);
+      
+      // Mock db recording for reveal
+      mockDb.updateShotResult = async () => ({ id: 'test-commit', result: 'loss' });
+      
+      await gameStore.revealShot();
+      
+      const state = get(gameStore);
+      expect(state.pendingShot).to.be.null; // Should be cleared after reveal
+      expect(state.takingShot).to.be.false;
+    });
+
+    it('should handle reveal shot errors', async () => {
+      // Set up a pending shot first
+      mockDb.recordShotCommit = async () => ({ id: 'test-commit' });
+      await gameStore.commitShot(false, null, false);
+      
+      // Mock failing contract call
+      const originalContract = mockEthers.Contract;
+      mockEthers.Contract = class {
+        constructor() {
+          this.revealShot = async () => { throw new Error('Reveal failed'); };
+          this.SHOT_COST = async () => mockEthers.parseEther('0.001');
+        }
+      };
+      
+      await gameStore.revealShot();
+      
+      const state = get(gameStore);
+      expect(state.pendingShot).to.not.be.null; // Should still be there after failed reveal
+      expect(state.error).to.not.be.null;
+      
+      // Restore contract
+      mockEthers.Contract = originalContract;
+    });
+  });
+
+  describe('Bonus Shot System', () => {
+    beforeEach(async () => {
+      await gameStore.init();
+      
+      // Set bonus shots available
+      gameStore.update(state => ({
+        ...state,
+        bonusShotsAvailable: 3
+      }));
+    });
+
+    it('should initialize with bonus shots', async () => {
+      const state = get(gameStore);
+      expect(state.bonusShotsAvailable).to.equal(3);
+    });
+
+    it('should use a bonus shot on commit', async () => {
+      // Mock db recording
+      mockDb.recordShotCommit = async () => ({ id: 'test-commit' });
+      
+      await gameStore.commitShot(false, null, true); // Use bonus shot
+      
+      const state = get(gameStore);
+      expect(state.bonusShotsAvailable).to.equal(2); // Decremented by 1
+      expect(state.pendingShot).to.not.be.null;
+      expect(state.pendingShot.useBonus).to.be.true;
+    });
+
+    it('should prevent committing with bonus when none available', async () => {
+      // Set bonus shots to 0
+      gameStore.update(state => ({
+        ...state,
+        bonusShotsAvailable: 0
+      }));
+      
+      await gameStore.commitShot(false, null, true); // Try to use bonus shot
+      
+      const state = get(gameStore);
+      expect(state.pendingShot).to.be.null; // Should not have committed
     });
   });
 });
