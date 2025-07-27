@@ -7,7 +7,7 @@
 
 import { json } from '@sveltejs/kit';
 import { verifyJWT } from '../../../lib/server/jwt-auth.js';
-import { supabaseServer, isSupabaseServerAvailable } from '../../../lib/database/server-client.js';
+import { getSupabaseServerClient, isSupabaseServerAvailable } from '../../../lib/database/server-client.js';
 
 /**
  * POST /api/profile - Handle profile operations
@@ -103,7 +103,9 @@ async function handleUpsertProfile(request, { profileData }) {
       );
     }
 
-    // Use server-side Supabase client to update profile
+    // Create a per-request Supabase client with JWT
+    const supabase = getSupabaseServerClient();
+
     console.log('🔄 Upserting user profile via server API:', {
       walletAddress,
       nickname: profileData.nickname,
@@ -111,7 +113,6 @@ async function handleUpsertProfile(request, { profileData }) {
       bio: profileData.bio
     });
 
-    // Use the secure upsert_user_profile_secure function that gets wallet address from JWT
     console.log('🔧 Calling upsert_user_profile_secure with parameters:', {
       p_nickname: profileData.nickname || null,
       p_avatar_url: profileData.avatarUrl || null,
@@ -119,7 +120,7 @@ async function handleUpsertProfile(request, { profileData }) {
       p_notifications_enabled: profileData.notificationsEnabled ?? true
     });
 
-    const { data, error } = await supabaseServer.rpc('upsert_user_profile_secure', {
+    const { data, error } = await supabase.rpc('upsert_user_profile_secure', {
       p_nickname: profileData.nickname || null,
       p_avatar_url: profileData.avatarUrl || null,
       p_bio: profileData.bio || null,
@@ -187,7 +188,9 @@ async function handleGetProfile(request, { walletAddress }) {
       );
     }
 
-    const { data, error } = await supabaseServer.rpc('get_user_profile', {
+    // Use server-side Supabase client (service role, public profile get)
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase.rpc('get_user_profile', {
       wallet_addr: walletAddress.toLowerCase()
     });
 

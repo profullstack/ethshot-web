@@ -46,6 +46,37 @@ export const getSupabaseServerClient = () => {
   return supabaseServer;
 };
 
+/**
+ * Create a Supabase client with JWT authentication for RLS-enabled operations
+ * @param {string} jwtToken - The JWT token to authenticate with
+ * @returns {Object} Supabase client configured with JWT token
+ */
+export const getSupabaseJWTClient = (jwtToken) => {
+  if (!isServerConfigured()) {
+    throw new Error(`Server-side Supabase client is not configured. Missing environment variables: ${SERVER_CONFIG.missingVariables.join(', ')}`);
+  }
+  
+  if (!jwtToken) {
+    throw new Error('JWT token is required for authenticated Supabase client');
+  }
+
+  // Create a new client instance with the JWT token
+  return createClient(SERVER_CONFIG.SUPABASE_URL, SERVER_CONFIG.SUPABASE_ANON_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${jwtToken}`,
+      },
+    },
+    db: {
+      schema: 'public',
+    },
+  });
+};
+
 // Database table names (same as client-side)
 export const TABLES = {
   USERS: 'users',

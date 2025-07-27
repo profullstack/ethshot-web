@@ -6,7 +6,7 @@
  */
 
 import { json } from '@sveltejs/kit';
-import { validateJWTToken } from '../../../lib/server/jwt-auth.js';
+import { validateAuthToken } from '../../../lib/services/wallet-auth-service.js';
 import { supabaseServer } from '../../../lib/database/server-client.js';
 
 /**
@@ -69,8 +69,8 @@ async function handleCreateReferralCode(supabase, { referrerAddress, authToken }
   try {
     // Validate JWT token if provided (optional for some referral operations)
     if (authToken) {
-      const tokenValidation = await validateJWTToken(authToken);
-      if (!tokenValidation.valid) {
+      const tokenValidation = await validateAuthToken(authToken);
+      if (!tokenValidation.success) {
         return json({ 
           success: false, 
           error: 'Invalid authentication token' 
@@ -145,8 +145,8 @@ async function handleUseReferralDiscount(supabase, { discountId, userId, authTok
   try {
     // Validate JWT token for discount usage
     if (authToken) {
-      const tokenValidation = await validateJWTToken(authToken);
-      if (!tokenValidation.valid) {
+      const tokenValidation = await validateAuthToken(authToken);
+      if (!tokenValidation.success) {
         return json({ 
           success: false, 
           error: 'Invalid authentication token' 
