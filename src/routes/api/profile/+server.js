@@ -111,31 +111,40 @@ async function handleUpsertProfile(request, { profileData }) {
       bio: profileData.bio
     });
 
-    // Use the existing upsert_user_profile function from the user_profiles table
-    const { data, error } = await supabaseServer.rpc('upsert_user_profile', {
-      wallet_addr: walletAddress.toLowerCase(),
+    // Use the secure upsert_user_profile_secure function that gets wallet address from JWT
+    console.log('🔧 Calling upsert_user_profile_secure with parameters:', {
       p_nickname: profileData.nickname || null,
       p_avatar_url: profileData.avatarUrl || null,
       p_bio: profileData.bio || null,
       p_notifications_enabled: profileData.notificationsEnabled ?? true
     });
 
+    const { data, error } = await supabaseServer.rpc('upsert_user_profile_secure', {
+      p_nickname: profileData.nickname || null,
+      p_avatar_url: profileData.avatarUrl || null,
+      p_bio: profileData.bio || null,
+      p_notifications_enabled: profileData.notificationsEnabled ?? true
+    });
+
+    console.log('📊 Supabase RPC response:', { data, error });
+
     if (error) {
       console.error('❌ Supabase profile upsert error:', error);
       return json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Failed to update profile',
-          message: error.message 
-        }, 
+          message: error.message,
+          details: error
+        },
         { status: 500 }
       );
     }
 
     console.log('✅ Profile upserted successfully via server API:', data);
-    return json({ 
-      success: true, 
-      profile: data && data.length > 0 ? data[0] : null 
+    return json({
+      success: true,
+      profile: data && data.length > 0 ? data[0] : data
     });
   } catch (error) {
     console.error('❌ Profile upsert error:', error);

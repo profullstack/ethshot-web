@@ -34,8 +34,11 @@
     avatar: ''
   };
 
-  // Load current profile data when component mounts or profile changes
-  $: if ($userProfile && show) {
+  // Track if we've initialized the form data for this modal session
+  let formInitialized = false;
+
+  // Load current profile data only when modal first opens
+  $: if ($userProfile && show && !formInitialized) {
     formData = {
       nickname: $userProfile.nickname || '',
       bio: $userProfile.bio || '',
@@ -45,6 +48,12 @@
     notificationsToggle = $userProfile.notifications_enabled ?? true;
     avatarPreview = $userProfile.avatar_url;
     clearErrors();
+    formInitialized = true;
+  }
+
+  // Reset form initialization flag when modal closes
+  $: if (!show) {
+    formInitialized = false;
   }
 
   // Sync the separate notification toggle with formData
