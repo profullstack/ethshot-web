@@ -250,9 +250,10 @@ async function handleCheckNickname(request, { nickname, excludeWalletAddress }) 
       );
     }
 
-    const { data, error } = await supabaseServer.rpc('is_username_available', {
-      p_username: nickname,
-      exclude_wallet_addr: excludeWalletAddress?.toLowerCase() || null
+    // Check nickname availability via Supabase RPC
+    const { data, error } = await supabaseServer.rpc('is_nickname_available', {
+      p_nickname: nickname,
+      exclude_wallet_addr: excludeWalletAddress || null
     });
 
     if (error) {

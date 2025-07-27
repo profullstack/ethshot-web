@@ -175,10 +175,12 @@
       // Update profile with all data (including new avatar URL if uploaded)
       // Note: walletAddress is now obtained from authentication, not passed from client
       await profileStore.updateProfile({
-        nickname: formData.nickname || null,
-        bio: formData.bio || null,
-        avatarUrl: avatarUrl,
-        notificationsEnabled: formData.notificationsEnabled
+        profileData: {
+          nickname: formData.nickname || null,
+          bio: formData.bio || null,
+          avatarUrl: avatarUrl,
+          notificationsEnabled: formData.notificationsEnabled
+        }
       });
 
       toastStore.success('Profile updated successfully!');

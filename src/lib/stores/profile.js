@@ -46,23 +46,15 @@ const createProfileStore = () => {
     // Update user profile
     async updateProfile(profileData) {
       update(state => ({ ...state, loading: true, error: null }));
-
       try {
-        const updatedProfile = await db.upsertUserProfile(profileData);
-        update(state => ({ 
-          ...state, 
-          profile: updatedProfile, 
-          loading: false, 
-          error: null 
-        }));
+        // Unwrap if wrapped in { profileData }
+        const actualProfileData = profileData.profileData ? profileData.profileData : profileData;
+        const updatedProfile = await db.upsertUserProfile(actualProfileData);
+        update(state => ({ ...state, profile: updatedProfile, loading: false, error: null }));
         return updatedProfile;
       } catch (error) {
         console.error('Failed to update user profile:', error);
-        update(state => ({ 
-          ...state, 
-          loading: false, 
-          error: error.message || 'Failed to update profile' 
-        }));
+        update(state => ({ ...state, loading: false, error: error.message || 'Failed to update profile' }));
         throw error;
       }
     },
