@@ -8,6 +8,15 @@
 import { supabase, TABLES, isSupabaseAvailable, getSupabaseClient } from './client.js';
 import { getPlayer, upsertPlayer, getTopPlayers, getLeaderboard } from './players.js';
 import { NETWORK_CONFIG } from '../config.js';
+import { upsertUserProfileAPI, getUserProfileAPI, isNicknameAvailableAPI } from '../utils/client-profile.js';
+import {
+  createReferralCodeAPI,
+  processReferralSignupAPI,
+  useReferralDiscountAPI,
+  getReferralStatsAPI,
+  getReferralCodeAPI,
+  validateReferralCodeAPI
+} from '../utils/client-referral.js';
 
 // Re-export client utilities
 export { supabase, TABLES, isSupabaseAvailable, getSupabaseClient };
@@ -470,129 +479,56 @@ export const db = {
 
   // User Profile operations
   async getUserProfile(walletAddress) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning null for getUserProfile');
-      return null;
-    }
-
     try {
-      const { data, error } = await supabase.rpc('get_user_profile', {
-        wallet_addr: walletAddress.toLowerCase()
-      });
+      console.log('🔍 Getting user profile via secure API:', { walletAddress });
 
-      if (error) {
-        console.warn('Supabase getUserProfile query error (expected if profile not found):', error);
+      // Use the new API-based profile retrieval
+      const result = await getUserProfileAPI(walletAddress);
+      
+      console.log('✅ User profile retrieved successfully via API:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Error getting user profile via API:', error);
+      // Return null for profile not found, but throw for other errors
+      if (error.message?.includes('not found') || error.message?.includes('404')) {
         return null;
       }
-
-      // Return first item if exists, otherwise null
-      return data && data.length > 0 ? data[0] : null;
-    } catch (error) {
-      console.warn('Error fetching user profile (expected if profile not found):', error);
-      return null;
+      throw error;
     }
   },
 
   async upsertUserProfile(profileData) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning null for upsertUserProfile');
-      return null;
-    }
-
     try {
-      console.log('🔄 Upserting user profile to Supabase (secure):', {
+      console.log('🔄 Upserting user profile via secure API:', {
         nickname: profileData.nickname,
         avatar_url: profileData.avatarUrl,
         bio: profileData.bio,
         notifications_enabled: profileData.notificationsEnabled
-        // Note: wallet address is now obtained from authenticated user, not from client
       });
 
-      // Check current authentication status before attempting update
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Use the new API-based profile upsert with JWT authentication
+      const result = await upsertUserProfileAPI(profileData);
       
-      if (sessionError) {
-        console.error('❌ Failed to get session:', sessionError);
-        throw new Error('Authentication error. Please reconnect your wallet and try again.');
-      }
-      
-      if (!session) {
-        console.error('❌ No active session found');
-        throw new Error('You must be logged in with a wallet to update your profile.');
-      }
-      
-      console.log('🔍 Current session info:', {
-        hasSession: !!session,
-        hasUser: !!session.user,
-        userEmail: session.user?.email,
-        expiresAt: session.expires_at,
-        isExpired: session.expires_at ? new Date(session.expires_at * 1000) < new Date() : 'unknown'
-      });
-
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Profile update timed out after 30 seconds')), 30000);
-      });
-
-      // Use the secure version that gets wallet address from authentication
-      const updatePromise = supabase.rpc('upsert_user_profile_secure', {
-        p_nickname: profileData.nickname || null,
-        p_avatar_url: profileData.avatarUrl || null,
-        p_bio: profileData.bio || null,
-        p_notifications_enabled: profileData.notificationsEnabled ?? true
-      });
-
-      const { data, error } = await Promise.race([updatePromise, timeoutPromise]);
-
-      if (error) {
-        console.error('❌ Supabase upsertUserProfile error:', error);
-        console.error('❌ Error details:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint
-        });
-        
-        // Provide more helpful error messages for common authentication issues
-        if (error.message?.includes('No authenticated wallet address found')) {
-          throw new Error('You must be logged in with a wallet to update your profile.');
-        } else if (error.message?.includes('JWT')) {
-          throw new Error('Authentication error. Please reconnect your wallet and try again.');
-        } else if (error.message?.includes('permission denied') || error.message?.includes('RLS')) {
-          throw new Error('Permission denied. Please reconnect your wallet and try again.');
-        }
-        
-        throw error;
-      }
-      
-      console.log('✅ User profile upserted successfully:', data);
-      return data && data.length > 0 ? data[0] : null;
+      console.log('✅ User profile upserted successfully via API:', result);
+      return result;
     } catch (error) {
-      console.error('❌ Error upserting user profile:', error);
+      console.error('❌ Error upserting user profile via API:', error);
       throw error;
     }
   },
 
   async isNicknameAvailable(nickname, excludeWalletAddress = null) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning false for isNicknameAvailable');
-      return false;
-    }
-
     try {
-      const { data, error } = await supabase.rpc('is_nickname_available', {
-        p_nickname: nickname,
-        exclude_wallet_addr: excludeWalletAddress?.toLowerCase() || null
-      });
+      console.log('🔍 Checking nickname availability via secure API:', { nickname, excludeWalletAddress });
 
-      if (error) {
-        console.error('Error checking nickname availability:', error);
-        return false;
-      }
-
-      return data === true;
+      // Use the new API-based nickname availability check
+      const result = await isNicknameAvailableAPI(nickname, excludeWalletAddress);
+      
+      console.log('✅ Nickname availability checked successfully via API:', result);
+      return result;
     } catch (error) {
-      console.error('Error checking nickname availability:', error);
+      console.error('❌ Error checking nickname availability via API:', error);
+      // Return false on error to be safe (assume nickname is not available)
       return false;
     }
   },
@@ -710,50 +646,31 @@ export const db = {
 
   // Referral system operations
   async createReferralCode(referrerAddress) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning null for createReferralCode');
-      return null;
-    }
-
     try {
-      const { data, error } = await supabase.rpc('create_referral_code', {
-        referrer_addr: referrerAddress.toLowerCase()
-      });
+      console.log('🔗 Creating referral code via secure API:', { referrerAddress });
 
-      if (error) {
-        console.error('Error creating referral code:', error);
-        throw error;
-      }
-
-      console.log('✅ Referral code created:', data);
-      return data;
+      // Use the new API-based referral code creation
+      const result = await createReferralCodeAPI(referrerAddress);
+      
+      console.log('✅ Referral code created successfully via API:', result);
+      return result;
     } catch (error) {
-      console.error('Error creating referral code:', error);
+      console.error('❌ Error creating referral code via API:', error);
       throw error;
     }
   },
 
   async processReferralSignup(referralCode, refereeAddress) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning false for processReferralSignup');
-      return false;
-    }
-
     try {
-      const { data, error } = await supabase.rpc('process_referral_signup', {
-        ref_code: referralCode,
-        referee_addr: refereeAddress.toLowerCase()
-      });
+      console.log('🔗 Processing referral signup via secure API:', { referralCode, refereeAddress });
 
-      if (error) {
-        console.error('Error processing referral signup:', error);
-        return false;
-      }
-
-      console.log('✅ Referral signup processed:', data);
-      return data;
+      // Use the new API-based referral signup processing
+      const result = await processReferralSignupAPI(referralCode, refereeAddress);
+      
+      console.log('✅ Referral signup processed successfully via API:', result);
+      return result;
     } catch (error) {
-      console.error('Error processing referral signup:', error);
+      console.error('❌ Error processing referral signup via API:', error);
       return false;
     }
   },
@@ -788,26 +705,16 @@ export const db = {
   },
 
   async useReferralDiscount(discountId, userId) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning null for useReferralDiscount');
-      return null;
-    }
-
     try {
-      const { data, error } = await supabase.rpc('use_referral_discount', {
-        p_discount_id: discountId,
-        p_user_id: userId
-      });
+      console.log('🔗 Using referral discount via secure API:', { discountId, userId });
 
-      if (error) {
-        console.error('Error using referral discount:', error);
-        return null;
-      }
-
-      console.log('✅ Referral discount used:', data);
-      return data;
+      // Use the new API-based referral discount usage
+      const result = await useReferralDiscountAPI(discountId, userId);
+      
+      console.log('✅ Referral discount used successfully via API:', result);
+      return result;
     } catch (error) {
-      console.error('Error using referral discount:', error);
+      console.error('❌ Error using referral discount via API:', error);
       return null;
     }
   },
@@ -839,78 +746,46 @@ export const db = {
   },
 
   async getReferralStats(playerAddress) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning null for getReferralStats');
-      return null;
-    }
-
     try {
-      const { data, error } = await supabase.rpc('get_referral_stats', {
-        player_addr: playerAddress.toLowerCase()
-      });
+      console.log('🔗 Getting referral stats via secure API:', { playerAddress });
 
-      if (error) {
-        console.error('Error getting referral stats:', error);
-        return null;
-      }
-
-      return data;
+      // Use the new API-based referral stats retrieval
+      const result = await getReferralStatsAPI(playerAddress);
+      
+      console.log('✅ Referral stats retrieved successfully via API:', result);
+      return result;
     } catch (error) {
-      console.error('Error getting referral stats:', error);
+      console.error('❌ Error getting referral stats via API:', error);
       return null;
     }
   },
 
   async getReferralCode(referrerAddress) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning null for getReferralCode');
-      return null;
-    }
-
     try {
-      const { data, error } = await supabase
-        .from(TABLES.REFERRAL_CODES)
-        .select('code')
-        .eq('referrer_address', referrerAddress.toLowerCase())
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      console.log('🔗 Getting referral code via secure API:', { referrerAddress });
 
-      if (error) {
-        console.error('Error getting referral code:', error);
-        return null;
-      }
-
-      return data && data.length > 0 ? data[0].code : null;
+      // Use the new API-based referral code retrieval
+      const result = await getReferralCodeAPI(referrerAddress);
+      
+      console.log('✅ Referral code retrieved successfully via API:', result);
+      return result;
     } catch (error) {
-      console.error('Error getting referral code:', error);
+      console.error('❌ Error getting referral code via API:', error);
       return null;
     }
   },
 
   async validateReferralCode(referralCode) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning false for validateReferralCode');
-      return false;
-    }
-
     try {
-      const { data, error } = await supabase
-        .from(TABLES.REFERRAL_CODES)
-        .select('*')
-        .eq('code', referralCode)
-        .eq('is_active', true)
-        .gte('expires_at', new Date().toISOString())
-        .limit(1);
+      console.log('🔗 Validating referral code via secure API:', { referralCode });
 
-      if (error) {
-        console.error('Error validating referral code:', error);
-        return false;
-      }
-
-      return data && data.length > 0;
+      // Use the new API-based referral code validation
+      const result = await validateReferralCodeAPI(referralCode);
+      
+      console.log('✅ Referral code validated successfully via API:', result);
+      return result;
     } catch (error) {
-      console.error('Error validating referral code:', error);
+      console.error('❌ Error validating referral code via API:', error);
       return false;
     }
   },

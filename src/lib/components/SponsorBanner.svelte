@@ -20,7 +20,9 @@
   // Format time remaining for sponsorship
   const timeAgo = (timestamp) => {
     const now = new Date();
-    const time = new Date(timestamp);
+    // Convert BigInt to number if needed
+    const timestampValue = typeof timestamp === 'bigint' ? Number(timestamp) : timestamp;
+    const time = new Date(timestampValue);
     const diffInSeconds = Math.floor((now - time) / 1000);
 
     if (diffInSeconds < 60) {

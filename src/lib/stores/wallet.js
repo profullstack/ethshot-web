@@ -1,7 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 import { NETWORK_CONFIG, WALLET_CONFIG, RPC_URLS, EXPLORER_URLS } from '../config.js';
-import { authenticateWithWallet, signOutFromSupabase, getCurrentSession, isAuthenticated, isAuthenticatedForWallet, getAuthStatus } from '../utils/wallet-auth.js';
+import { authenticateWithWalletAPI, signOutFromSupabaseAPI, getCurrentSessionAPI, isAuthenticatedAPI, isAuthenticatedForWalletAPI, getAuthStatusAPI } from '../utils/client-auth.js';
 
 // Wallet connection state
 const createWalletStore = () => {
@@ -21,6 +21,9 @@ const createWalletStore = () => {
   let ethers = null;
   let Web3Modal = null;
   let WalletConnectProvider = null;
+  
+  // Connection lock to prevent multiple simultaneous connections
+  let connectionInProgress = false;
 
   // Initialize Web3Modal (browser only)
   const init = async () => {
@@ -45,18 +48,21 @@ const createWalletStore = () => {
       // Check if user was previously connected via localStorage
       const wasConnected = localStorage.getItem('wallet_connected') === 'true';
       if (wasConnected && window.ethereum) {
-        console.log('Previous wallet connection found, attempting to reconnect...');
+        console.log('Previous wallet connection found, checking for active session...');
         
-        // Check if there's already a valid Supabase session
+        // Only auto-reconnect if there's an active Supabase session
         setTimeout(async () => {
           try {
-            const existingSession = await getCurrentSession();
-            if (existingSession) {
-              console.log('✅ Found existing Supabase session, skipping re-authentication');
+            const existingSession = await getCurrentSessionAPI();
+            if (existingSession && existingSession.user) {
+              console.log('✅ Found existing Supabase session, attempting auto-reconnection');
+              // Attempt to reconnect wallet
+              await connect('injected');
+            } else {
+              console.log('❌ No active Supabase session found, skipping auto-reconnection');
+              // Clear the stored connection state since there's no active session
+              localStorage.removeItem('wallet_connected');
             }
-            
-            // Attempt to reconnect wallet
-            await connect('injected');
           } catch (error) {
             console.log('Auto-reconnection failed:', error.message);
             // Clear the stored connection state if reconnection fails
@@ -80,6 +86,13 @@ const createWalletStore = () => {
       return;
     }
 
+    // Prevent multiple simultaneous connection attempts
+    if (connectionInProgress) {
+      console.log('🔄 Connection already in progress, skipping duplicate request');
+      return;
+    }
+
+    connectionInProgress = true;
     update(state => ({ ...state, connecting: true, error: null }));
 
     try {
@@ -256,28 +269,29 @@ const createWalletStore = () => {
       // Store connection state
       localStorage.setItem('wallet_connected', 'true');
 
-      // Authenticate with Supabase using wallet signature verification
+      // Authenticate with Supabase using wallet signature verification via API
       try {
         // Check if we already have a valid session for this wallet
-        const authStatus = await getAuthStatus();
-        const isAlreadyAuthenticatedForWallet = await isAuthenticatedForWallet(address);
+        const authStatus = await getAuthStatusAPI();
+        const isAlreadyAuthenticatedForWallet = await isAuthenticatedForWalletAPI(address);
         
         if (isAlreadyAuthenticatedForWallet) {
           console.log('✅ Already authenticated with Supabase for this wallet');
         } else {
-          console.log('🔐 Authenticating with Supabase using signature verification...');
-          await authenticateWithWallet(address, signer);
-          console.log('✅ Supabase authentication successful');
+          console.log('🔐 Authenticating with Supabase using API-based signature verification...');
+          // Use the new API-based authentication (secure server-side processing)
+          await authenticateWithWalletAPI(address, signer, 3);
+          console.log('✅ Supabase API authentication successful');
           
           // Verify authentication was successful
-          const newAuthStatus = await getAuthStatus();
+          const newAuthStatus = await getAuthStatusAPI();
           console.log('🔍 Post-authentication status:', newAuthStatus);
         }
       } catch (authError) {
         console.warn('⚠️ Supabase authentication failed:', authError.message);
         // Don't fail the wallet connection if Supabase auth fails
         // The user can still use the wallet, but profile editing won't work
-        // Common reasons: user rejected signature, wallet doesn't support signing
+        // Common reasons: user rejected signature, wallet doesn't support signing, server errors
       }
 
       update(state => ({
@@ -317,6 +331,9 @@ const createWalletStore = () => {
       }));
       
       throw new Error(errorMessage);
+    } finally {
+      // Always clear the connection lock
+      connectionInProgress = false;
     }
   };
 
@@ -334,7 +351,7 @@ const createWalletStore = () => {
       // Sign out from Supabase
       try {
         console.log('🔐 Signing out from Supabase...');
-        await signOutFromSupabase();
+        await signOutFromSupabaseAPI();
         console.log('✅ Supabase sign out successful');
       } catch (authError) {
         console.warn('⚠️ Supabase sign out failed:', authError.message);
