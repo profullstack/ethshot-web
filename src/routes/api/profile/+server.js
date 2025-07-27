@@ -108,25 +108,17 @@ async function handleUpsertProfile(request, { profileData }) {
       walletAddress,
       nickname: profileData.nickname,
       avatar_url: profileData.avatarUrl,
-      bio: profileData.bio,
-      notifications_enabled: profileData.notificationsEnabled
+      bio: profileData.bio
     });
 
-    // Since we're using the service role, we can directly upsert to the users table
-    // bypassing RLS policies entirely
-    const { data, error } = await supabaseServer
-      .from('users')
-      .upsert({
-        wallet_address: walletAddress.toLowerCase(),
-        nickname: profileData.nickname || null,
-        avatar_url: profileData.avatarUrl || null,
-        bio: profileData.bio || null,
-        notifications_enabled: profileData.notificationsEnabled ?? true,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'wallet_address'
-      })
-      .select();
+    // Use the existing upsert_user_profile function from the user_profiles table
+    const { data, error } = await supabaseServer.rpc('upsert_user_profile', {
+      wallet_addr: walletAddress.toLowerCase(),
+      p_nickname: profileData.nickname || null,
+      p_avatar_url: profileData.avatarUrl || null,
+      p_bio: profileData.bio || null,
+      p_notifications_enabled: profileData.notificationsEnabled ?? true
+    });
 
     if (error) {
       console.error('❌ Supabase profile upsert error:', error);
@@ -249,8 +241,8 @@ async function handleCheckNickname(request, { nickname, excludeWalletAddress }) 
       );
     }
 
-    const { data, error } = await supabaseServer.rpc('is_nickname_available', {
-      p_nickname: nickname,
+    const { data, error } = await supabaseServer.rpc('is_username_available', {
+      p_username: nickname,
       exclude_wallet_addr: excludeWalletAddress?.toLowerCase() || null
     });
 

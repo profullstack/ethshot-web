@@ -1,12 +1,13 @@
 /**
  * Client-side Authentication Utilities
- * 
+ *
  * This module provides client-side authentication functions that communicate
  * with the server-side API endpoints instead of directly calling Supabase.
  * This ensures security by keeping sensitive operations on the server.
  */
 
 import { supabase } from '../database/client.js';
+import { clearAllAuthStorage, verifyAuthStorageCleared } from './storage-cleanup.js';
 
 /**
  * Authenticate user with wallet signature via server-side API
@@ -211,19 +212,26 @@ export async function refreshTokenAPI(currentToken) {
 }
 
 /**
- * Sign out from JWT-based authentication system
+ * Sign out from JWT-based authentication system and clear all storage
  * @returns {Promise<void>}
  */
 export async function signOutFromSupabaseAPI() {
   try {
     console.log('🔐 Signing out from JWT-based authentication...');
     
-    // Clear all stored authentication data
-    localStorage.removeItem('ethshot_jwt_token');
-    localStorage.removeItem('ethshot_wallet_address');
-    localStorage.removeItem('ethshot_auth_expires_at');
+    // Use comprehensive storage cleanup utility
+    const clearedItems = clearAllAuthStorage(true);
     
-    console.log('✅ Signed out successfully - cleared all stored auth data');
+    // Verify that all authentication data has been cleared
+    const verification = verifyAuthStorageCleared();
+    
+    if (verification.isCleared) {
+      console.log('✅ Signed out successfully - all authentication storage cleared');
+      console.log(`📊 Cleanup summary: ${clearedItems.localStorage.length} localStorage items, ${clearedItems.sessionStorage.length} sessionStorage items`);
+    } else {
+      console.warn('⚠️ Sign out completed but some data may remain:', verification.remainingKeys);
+    }
+    
   } catch (error) {
     console.error('❌ Sign out failed:', error);
     throw error;
