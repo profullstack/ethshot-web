@@ -8,21 +8,21 @@
 
   const dispatch = createEventDispatcher();
 
-  // Form data
+  // Form data - initialize with user profile data if available
   let formData = {
-    nickname: '',
-    bio: '',
+    nickname: $userProfile?.nickname || '',
+    bio: $userProfile?.bio || '',
     avatarFile: null,
-    twitterHandle: '',
-    discordHandle: '',
-    websiteUrl: '',
-    notificationsEnabled: true,
-    debugMode: false
+    twitterHandle: $userProfile?.twitter_handle || '',
+    discordHandle: $userProfile?.discord_handle || '',
+    websiteUrl: $userProfile?.website_url || '',
+    notificationsEnabled: $userProfile?.notifications_enabled ?? true,
+    debugMode: $userProfile?.debug_mode ?? false
   };
 
-  // Separate reactive variables to avoid reset issues
-  let notificationsToggle = true;
-  let debugModeToggle = false;
+  // Separate reactive variables to avoid reset issues - initialize with user profile data
+  let notificationsToggle = $userProfile?.notifications_enabled ?? true;
+  let debugModeToggle = $userProfile?.debug_mode ?? false;
 
   // Form state
   let saving = false;
@@ -273,15 +273,6 @@
         fullProfile: updatedProfile
       });
 
-      // Update toggle states to reflect saved values
-      notificationsToggle = updatedProfile?.notifications_enabled ?? true;
-      debugModeToggle = updatedProfile?.debug_mode ?? false;
-      
-      console.log('🔧 UserProfile: Updated toggle states after save:', {
-        notificationsToggle,
-        debugModeToggle
-      });
-
       toastStore.success('Profile updated successfully!');
       handleClose();
     } catch (error) {
@@ -296,20 +287,37 @@
     show = false;
     dispatch('close');
     
-    // Reset form
-    formData = {
-      nickname: '',
-      bio: '',
-      avatarFile: null,
-      twitterHandle: '',
-      discordHandle: '',
-      websiteUrl: '',
-      notificationsEnabled: true,
-      debugMode: false
-    };
-    notificationsToggle = true;
-    debugModeToggle = false;
-    avatarPreview = null;
+    // Reset form to current profile values, not hardcoded defaults
+    if ($userProfile) {
+      formData = {
+        nickname: $userProfile.nickname || '',
+        bio: $userProfile.bio || '',
+        avatarFile: null,
+        twitterHandle: $userProfile.twitter_handle || '',
+        discordHandle: $userProfile.discord_handle || '',
+        websiteUrl: $userProfile.website_url || '',
+        notificationsEnabled: $userProfile.notifications_enabled ?? true,
+        debugMode: $userProfile.debug_mode ?? false
+      };
+      notificationsToggle = $userProfile.notifications_enabled ?? true;
+      debugModeToggle = $userProfile.debug_mode ?? false;
+      avatarPreview = $userProfile.avatar_url;
+    } else {
+      // Only use defaults if no profile exists
+      formData = {
+        nickname: '',
+        bio: '',
+        avatarFile: null,
+        twitterHandle: '',
+        discordHandle: '',
+        websiteUrl: '',
+        notificationsEnabled: true,
+        debugMode: false
+      };
+      notificationsToggle = true;
+      debugModeToggle = false;
+      avatarPreview = null;
+    }
     clearErrors();
     
     if (fileInput) {

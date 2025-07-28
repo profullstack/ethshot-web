@@ -49,8 +49,31 @@ const createProfileStore = () => {
       try {
         // Unwrap if wrapped in { profileData }
         const actualProfileData = profileData.profileData ? profileData.profileData : profileData;
+        
+        console.log('🔄 Profile Store: Updating profile with data:', {
+          debug_mode: actualProfileData.debugMode,
+          notifications_enabled: actualProfileData.notificationsEnabled,
+          nickname: actualProfileData.nickname
+        });
+        
         const updatedProfile = await db.upsertUserProfile(actualProfileData);
-        update(state => ({ ...state, profile: updatedProfile, loading: false, error: null }));
+        
+        console.log('✅ Profile Store: Profile updated, received from API:', {
+          debug_mode: updatedProfile?.debug_mode,
+          notifications_enabled: updatedProfile?.notifications_enabled,
+          nickname: updatedProfile?.nickname
+        });
+        
+        // Update the store with the fresh data from the API
+        update(state => ({
+          ...state,
+          profile: updatedProfile,
+          loading: false,
+          error: null
+        }));
+        
+        console.log('🔄 Profile Store: Store updated with fresh profile data');
+        
         return updatedProfile;
       } catch (error) {
         console.error('Failed to update user profile:', error);
@@ -196,20 +219,11 @@ export const isAdmin = derived(userProfile, $userProfile => {
 
 // Auto-load profile when wallet connects
 let currentAddress = null;
-let isInitialLoad = true;
-
 walletAddress.subscribe(async (address) => {
   if (address && address !== currentAddress) {
     currentAddress = address;
     try {
-      // Force reload on initial page load to ensure fresh data
-      if (isInitialLoad) {
-        console.log('🔄 Profile Store: Initial page load, forcing profile reload');
-        await profileStore.forceReloadProfile(address);
-        isInitialLoad = false;
-      } else {
-        await profileStore.loadProfile(address);
-      }
+      await profileStore.loadProfile(address);
     } catch (error) {
       console.warn('Failed to auto-load profile:', error);
     }

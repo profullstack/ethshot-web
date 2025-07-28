@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import { db } from '$lib/database/index.js';
 
 /** @type {import('./$types').PageLoad} */
-export async function load({ params }) {
+export async function load({ params, fetch }) {
 	const { walletAddress } = params;
 	
 	// Validate wallet address format (basic validation)
@@ -18,8 +18,8 @@ export async function load({ params }) {
 			throw error(404, 'User not found');
 		}
 
-		// Get user profile information
-		const userProfile = await db.getUserProfile(walletAddress);
+		// Get user profile information (pass fetch for server-side compatibility)
+		const userProfile = await db.getUserProfile(walletAddress, fetch);
 
 		// Get referral stats
 		const referralStats = await db.getReferralStats(walletAddress);
@@ -63,6 +63,9 @@ export async function load({ params }) {
 				nickname: userProfile?.nickname || null,
 				avatar_url: userProfile?.avatar_url || null,
 				bio: userProfile?.bio || null,
+				twitter_handle: userProfile?.twitter_handle || null,
+				discord_handle: userProfile?.discord_handle || null,
+				website_url: userProfile?.website_url || null,
 				created_at: userProfile?.created_at || playerData.created_at,
 				updated_at: userProfile?.updated_at || playerData.updated_at
 			},

@@ -18,8 +18,8 @@ const ENDPOINTS = {
  * Profile API client that extends BaseApiClient for centralized auth
  */
 export class ProfileAPI extends BaseApiClient {
-  constructor() {
-    super(); // Initialize base client
+  constructor(customFetch = null) {
+    super('', customFetch); // Initialize base client with custom fetch
   }
   /**
    * Update or create user profile

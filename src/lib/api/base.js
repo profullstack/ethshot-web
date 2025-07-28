@@ -12,8 +12,9 @@ import { walletAddress } from '../stores/wallet.js';
  * Base API client class with JWT authentication
  */
 export class BaseApiClient {
-  constructor(baseURL = '') {
+  constructor(baseURL = '', customFetch = null) {
     this.baseURL = baseURL;
+    this.fetchFn = customFetch || globalThis.fetch;
   }
 
   /**
@@ -111,7 +112,7 @@ export class BaseApiClient {
 
     // Make the request
     try {
-      const response = await fetch(url, {
+      const response = await this.fetchFn(url, {
         ...options,
         headers
       });

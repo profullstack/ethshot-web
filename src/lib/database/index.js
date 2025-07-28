@@ -9,7 +9,7 @@ import { supabase, TABLES, isSupabaseAvailable, getSupabaseClient } from './clie
 import { getPlayer, upsertPlayer, getTopPlayers, getLeaderboard } from './players.js';
 import { withAuthenticatedClient } from './authenticated-client.js';
 import { NETWORK_CONFIG } from '../config.js';
-import { profileAPI } from '../api/profile.js';
+import { ProfileAPI } from '../api/profile.js';
 import {
   createReferralCodeAPI,
   processReferralSignupAPI,
@@ -512,17 +512,56 @@ export const db = {
   },
 
   // User Profile operations
-  async getUserProfile(walletAddress) {
+  async getUserProfile(walletAddress, customFetch = null) {
     try {
       console.log('🔍 Getting user profile via ProfileAPI:', { walletAddress });
 
-      // Use the new ProfileAPI client
-      const result = await profileAPI.getProfile(walletAddress);
+      // Create ProfileAPI instance with custom fetch for server-side compatibility
+      const profileAPIInstance = customFetch ? new ProfileAPI(customFetch) : new ProfileAPI();
+      const result = await profileAPIInstance.getProfile(walletAddress);
       
       console.log('✅ User profile retrieved successfully via ProfileAPI:', result);
       return result;
     } catch (error) {
       console.error('❌ Error getting user profile via ProfileAPI:', error);
+      
+      // If ProfileAPI fails, try fallback to server API
+      if (customFetch) {
+        try {
+          console.log('🔍 Getting user profile via server API:', { walletAddress });
+          
+          // Use server-side supabase client as fallback
+          if (!supabase) {
+            console.warn('Supabase not configured - returning null for getUserProfile');
+            return null;
+          }
+
+          const { data, error: dbError } = await supabase
+            .from(TABLES.USER_PROFILES)
+            .select('*')
+            .eq('wallet_address', walletAddress.toLowerCase())
+            .single();
+
+          if (dbError) {
+            if (dbError.code === 'PGRST116') {
+              console.log('ℹ️ Profile not found for wallet:', walletAddress);
+              return null;
+            }
+            throw dbError;
+          }
+
+          console.log('✅ Profile retrieved successfully via server API:', data);
+          return data;
+        } catch (fallbackError) {
+          console.error('❌ Fallback server API also failed:', fallbackError);
+          // Return null for profile not found, but throw for other errors
+          if (fallbackError.message?.includes('not found') || fallbackError.code === 'PGRST116') {
+            return null;
+          }
+          throw fallbackError;
+        }
+      }
+      
       // Return null for profile not found, but throw for other errors
       if (error.message?.includes('not found') || error.message?.includes('404')) {
         return null;
