@@ -48,6 +48,12 @@
 
   // Load current profile data when modal opens or profile changes
   $: if (show && $userProfile && (!formInitialized || JSON.stringify($userProfile) !== JSON.stringify(lastProfileData))) {
+    console.log('🔧 UserProfile: Initializing form with profile data:', {
+      debug_mode: $userProfile.debug_mode,
+      notifications_enabled: $userProfile.notifications_enabled,
+      fullProfile: $userProfile
+    });
+    
     formData = {
       nickname: $userProfile.nickname || '',
       bio: $userProfile.bio || '',
@@ -60,6 +66,12 @@
     };
     notificationsToggle = $userProfile.notifications_enabled ?? true;
     debugModeToggle = $userProfile.debug_mode ?? false;
+    
+    console.log('🔧 UserProfile: Set toggle states:', {
+      notificationsToggle,
+      debugModeToggle
+    });
+    
     avatarPreview = $userProfile.avatar_url;
     clearErrors();
     formInitialized = true;
@@ -242,7 +254,7 @@
 
       // Update profile with all data (including new avatar URL if uploaded)
       // Note: walletAddress is now obtained from authentication, not passed from client
-      await profileStore.updateProfile({
+      const updatedProfile = await profileStore.updateProfile({
         profileData: {
           nickname: formData.nickname || null,
           bio: formData.bio || null,
@@ -253,6 +265,21 @@
           notificationsEnabled: formData.notificationsEnabled,
           debugMode: formData.debugMode
         }
+      });
+
+      console.log('🔧 UserProfile: Profile updated, returned data:', {
+        debug_mode: updatedProfile?.debug_mode,
+        notifications_enabled: updatedProfile?.notifications_enabled,
+        fullProfile: updatedProfile
+      });
+
+      // Update toggle states to reflect saved values
+      notificationsToggle = updatedProfile?.notifications_enabled ?? true;
+      debugModeToggle = updatedProfile?.debug_mode ?? false;
+      
+      console.log('🔧 UserProfile: Updated toggle states after save:', {
+        notificationsToggle,
+        debugModeToggle
       });
 
       toastStore.success('Profile updated successfully!');

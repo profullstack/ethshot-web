@@ -120,6 +120,43 @@ const createProfileStore = () => {
     // Clear error
     clearError() {
       update(state => ({ ...state, error: null }));
+    },
+
+    // Force reload profile (useful for page refresh scenarios)
+    async forceReloadProfile(address) {
+      if (!address) {
+        this.clear();
+        return;
+      }
+
+      console.log('🔄 Profile Store: Force reloading profile for:', address);
+      
+      update(state => ({ ...state, loading: true, error: null }));
+
+      try {
+        const profile = await db.getUserProfile(address);
+        update(state => ({
+          ...state,
+          profile,
+          loading: false,
+          error: null
+        }));
+        
+        console.log('✅ Profile Store: Profile force reloaded successfully:', {
+          debug_mode: profile?.debug_mode,
+          notifications_enabled: profile?.notifications_enabled
+        });
+        
+        return profile;
+      } catch (error) {
+        console.error('❌ Profile Store: Failed to force reload profile:', error);
+        update(state => ({
+          ...state,
+          loading: false,
+          error: error.message || 'Failed to reload profile'
+        }));
+        throw error;
+      }
     }
   };
 };
@@ -159,11 +196,20 @@ export const isAdmin = derived(userProfile, $userProfile => {
 
 // Auto-load profile when wallet connects
 let currentAddress = null;
+let isInitialLoad = true;
+
 walletAddress.subscribe(async (address) => {
   if (address && address !== currentAddress) {
     currentAddress = address;
     try {
-      await profileStore.loadProfile(address);
+      // Force reload on initial page load to ensure fresh data
+      if (isInitialLoad) {
+        console.log('🔄 Profile Store: Initial page load, forcing profile reload');
+        await profileStore.forceReloadProfile(address);
+        isInitialLoad = false;
+      } else {
+        await profileStore.loadProfile(address);
+      }
     } catch (error) {
       console.warn('Failed to auto-load profile:', error);
     }
