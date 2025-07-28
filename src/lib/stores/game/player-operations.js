@@ -202,7 +202,7 @@ export const takeShot = async ({
   loadPlayerData,
   walletStore
 }) => {
-  console.log('🎯 Player takeShot() called!', { useDiscount, discountId });
+  console.log('🎯 Player takeShot() called!', { useDiscount, discountId, customShotCost });
   
   if (!browser) {
     console.log('❌ Not in browser environment');
@@ -314,6 +314,7 @@ export const takeShot = async ({
         ethers,
         wallet,
         actualShotCost,
+        customShotCost,
         discountApplied
       });
     }
@@ -343,10 +344,12 @@ export const takeShot = async ({
     }
 
     // Log transaction to database
+    // For first shots, log the custom cost for display purposes even though we charged full amount
+    const loggedShotCost = customShotCost ? customShotCost.toString() : actualShotCost;
     await logShotToDatabase({
       result,
       wallet,
-      actualShotCost,
+      actualShotCost: loggedShotCost,
       state,
       discountApplied,
       discountPercentage,
@@ -394,7 +397,7 @@ export const takeShot = async ({
  * @param {Object} params - Transaction parameters
  * @returns {Promise<Object>} Transaction result
  */
-const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost, discountApplied }) => {
+const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost, customShotCost, discountApplied }) => {
   const contractWithSigner = contract.connect(wallet.signer);
   const fullShotCost = await contract.SHOT_COST();
   
@@ -427,9 +430,24 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
     }
   }
 
-  // Always use full shot cost for the transaction
-  // Discounts are handled at the database/UI level, not contract level
+  // IMPORTANT: Always use full shot cost for contract transactions
+  // The contract likely expects exactly SHOT_COST amount and rejects anything else
+  // Custom shot costs are handled at the UI/database level for display purposes only
   const transactionValue = fullShotCost;
+  
+  // Log the decision for debugging
+  if (customShotCost) {
+    console.log('🔄 CHANGED APPROACH: Using full shot cost instead of custom amount');
+    console.log('Reason: Contract likely rejects non-standard amounts');
+    console.log('Custom amount will be handled at UI/database level only');
+  }
+  
+  console.log('💰 Transaction value calculation:', {
+    customShotCost,
+    fullShotCost: ethers.formatEther(fullShotCost),
+    transactionValue: ethers.formatEther(transactionValue),
+    isFirstShot: !!customShotCost
+  });
 
   console.log('🔍 Pre-transaction validation:', {
     contractAddress: await contract.getAddress(),
@@ -455,8 +473,17 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   const balance = await wallet.provider.getBalance(wallet.address);
   console.log('💰 Balance check:', {
     balance: ethers.formatEther(balance),
-    required: ethers.formatEther(fullShotCost)
+    requiredForFullShot: ethers.formatEther(fullShotCost),
+    actualTransactionValue: ethers.formatEther(transactionValue)
   });
+  
+  // CRITICAL: Check if contract might be rejecting non-standard amounts
+  if (customShotCost && transactionValue !== fullShotCost) {
+    console.warn('⚠️ POTENTIAL ISSUE: Sending custom amount to contract that might expect exact SHOT_COST');
+    console.warn('Contract SHOT_COST:', ethers.formatEther(fullShotCost));
+    console.warn('Our transaction value:', ethers.formatEther(transactionValue));
+    console.warn('This might be why the transaction is reverting!');
+  }
   
   // Generate secret and commitment for commit-reveal
   const secret = ethers.hexlify(ethers.randomBytes(32));
@@ -467,18 +494,40 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   // Estimate gas for commitShot
   let gasEstimate;
   try {
+    console.log('🔍 Attempting gas estimation with:', {
+      commitment,
+      value: ethers.formatEther(transactionValue),
+      contractAddress: await contract.getAddress()
+    });
+    
     gasEstimate = await contractWithSigner.commitShot.estimateGas(commitment, {
       value: transactionValue
     });
     console.log('✅ Gas estimation successful:', gasEstimate.toString());
   } catch (estimateError) {
     console.error('❌ Gas estimation failed:', estimateError);
+    console.error('Full error details:', {
+      message: estimateError.message,
+      code: estimateError.code,
+      data: estimateError.data,
+      reason: estimateError.reason
+    });
     
     // Check if this is a simulation failure
     if (estimateError.message.includes('execution reverted') ||
         estimateError.message.includes('transaction may fail') ||
         estimateError.code === 'UNPREDICTABLE_GAS_LIMIT') {
-      throw new Error('Transaction simulation failed. This may be due to insufficient funds, cooldown period, or contract state. Please check your balance and try again.');
+      
+      // Try to get more specific error information
+      let specificError = 'Transaction simulation failed.';
+      if (estimateError.reason) {
+        specificError += ` Reason: ${estimateError.reason}`;
+      }
+      if (estimateError.data) {
+        specificError += ` Data: ${estimateError.data}`;
+      }
+      
+      throw new Error(specificError + ' This may be due to insufficient funds, cooldown period, or contract state. Please check your balance and try again.');
     }
     
     console.warn('Using default gas estimate due to estimation failure');
