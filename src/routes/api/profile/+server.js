@@ -114,7 +114,8 @@ async function handleUpsertProfile(request, { profileData }) {
       bio: profileData.bio,
       twitter_handle: profileData.twitterHandle,
       discord_handle: profileData.discordHandle,
-      website_url: profileData.websiteUrl
+      website_url: profileData.websiteUrl,
+      debug_mode: profileData.debugMode
     });
 
     // Extract all profile fields from profileData
@@ -124,7 +125,8 @@ async function handleUpsertProfile(request, { profileData }) {
       avatarUrl,
       twitterHandle,
       discordHandle,
-      websiteUrl
+      websiteUrl,
+      debugMode
     } = profileData;
 
     console.log('🔧 Calling upsert_user_profile_secure with parameters:', {
@@ -134,7 +136,8 @@ async function handleUpsertProfile(request, { profileData }) {
       p_avatar_url: avatarUrl || null,
       p_twitter_handle: twitterHandle || null,
       p_discord_handle: discordHandle || null,
-      p_website_url: websiteUrl || null
+      p_website_url: websiteUrl || null,
+      p_debug_mode: debugMode !== undefined ? debugMode : null
     });
 
     const { data, error } = await supabase.rpc('upsert_user_profile_secure', {
@@ -144,7 +147,8 @@ async function handleUpsertProfile(request, { profileData }) {
       p_avatar_url: avatarUrl || null,
       p_twitter_handle: twitterHandle || null,
       p_discord_handle: discordHandle || null,
-      p_website_url: websiteUrl || null
+      p_website_url: websiteUrl || null,
+      p_debug_mode: debugMode !== undefined ? debugMode : null
     });
 
     console.log('📊 Supabase RPC response:', { data, error });

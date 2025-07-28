@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
   import { gameStore, winnerEventStore } from '$lib/stores/game/index.js';
+  import { debugMode } from '$lib/stores/debug.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatCooldownTime } from '$lib/config.js';
   import GameButton from '$lib/components/GameButton.svelte';
   import PotDisplay from '$lib/components/PotDisplay.svelte';
@@ -159,15 +160,19 @@
 
         <!-- Pending Shot Manager -->
         {#if $walletStore.connected}
-          <div class="debug-info">
-            <p>Debug: Wallet connected = {$walletStore.connected}</p>
-            <p>Debug: Wallet address = {$walletStore.address}</p>
-          </div>
+          {#if $debugMode}
+            <div class="debug-info">
+              <p>Debug: Wallet connected = {$walletStore.connected}</p>
+              <p>Debug: Wallet address = {$walletStore.address}</p>
+            </div>
+          {/if}
           <SimplePendingShotManager />
         {:else}
-          <div class="debug-info">
-            <p>Debug: Wallet NOT connected</p>
-          </div>
+          {#if $debugMode}
+            <div class="debug-info">
+              <p>Debug: Wallet NOT connected</p>
+            </div>
+          {/if}
         {/if}
 
         <!-- Game Rules -->

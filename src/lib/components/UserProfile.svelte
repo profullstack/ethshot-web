@@ -13,11 +13,13 @@
     nickname: '',
     bio: '',
     avatarFile: null,
-    notificationsEnabled: true
+    notificationsEnabled: true,
+    debugMode: false
   };
 
-  // Separate reactive variable for notifications to avoid reset issues
+  // Separate reactive variables to avoid reset issues
   let notificationsToggle = true;
+  let debugModeToggle = false;
 
   // Form state
   let saving = false;
@@ -44,9 +46,11 @@
       nickname: $userProfile.nickname || '',
       bio: $userProfile.bio || '',
       avatarFile: null,
-      notificationsEnabled: $userProfile.notifications_enabled ?? true
+      notificationsEnabled: $userProfile.notifications_enabled ?? true,
+      debugMode: $userProfile.debug_mode ?? false
     };
     notificationsToggle = $userProfile.notifications_enabled ?? true;
+    debugModeToggle = $userProfile.debug_mode ?? false;
     avatarPreview = $userProfile.avatar_url;
     clearErrors();
     formInitialized = true;
@@ -59,9 +63,11 @@
       nickname: '',
       bio: '',
       avatarFile: null,
-      notificationsEnabled: true
+      notificationsEnabled: true,
+      debugMode: false
     };
     notificationsToggle = true;
+    debugModeToggle = false;
     avatarPreview = null;
     clearErrors();
     formInitialized = true;
@@ -74,8 +80,9 @@
     lastProfileData = null;
   }
 
-  // Sync the separate notification toggle with formData
+  // Sync the separate toggles with formData
   $: formData.notificationsEnabled = notificationsToggle;
+  $: formData.debugMode = debugModeToggle;
 
   // Watch nickname changes for availability checking
   $: if (formData.nickname && formData.nickname !== ($userProfile?.nickname || '')) {
@@ -197,7 +204,8 @@
           nickname: formData.nickname || null,
           bio: formData.bio || null,
           avatarUrl: avatarUrl,
-          notificationsEnabled: formData.notificationsEnabled
+          notificationsEnabled: formData.notificationsEnabled,
+          debugMode: formData.debugMode
         }
       });
 
@@ -220,9 +228,11 @@
       nickname: '',
       bio: '',
       avatarFile: null,
-      notificationsEnabled: true
+      notificationsEnabled: true,
+      debugMode: false
     };
     notificationsToggle = true;
+    debugModeToggle = false;
     avatarPreview = null;
     clearErrors();
     
@@ -384,12 +394,14 @@
           </div>
         </div>
 
-        <!-- Notification Settings -->
+        <!-- Settings -->
         <div>
           <label class="block text-sm font-medium text-gray-300 mb-3">
-            Notification Settings
+            Settings
           </label>
-          <div class="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-600">
+          
+          <!-- Notification Settings -->
+          <div class="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-600 mb-3">
             <div class="flex items-center space-x-3">
               <div class="text-yellow-400">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -410,6 +422,32 @@
               <span class="sr-only">Toggle notifications</span>
               <span
                 class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {notificationsToggle ? 'translate-x-6' : 'translate-x-1'}"
+              ></span>
+            </button>
+          </div>
+
+          <!-- Debug Mode Settings -->
+          <div class="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-600">
+            <div class="flex items-center space-x-3">
+              <div class="text-green-400">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-white text-sm font-medium">Debug Mode</p>
+                <p class="text-gray-400 text-xs">Show debug information and developer tools</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {debugModeToggle ? 'bg-green-600' : 'bg-gray-600'}"
+              disabled={saving || $uploadingAvatar}
+              on:click={() => debugModeToggle = !debugModeToggle}
+            >
+              <span class="sr-only">Toggle debug mode</span>
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {debugModeToggle ? 'translate-x-6' : 'translate-x-1'}"
               ></span>
             </button>
           </div>

@@ -4,6 +4,7 @@
   import { gameStore } from '$lib/stores/game/index.js';
   import { NETWORK_CONFIG } from '$lib/config.js';
   import { browser } from '$app/environment';
+  import { debugMode } from '$lib/stores/debug.js';
 
   let isOwner = false;
   let ownershipChecked = false; // Track if we've successfully checked ownership
@@ -299,10 +300,12 @@
   };
 </script>
 
-<!-- Debug info (remove in production) -->
+<!-- Debug info - only show when debug mode is enabled -->
+{#if $debugMode}
 <div class="text-xs text-gray-500 mb-2">
   Debug: isOwner={isOwner}, ownershipChecked={ownershipChecked}, wallet={$walletStore.connected}
 </div>
+{/if}
 
 {#if isOwner}
   <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-yellow-500/50">

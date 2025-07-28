@@ -3,6 +3,7 @@
   import { walletStore } from '../stores/wallet.js';
   import { gameStore } from '../stores/game/core.js';
   import { toastStore } from '../stores/toast.js';
+  import { debugMode } from '../stores/debug.js';
   import { cleanupExpiredPendingShot } from '../utils/pending-shot-cleanup.js';
 
   let pendingShot = null;
@@ -202,7 +203,8 @@
   }
 </script>
 
-<!-- Always Visible Debug Info -->
+<!-- Debug Info - only show when debug mode is enabled -->
+{#if $debugMode}
 <div class="debug-info" style="background: #333; color: white; padding: 15px; margin: 10px 0; border-radius: 8px; font-size: 14px; border: 2px solid #e94560;">
   <h4 style="color: #e94560; margin: 0 0 10px 0;">🔍 SimplePendingShotManager Debug</h4>
   <p>- Wallet connected: <span style="color: {wallet.connected ? '#2ed573' : '#e94560'}">{wallet.connected}</span></p>
@@ -249,6 +251,7 @@
     🧪 Force Test UI
   </button>
 </div>
+{/if}
 
 {#if pendingShot}
   <div class="pending-shot-manager">

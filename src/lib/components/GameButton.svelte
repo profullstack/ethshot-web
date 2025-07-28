@@ -4,6 +4,7 @@
   import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError, currentPot } from '../stores/game/index.js';
   import { walletStore, isConnected, isCorrectNetwork } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
+  import { debugMode } from '../stores/debug.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatTime as configFormatTime } from '../config.js';
   import { onMount, onDestroy } from 'svelte';
   import { get } from 'svelte/store';
@@ -538,8 +539,8 @@
           <span class="text-sm opacity-80">Check wallet connection and cooldown</span>
         </button>
         
-        <!-- Debug info and manual refresh -->
-        {#if $isConnected}
+        <!-- Debug info and manual refresh - only show when debug mode is enabled -->
+        {#if $isConnected && $debugMode}
           <div class="text-xs text-gray-400 text-center">
             Debug: canShoot={$canTakeShot}, cooldown={$cooldownRemaining}s, pot={$currentPot}
           </div>
