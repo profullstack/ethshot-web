@@ -152,6 +152,11 @@ export const notificationsEnabled = derived(userProfile, $userProfile => {
   return $userProfile?.notifications_enabled ?? true; // Default to true if not set
 });
 
+// Derived store for admin status
+export const isAdmin = derived(userProfile, $userProfile => {
+  return $userProfile?.is_admin ?? false; // Default to false if not set
+});
+
 // Auto-load profile when wallet connects
 let currentAddress = null;
 walletAddress.subscribe(async (address) => {
