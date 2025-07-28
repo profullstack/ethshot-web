@@ -18,15 +18,30 @@
 
   // Check if current user is contract owner
   const checkOwnership = async () => {
-    if (!browser || !$walletStore.connected || !$gameStore.contract) return;
+    if (!browser || !$walletStore.connected || !$gameStore.contract) {
+      console.log('AdminPanel: Missing requirements', {
+        browser,
+        connected: $walletStore.connected,
+        contract: !!$gameStore.contract
+      });
+      return;
+    }
     
     try {
       const ethers = await import('ethers');
       const contract = $gameStore.contract;
       const ownerAddress = await contract.owner();
-      isOwner = ownerAddress.toLowerCase() === $walletStore.address.toLowerCase();
+      const userAddress = $walletStore.address;
+      
+      console.log('AdminPanel: Ownership check', {
+        ownerAddress,
+        userAddress,
+        match: ownerAddress.toLowerCase() === userAddress.toLowerCase()
+      });
+      
+      isOwner = ownerAddress.toLowerCase() === userAddress.toLowerCase();
     } catch (err) {
-      console.error('Failed to check ownership:', err);
+      console.error('AdminPanel: Failed to check ownership:', err);
       isOwner = false;
     }
   };

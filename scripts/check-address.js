@@ -27,8 +27,8 @@ async function checkAddresses() {
       console.log('   → Will default to deployer address\n');
     }
 
-    // Determine contract owner
-    const contractOwner = houseAddress || wallet.address;
+    // Contract owner is always the deployer (for admin privileges)
+    const contractOwner = wallet.address;
     console.log('👑 Contract Owner (who can access AdminPanel):');
     console.log(`   ${contractOwner}`);
     console.log('   → This address has admin privileges on the contract');
@@ -36,9 +36,9 @@ async function checkAddresses() {
 
     // Summary
     console.log('📋 Summary:');
-    console.log(`   Deployer: ${wallet.address}`);
-    console.log(`   House: ${houseAddress || 'Same as deployer'}`);
-    console.log(`   Owner: ${contractOwner}`);
+    console.log(`   Deployer: ${wallet.address} (also contract owner)`);
+    console.log(`   House: ${houseAddress || 'Same as deployer'} (receives fees)`);
+    console.log(`   Owner: ${contractOwner} (admin privileges)`);
 
   } catch (error) {
     console.log('❌ Invalid private key format');

@@ -15,7 +15,7 @@ async function main() {
   const [signer] = await ethers.getSigners();
   
   // Contract constructor parameters (from environment variables)
-  const initialOwner = process.env.HOUSE_COMMISSION_ADDRESS || signer.address;
+  const initialOwner = signer.address; // Contract owner should be the deployer (for admin privileges)
   const shotCost = ethers.parseEther(process.env.VITE_SHOT_COST_ETH || "0.001");
   const sponsorCost = ethers.parseEther(process.env.VITE_SPONSOR_COST_ETH || "0.01");
   const cooldownPeriod = (parseInt(process.env.VITE_COOLDOWN_HOURS || "1")) * 60 * 60;
