@@ -161,9 +161,21 @@ export const loadGameState = async ({ state, contract, ethers, db, updateState }
       }
 
       // Calculate actual pot (contract balance minus house funds)
-      const actualPot = contractBalance && houseFunds ?
+      // Ensure pot never goes negative
+      const rawPot = contractBalance && houseFunds ?
         BigInt(contractBalance) - BigInt(houseFunds) :
         BigInt(contractBalance || '0');
+      const actualPot = rawPot < 0n ? 0n : rawPot;
+      
+      // Log for debugging if pot calculation seems off
+      if (rawPot < 0n) {
+        console.warn('⚠️ Pot calculation resulted in negative value:', {
+          contractBalance: contractBalance?.toString(),
+          houseFunds: houseFunds?.toString(),
+          rawPot: rawPot.toString(),
+          adjustedPot: actualPot.toString()
+        });
+      }
         
       // Force fresh contract calls if pot seems wrong
       if (ethers.formatEther(actualPot) === '0.001') {
