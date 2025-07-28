@@ -41,7 +41,7 @@
   let lastProfileData = null;
 
   // Load current profile data when modal opens or profile changes
-  $: if (show && $userProfile && (!formInitialized || $userProfile !== lastProfileData)) {
+  $: if (show && $userProfile && (!formInitialized || JSON.stringify($userProfile) !== JSON.stringify(lastProfileData))) {
     formData = {
       nickname: $userProfile.nickname || '',
       bio: $userProfile.bio || '',

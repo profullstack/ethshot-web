@@ -115,6 +115,7 @@ async function handleUpsertProfile(request, { profileData }) {
       twitter_handle: profileData.twitterHandle,
       discord_handle: profileData.discordHandle,
       website_url: profileData.websiteUrl,
+      notifications_enabled: profileData.notificationsEnabled,
       debug_mode: profileData.debugMode
     });
 
@@ -126,6 +127,7 @@ async function handleUpsertProfile(request, { profileData }) {
       twitterHandle,
       discordHandle,
       websiteUrl,
+      notificationsEnabled,
       debugMode
     } = profileData;
 
@@ -137,6 +139,7 @@ async function handleUpsertProfile(request, { profileData }) {
       p_twitter_handle: twitterHandle || null,
       p_discord_handle: discordHandle || null,
       p_website_url: websiteUrl || null,
+      p_notifications_enabled: notificationsEnabled !== undefined ? notificationsEnabled : null,
       p_debug_mode: debugMode !== undefined ? debugMode : null
     });
 
@@ -148,6 +151,7 @@ async function handleUpsertProfile(request, { profileData }) {
       p_twitter_handle: twitterHandle || null,
       p_discord_handle: discordHandle || null,
       p_website_url: websiteUrl || null,
+      p_notifications_enabled: notificationsEnabled !== undefined ? notificationsEnabled : null,
       p_debug_mode: debugMode !== undefined ? debugMode : null
     });
 
