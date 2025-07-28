@@ -575,13 +575,37 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   
   toastStore.info('Commitment confirmed! Waiting for reveal window...');
   
-  // Wait for reveal delay (in practice, this should be handled by UI timing)
-  await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+  // FIXED: Wait for proper block-based reveal delay instead of time-based
+  // The contract requires REVEAL_DELAY blocks to pass before revealing
+  console.log('⏳ Waiting for reveal delay (block-based)...');
   
-  // Check if we can reveal
-  const canReveal = await contract.canRevealShot(wallet.address);
+  let canReveal = false;
+  let attempts = 0;
+  const maxAttempts = 30; // Maximum 30 attempts (about 6 minutes on Ethereum)
+  
+  while (!canReveal && attempts < maxAttempts) {
+    attempts++;
+    
+    try {
+      canReveal = await contract.canRevealShot(wallet.address);
+      
+      if (canReveal) {
+        console.log(`✅ Reveal window opened after ${attempts} attempts`);
+        break;
+      }
+      
+      // Wait for next block (approximately 12 seconds on Ethereum mainnet, faster on testnets)
+      console.log(`⏳ Attempt ${attempts}/${maxAttempts}: Waiting for reveal window...`);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Check every 2 seconds
+      
+    } catch (revealCheckError) {
+      console.warn(`⚠️ Error checking reveal status (attempt ${attempts}):`, revealCheckError.message);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+  
   if (!canReveal) {
-    throw new Error('Cannot reveal shot yet. Please wait for the reveal window.');
+    throw new Error('Reveal window timeout. The reveal delay period may have expired. Please try taking a new shot.');
   }
   
   console.log('🔓 Revealing shot with secret:', secret.slice(0, 10) + '...');
