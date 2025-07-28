@@ -1,9 +1,17 @@
--- Fix Existing Authentication Policies
+-- Final Authentication Policies Fix
 -- 
--- This migration drops and recreates the authentication policies to ensure
--- they are properly configured for JWT authentication with wallet address validation.
+-- This migration properly handles the dependency chain by dropping triggers first,
+-- then functions, then policies, and recreating everything in the correct order.
 
--- Drop existing policies if they exist
+-- Drop trigger first (this depends on the function)
+DROP TRIGGER IF EXISTS trigger_update_player_stats_on_shot ON shots;
+
+-- Now we can drop the function
+DROP FUNCTION IF EXISTS update_player_stats_on_shot();
+DROP FUNCTION IF EXISTS validate_jwt_wallet_address(TEXT);
+DROP FUNCTION IF EXISTS get_authenticated_wallet_address();
+
+-- Drop existing policies
 DROP POLICY IF EXISTS "shots_authenticated_only_insert" ON shots;
 DROP POLICY IF EXISTS "shots_public_select" ON shots;
 DROP POLICY IF EXISTS "winners_authenticated_only_insert" ON winners;
@@ -11,14 +19,6 @@ DROP POLICY IF EXISTS "winners_public_select" ON winners;
 DROP POLICY IF EXISTS "players_authenticated_only_insert" ON players;
 DROP POLICY IF EXISTS "players_authenticated_only_update" ON players;
 DROP POLICY IF EXISTS "players_public_select" ON players;
-
--- Drop existing functions if they exist
-DROP FUNCTION IF EXISTS validate_jwt_wallet_address(TEXT);
-DROP FUNCTION IF EXISTS get_authenticated_wallet_address();
-DROP FUNCTION IF EXISTS update_player_stats_on_shot();
-
--- Drop existing trigger if it exists
-DROP TRIGGER IF EXISTS trigger_update_player_stats_on_shot ON shots;
 
 -- Ensure RLS is enabled on all tables
 ALTER TABLE shots ENABLE ROW LEVEL SECURITY;
