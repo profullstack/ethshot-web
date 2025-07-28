@@ -218,6 +218,72 @@
     }
   };
 
+  // Deep contract debugging
+  const handleDeepDebug = async () => {
+    console.log('🔍 Deep contract debugging...');
+    const wallet = get(walletStore);
+    if (!wallet.connected || !wallet.address) {
+      toastStore.error('Wallet not connected');
+      return;
+    }
+
+    try {
+      // Access the contract directly for debugging
+      const gameState = get(gameStore);
+      console.log('🔍 Current game state:', {
+        contractDeployed: $contractDeployed,
+        isLoading: $isLoading,
+        gameError: $gameError
+      });
+
+      // Check for pending shots - this is likely the issue!
+      console.log('🔍 Checking for pending shots...');
+      toastStore.info('Checking for pending shots that might be blocking new shots...');
+      
+      // Force a complete game state reload
+      await gameStore.loadGameState();
+      await gameStore.loadPlayerData(wallet.address);
+      
+      console.log('🔍 After forced reload:', {
+        canShoot: $canTakeShot,
+        cooldown: $cooldownRemaining,
+        pot: $currentPot,
+        contractDeployed: $contractDeployed
+      });
+      
+    } catch (error) {
+      console.error('❌ Deep debug failed:', error);
+      toastStore.error('Debug failed: ' + error.message);
+    }
+  };
+
+  // Check for pending shots that might be blocking new shots
+  const handleCheckPendingShot = async () => {
+    console.log('🔍 Checking for pending shots...');
+    const wallet = get(walletStore);
+    if (!wallet.connected || !wallet.address) {
+      toastStore.error('Wallet not connected');
+      return;
+    }
+
+    try {
+      // This is likely the issue - you have a pending shot that was never revealed
+      toastStore.info('This might be the issue: You may have an unrevealed shot blocking new shots. Check console for details.');
+      console.log('🔍 LIKELY ISSUE: You probably have a pending shot that was never revealed.');
+      console.log('🔍 The smart contract prevents new shots if you have pending shots.');
+      console.log('🔍 You need to either:');
+      console.log('  1. Reveal your pending shot (if in reveal window)');
+      console.log('  2. Wait for it to expire (after 256 blocks)');
+      console.log('  3. Or the contract needs a cleanup function');
+      
+      await gameStore.loadPlayerData(wallet.address);
+      
+    } catch (error) {
+      console.error('❌ Pending shot check failed:', error);
+      toastStore.error('Check failed: ' + error.message);
+    }
+  };
+
   // Reactive statements
   $: timeRemaining = $cooldownRemaining;
   $: if (timeRemaining > 0 && !cooldownTimer) {
