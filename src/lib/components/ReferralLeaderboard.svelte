@@ -353,8 +353,10 @@
   }
 
   .table-header {
-    @apply grid grid-cols-5 gap-4 p-4 bg-gray-900/50 border-b border-gray-700;
+    @apply grid p-4 bg-gray-900/50 border-b border-gray-700;
     @apply text-gray-300 font-semibold text-sm;
+    grid-template-columns: 60px 1fr 70px 70px 70px;
+    gap: 16px;
   }
 
   .table-body {
@@ -362,7 +364,9 @@
   }
 
   .table-row {
-    @apply grid grid-cols-5 gap-4 p-4 hover:bg-gray-700/30 transition-colors;
+    @apply grid p-4 hover:bg-gray-700/30 transition-colors;
+    grid-template-columns: 60px 1fr 70px 70px 70px;
+    gap: 16px;
   }
 
   .table-row.current-user {
@@ -390,11 +394,12 @@
   }
 
   .cell-player {
-    @apply flex items-center;
+    @apply flex items-center min-w-0;
   }
 
   .player-info {
-    @apply flex items-center space-x-2;
+    @apply flex items-center space-x-2 min-w-0;
+    max-width: 100%;
   }
 
   .player-address {
@@ -406,7 +411,8 @@
   }
 
   .cell-referrals, .cell-active, .cell-rate {
-    @apply flex items-center text-white font-semibold;
+    @apply flex items-center justify-center text-white font-semibold;
+    min-width: 70px;
   }
 
   .referral-count, .active-count {
@@ -460,7 +466,9 @@
     }
 
     .table-header, .table-row {
-      @apply grid-cols-3 gap-2 text-sm;
+      grid-template-columns: 50px 1fr 60px;
+      gap: 12px;
+      @apply text-sm;
     }
 
     .header-active, .header-rate,

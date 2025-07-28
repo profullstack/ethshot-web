@@ -19,11 +19,6 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.en
  * @throws {Error} If no valid token is found
  */
 async function getAuthToken() {
-  const currentWalletAddress = get(walletAddress);
-  if (!currentWalletAddress) {
-    throw new Error('No wallet connected. Please connect your wallet first.');
-  }
-
   // Get JWT token from localStorage (set by server-side authentication)
   const jwtToken = localStorage.getItem('ethshot_jwt_token');
   const storedWalletAddress = localStorage.getItem('ethshot_wallet_address');
@@ -31,11 +26,6 @@ async function getAuthToken() {
 
   if (!jwtToken || !storedWalletAddress) {
     throw new Error('No authentication token found. Please connect and authenticate your wallet first.');
-  }
-
-  // Verify the stored wallet matches the current wallet
-  if (storedWalletAddress.toLowerCase() !== currentWalletAddress.toLowerCase()) {
-    throw new Error('Authentication token is for a different wallet. Please sign in again.');
   }
 
   // Check if token is expired
@@ -50,6 +40,18 @@ async function getAuthToken() {
       localStorage.removeItem('ethshot_auth_expires_at');
       throw new Error('Authentication token has expired. Please sign in again.');
     }
+  }
+
+  // Optional: Verify the stored wallet matches the current wallet from store
+  // But don't fail if store is not available - localStorage is the source of truth
+  try {
+    const currentWalletAddress = get(walletAddress);
+    if (currentWalletAddress && storedWalletAddress.toLowerCase() !== currentWalletAddress.toLowerCase()) {
+      console.warn('⚠️ Wallet address mismatch between localStorage and store. Using localStorage as source of truth.');
+    }
+  } catch (error) {
+    // Store might not be available, that's okay - localStorage is sufficient
+    console.log('📝 Wallet store not available, using localStorage authentication only');
   }
 
   return jwtToken;

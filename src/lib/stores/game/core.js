@@ -371,8 +371,8 @@ const createUnifiedGameStore = () => {
     updateInterval = null;
   };
 
-  // Clean up expired pending shot
-  const cleanupExpiredPendingShot = async (playerAddress) => {
+  // Clean up expired pending shot (only allow cleaning up your own pending shot)
+  const cleanupExpiredPendingShot = async (playerAddress = null) => {
     if (!browser) {
       throw new Error('Not available on server');
     }
@@ -387,6 +387,14 @@ const createUnifiedGameStore = () => {
 
     if (state.contractDeployed === false) {
       throw new Error(`${state.activeCrypto} contract not deployed yet.`);
+    }
+
+    // Default to cleaning up the current user's pending shot
+    const targetPlayer = playerAddress || wallet.address;
+    
+    // Only allow users to clean up their own pending shots for privacy
+    if (targetPlayer !== wallet.address) {
+      throw new Error('You can only clean up your own pending shots');
     }
 
     try {
@@ -412,7 +420,7 @@ const createUnifiedGameStore = () => {
         
         const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
         
-        const tx = await contractWithSigner.cleanupExpiredPendingShot(playerAddress, {
+        const tx = await contractWithSigner.cleanupExpiredPendingShot(targetPlayer, {
           gasLimit: gasLimit
         });
 
@@ -429,6 +437,7 @@ const createUnifiedGameStore = () => {
       throw error;
     }
   };
+
 
   return {
     subscribe,

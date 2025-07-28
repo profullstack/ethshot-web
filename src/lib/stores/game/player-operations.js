@@ -217,6 +217,13 @@ export const takeShot = async ({
     availableDiscounts: state.availableDiscounts?.length || 0
   });
   
+  console.log('🎮 Game state:', {
+    contractDeployed: state.contractDeployed,
+    canShoot: state.canShoot,
+    takingShot: state.takingShot,
+    activeCrypto: state.activeCrypto
+  });
+  
   if (!wallet.connected || !wallet.address) {
     console.log('❌ Wallet not connected');
     toastStore.error('Please connect your wallet first');
@@ -468,12 +475,46 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
 
   // Check if user can commit a shot
   const canCommit = await contract.canCommitShot(wallet.address);
+  const hasPending = await contract.hasPendingShot(wallet.address);
+  
+  console.log('🔍 Shot validation checks:', {
+    canCommit,
+    hasPending,
+    walletAddress: wallet.address
+  });
+  
   if (!canCommit) {
-    throw new Error('Cannot commit shot. You may be in cooldown period or have a pending shot.');
+    if (hasPending) {
+      // Get detailed pending shot info to determine if it's expired
+      try {
+        const pendingShot = await contract.getPendingShot(wallet.address);
+        const currentBlock = await wallet.provider.getBlockNumber();
+        const commitBlock = pendingShot.blockNumber;
+        const maxRevealDelay = 256; // MAX_REVEAL_DELAY from contract
+        
+        const revealExpired = currentBlock > commitBlock + maxRevealDelay;
+        
+        if (revealExpired) {
+          throw new Error('You have an expired pending shot. Please refresh the page to clear it and try again.');
+        } else {
+          // Check if we can reveal the pending shot
+          const canReveal = await contract.canRevealShot(wallet.address);
+          if (canReveal) {
+            throw new Error('You have a pending shot ready to reveal. Please complete the reveal transaction first.');
+          } else {
+            const blocksToWait = (commitBlock + 1) - currentBlock; // +1 for REVEAL_DELAY
+            throw new Error(`You have a pending shot. Please wait ${Math.max(0, blocksToWait)} more block(s) before revealing.`);
+          }
+        }
+      } catch (pendingCheckError) {
+        console.warn('Could not check pending shot details:', pendingCheckError.message);
+        throw new Error('You have a pending shot that needs to be resolved. Please refresh the page to clear it.');
+      }
+    } else {
+      throw new Error('Cannot take shot. You may be in cooldown period. Please wait and try again.');
+    }
   }
 
-  // Check if user has pending shot
-  const hasPending = await contract.hasPendingShot(wallet.address);
   if (hasPending) {
     throw new Error('You have a pending shot. Please wait for the reveal window or reveal your current shot.');
   }
@@ -619,9 +660,8 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   
   // Now reveal the shot
   const revealTx = await contractWithSigner.revealShot(secret);
-  toastStore.info('Revealing shot...');
+  toastStore.info('🎲 Revealing shot result...');
 
-  toastStore.info('Shot submitted! Waiting for confirmation...');
   const receipt = await revealTx.wait();
   
   console.log('✅ Reveal transaction confirmed:', receipt.hash);
@@ -641,6 +681,16 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
     const parsed = contract.interface.parseLog(shotRevealedEvent);
     won = parsed.args.won;
     console.log('🎲 Shot result:', won ? 'WON!' : 'Lost');
+    
+    // Immediate, prominent result feedback
+    if (won) {
+      toastStore.success('🎉 JACKPOT! YOU WON! 🎊', { duration: 8000 });
+    } else {
+      toastStore.info('🎲 Shot complete - Better luck next time!', { duration: 4000 });
+    }
+  } else {
+    // Fallback if we can't parse the event
+    toastStore.info('🎲 Shot complete - Check the leaderboard for results!', { duration: 4000 });
   }
 
   return {
@@ -649,6 +699,172 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
     won,
     isDiscountShot: discountApplied
   };
+};
+
+/**
+ * Reveal a pending shot
+ * @param {Object} params - Parameters object
+ * @param {string} params.secret - The secret used in the commitment
+ * @param {Object} params.state - Current game state
+ * @param {Object} params.contract - Contract instance
+ * @param {Object} params.ethers - Ethers library
+ * @param {Object} params.wallet - Wallet instance
+ * @param {Object} params.db - Database instance
+ * @param {Function} params.updateState - State update function
+ * @param {Function} params.loadGameState - Function to reload game state
+ * @param {Function} params.loadPlayerData - Function to reload player data
+ * @param {Object} params.walletStore - Wallet store instance
+ */
+export const revealShot = async ({
+  secret,
+  state,
+  contract,
+  ethers,
+  wallet,
+  db,
+  updateState,
+  loadGameState,
+  loadPlayerData,
+  walletStore
+}) => {
+  console.log('🔓 Player revealShot() called!', { secret: secret?.slice(0, 10) + '...' });
+  
+  if (!browser) {
+    console.log('❌ Not in browser environment');
+    toastStore.error('Not available on server');
+    return;
+  }
+  
+  if (!wallet.connected || !wallet.address) {
+    console.log('❌ Wallet not connected');
+    toastStore.error('Please connect your wallet first');
+    return;
+  }
+
+  if (!contract || !ethers || !wallet.signer) {
+    console.log('❌ Contract or signer not available');
+    toastStore.error('Contract not available');
+    return;
+  }
+
+  if (!secret) {
+    console.log('❌ No secret provided');
+    toastStore.error('Secret is required to reveal shot');
+    return;
+  }
+
+  try {
+    updateState(state => ({ ...state, takingShot: true, error: null }));
+
+    const contractWithSigner = contract.connect(wallet.signer);
+    
+    // Check if user can reveal
+    const canReveal = await contract.canRevealShot(wallet.address);
+    if (!canReveal) {
+      throw new Error('Cannot reveal shot. Either no pending shot exists or reveal window is not open.');
+    }
+
+    console.log('🔓 Revealing shot with secret:', secret.slice(0, 10) + '...');
+    
+    // Reveal the shot
+    const revealTx = await contractWithSigner.revealShot(secret);
+    toastStore.info('🎲 Revealing shot result...');
+
+    const receipt = await revealTx.wait();
+    
+    console.log('✅ Reveal transaction confirmed:', receipt.hash);
+    
+    // Check if user won by looking at ShotRevealed events
+    const shotRevealedEvent = receipt.logs.find(log => {
+      try {
+        const parsed = contract.interface.parseLog(log);
+        return parsed.name === 'ShotRevealed';
+      } catch {
+        return false;
+      }
+    });
+
+    let won = false;
+    if (shotRevealedEvent) {
+      const parsed = contract.interface.parseLog(shotRevealedEvent);
+      won = parsed.args.won;
+      console.log('🎲 Shot result:', won ? 'WON!' : 'Lost');
+      
+      // Immediate, prominent result feedback
+      if (won) {
+        toastStore.success('🎉 JACKPOT! YOU WON! 🎊', { duration: 8000 });
+      } else {
+        toastStore.info('🎲 Shot complete - Better luck next time!', { duration: 4000 });
+      }
+    } else {
+      // Fallback if we can't parse the event
+      toastStore.info('🎲 Shot complete - Check the leaderboard for results!', { duration: 4000 });
+    }
+
+    const result = {
+      hash: receipt.hash,
+      receipt,
+      won
+    };
+
+    if (won) {
+      // Trigger winner animation
+      winnerEventStore.set({
+        winner: wallet.address,
+        amount: state.currentPot,
+        timestamp: new Date().toISOString(),
+        isDiscountShot: false
+      });
+      
+      // Notify all users about the jackpot win
+      notifyJackpotWon(state.currentPot, wallet.address);
+    }
+
+    // Log transaction to database
+    await logShotToDatabase({
+      result,
+      wallet,
+      actualShotCost: state.shotCost,
+      state,
+      discountApplied: false,
+      discountPercentage: 0,
+      db
+    });
+
+    // Clear cache to force fresh data fetch
+    rpcCache.clear();
+    
+    // Add a small delay to ensure blockchain state is updated
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Refresh game state with fresh data
+    await loadGameState();
+    await loadPlayerData(wallet.address);
+    
+    // Update wallet balance
+    await walletStore.updateBalance();
+
+    return result;
+
+  } catch (error) {
+    console.error('Failed to reveal shot:', error);
+    
+    let errorMessage = 'Failed to reveal shot';
+    if (error.message.includes('insufficient funds')) {
+      errorMessage = `Insufficient ${state.activeCrypto} balance for gas`;
+    } else if (error.message.includes('user rejected')) {
+      errorMessage = 'Transaction cancelled';
+    } else if (error.message.includes('reveal')) {
+      errorMessage = error.message;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    toastStore.error(errorMessage);
+    updateState(state => ({ ...state, error: errorMessage }));
+  } finally {
+    updateState(state => ({ ...state, takingShot: false }));
+  }
 };
 
 /**
@@ -665,24 +881,7 @@ const logShotToDatabase = async ({
   db
 }) => {
   try {
-    console.log('📝 Recording shot to database with JWT authentication...');
-
-    // Check if we have valid JWT authentication
-    const jwtToken = localStorage.getItem('ethshot_jwt_token');
-    const storedWalletAddress = localStorage.getItem('ethshot_wallet_address');
-    
-    if (!jwtToken || !storedWalletAddress) {
-      console.error('❌ No JWT token found - cannot record shot to database');
-      toastStore.error('Authentication required to record shot. Please reconnect your wallet.');
-      return;
-    }
-
-    // Verify wallet address matches
-    if (storedWalletAddress.toLowerCase() !== wallet.address.toLowerCase()) {
-      console.error('❌ JWT token wallet address mismatch - cannot record shot');
-      toastStore.error('Wallet address mismatch. Please reconnect your wallet.');
-      return;
-    }
+    console.log('📝 Recording shot to database...');
 
     // Get contract address from centralized config or state
     const contractAddress = state.contractAddress || NETWORK_CONFIG.CONTRACT_ADDRESS;
@@ -702,7 +901,7 @@ const logShotToDatabase = async ({
     console.log('✅ Shot recorded successfully:', shotRecord?.id);
 
     if (result.won) {
-      console.log('🏆 Recording winner to database with authenticated client...');
+      console.log('🏆 Recording winner to database...');
       const winnerRecord = await db.recordWinner({
         winnerAddress: wallet.address,
         amount: state.currentPot,

@@ -1,7 +1,7 @@
 /**
  * Exchange Rate Utility
- * 
- * Fetches real-time ETH/USD exchange rates from Tatum API
+ *
+ * Fetches real-time ETH/USD exchange rates via secure server-side API
  * with caching and fallback mechanisms
  */
 
@@ -14,17 +14,10 @@ let cachedRate = null;
 let cacheTimestamp = null;
 
 /**
- * Fetches ETH/USD exchange rate from Tatum API
+ * Fetches ETH/USD exchange rate from secure server-side API
  * @returns {Promise<number>} ETH price in USD
  */
 export const fetchETHUSDRate = async () => {
-  const apiKey = import.meta.env.TATUM_API_KEY || import.meta.env.VITE_TATUM_API_KEY;
-  
-  if (!apiKey || apiKey === 'your-tatum-api-key-here') {
-    console.warn('Tatum API key not configured, using fallback rate');
-    return FALLBACK_RATE;
-  }
-
   // Check cache first
   if (cachedRate && cacheTimestamp && (Date.now() - cacheTimestamp < CACHE_DURATION)) {
     console.log('Using cached ETH/USD rate:', cachedRate);
@@ -32,40 +25,38 @@ export const fetchETHUSDRate = async () => {
   }
 
   try {
-    console.log('Fetching fresh ETH/USD rate from Tatum API...');
+    console.log('Fetching fresh ETH/USD rate from secure API...');
     
-    const response = await fetch('https://api.tatum.io/v3/tatum/rate/ETH?basePair=USD', {
+    const response = await fetch('/api/exchange-rate', {
       method: 'GET',
       headers: {
-        'x-api-key': apiKey,
         'Content-Type': 'application/json'
       }
     });
 
     if (!response.ok) {
-      throw new Error(`Tatum API error: ${response.status} ${response.statusText}`);
+      throw new Error(`Exchange rate API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     
-    // Tatum API returns rate data in different formats, handle both
-    const rate = data.value || data.rate || data.price;
-    
-    if (!rate || isNaN(parseFloat(rate))) {
-      throw new Error('Invalid rate data received from Tatum API');
+    if (!data.rate || isNaN(parseFloat(data.rate))) {
+      throw new Error('Invalid rate data received from exchange rate API');
     }
 
-    const ethUsdRate = parseFloat(rate);
+    const ethUsdRate = parseFloat(data.rate);
     
-    // Update cache
-    cachedRate = ethUsdRate;
-    cacheTimestamp = Date.now();
+    // Update cache only if not using cached data from server
+    if (!data.cached) {
+      cachedRate = ethUsdRate;
+      cacheTimestamp = Date.now();
+    }
     
-    console.log('Successfully fetched ETH/USD rate:', ethUsdRate);
+    console.log(`Successfully fetched ETH/USD rate: ${ethUsdRate} (source: ${data.source}, cached: ${data.cached})`);
     return ethUsdRate;
 
   } catch (error) {
-    console.error('Failed to fetch ETH/USD rate from Tatum API:', error.message);
+    console.error('Failed to fetch ETH/USD rate from secure API:', error.message);
     
     // Return cached rate if available, otherwise fallback
     if (cachedRate) {

@@ -25,7 +25,7 @@ export const GAME_CONFIG = {
   COOLDOWN_HOURS: parseInt(import.meta.env.VITE_COOLDOWN_HOURS || import.meta.env.PUBLIC_COOLDOWN_HOURS || '1'),
   COOLDOWN_SECONDS: parseInt(import.meta.env.VITE_COOLDOWN_HOURS || import.meta.env.PUBLIC_COOLDOWN_HOURS || '1') * 3600,
   ETH_USD_PRICE: parseFloat(import.meta.env.VITE_ETH_USD_PRICE || import.meta.env.PUBLIC_ETH_USD_PRICE || '2500'),
-  TATUM_API_KEY: import.meta.env.TATUM_API_KEY || import.meta.env.VITE_TATUM_API_KEY || '',
+  // TATUM_API_KEY removed for security - now handled server-side via /api/exchange-rate
 };
 
 // Network Configuration

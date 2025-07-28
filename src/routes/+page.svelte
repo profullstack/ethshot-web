@@ -15,6 +15,7 @@
   import ReferralSystem from '$lib/components/ReferralSystem.svelte';
   import DiscountButton from '$lib/components/DiscountButton.svelte';
   import AdminPanel from '$lib/components/AdminPanel.svelte';
+  import SimplePendingShotManager from '$lib/components/SimplePendingShotManager.svelte';
   
   // Social Proof Components
   import LiveActivityFeed from '$lib/components/LiveActivityFeed.svelte';
@@ -155,6 +156,11 @@
             <WalletConnect />
           {/if}
         </div>
+
+        <!-- Pending Shot Manager -->
+        {#if $walletStore.connected}
+          <SimplePendingShotManager />
+        {/if}
 
         <!-- Game Rules -->
         <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
