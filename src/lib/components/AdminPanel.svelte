@@ -6,6 +6,7 @@
   import { browser } from '$app/environment';
 
   let isOwner = false;
+  let ownershipChecked = false; // Track if we've successfully checked ownership
   let testModeConfig = {
     isTestMode: false,
     isFiftyPercentMode: false,
@@ -24,6 +25,10 @@
         connected: $walletStore.connected,
         contract: !!$gameStore.contract
       });
+      // Don't reset isOwner if we've already confirmed ownership
+      if (!ownershipChecked) {
+        isOwner = false;
+      }
       return;
     }
     
@@ -38,7 +43,10 @@
           hasOwnerFunction: contract && typeof contract.owner === 'function',
           contractMethods: contract ? Object.getOwnPropertyNames(contract) : 'no contract'
         });
-        isOwner = false;
+        // Don't reset isOwner if we've already confirmed ownership
+        if (!ownershipChecked) {
+          isOwner = false;
+        }
         return;
       }
       
@@ -51,7 +59,17 @@
         match: ownerAddress.toLowerCase() === userAddress.toLowerCase()
       });
       
-      isOwner = ownerAddress.toLowerCase() === userAddress.toLowerCase();
+      const newIsOwner = ownerAddress.toLowerCase() === userAddress.toLowerCase();
+      
+      // Only update if ownership status actually changed or this is first check
+      if (!ownershipChecked || isOwner !== newIsOwner) {
+        isOwner = newIsOwner;
+        ownershipChecked = true;
+        
+        if (isOwner) {
+          console.log('✅ AdminPanel: User confirmed as contract owner');
+        }
+      }
     } catch (err) {
       console.error('AdminPanel: Failed to check ownership:', err);
       console.error('AdminPanel: Error details:', {
@@ -60,7 +78,11 @@
         contractExists: !!$gameStore.contract,
         walletConnected: $walletStore.connected
       });
-      isOwner = false;
+      
+      // Don't reset isOwner if we've already confirmed ownership
+      if (!ownershipChecked) {
+        isOwner = false;
+      }
     }
   };
 
@@ -197,11 +219,18 @@
     }
   });
 
-  // Reactive updates when wallet or contract changes
-  $: if ($walletStore.connected && $gameStore.contract) {
+  // Reactive updates when wallet or contract changes - but only check ownership once per session
+  $: if ($walletStore.connected && $gameStore.contract && !ownershipChecked) {
     checkOwnership();
   }
 
+  // Reset ownership check when wallet disconnects or changes
+  $: if (!$walletStore.connected) {
+    ownershipChecked = false;
+    isOwner = false;
+  }
+
+  // Load config and funds when owner status is confirmed
   $: if (isOwner && $gameStore.contract) {
     loadTestModeConfig();
     loadHouseFunds();
