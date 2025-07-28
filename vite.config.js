@@ -2,7 +2,23 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [sveltekit()],
+  plugins: [
+    sveltekit({
+      // Suppress deprecation warnings from third-party libraries
+      onwarn: (warning, handler) => {
+        // Suppress the "Components object is deprecated" warning from WalletConnect libraries
+        if (warning.message?.includes('Components object is deprecated')) {
+          return;
+        }
+        // Suppress other common third-party deprecation warnings
+        if (warning.message?.includes('deprecated') && warning.filename?.includes('node_modules')) {
+          return;
+        }
+        // Handle all other warnings normally
+        handler(warning);
+      }
+    })
+  ],
   
   // Development server configuration
   server: {
@@ -26,12 +42,10 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'ethers',
-      'web3modal',
       'events',
       '@stablelib/random'
     ],
     exclude: [
-      '@walletconnect/web3-provider',
       '@walletconnect/client',
       '@walletconnect/core',
       '@walletconnect/crypto',
