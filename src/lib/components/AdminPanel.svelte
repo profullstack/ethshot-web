@@ -11,6 +11,7 @@
     isFiftyPercentMode: false,
     currentChainId: 0
   };
+  let houseFunds = 0;
   let loading = false;
   let error = null;
   let success = null;
