@@ -2,6 +2,9 @@
 
 # Deploy Environment Variables to Railway using CLI with Rate Limiting
 # Usage: ./bin/deploy-env-railway.sh [.env file path]
+# Examples:
+#   ./bin/deploy-env-railway.sh                    # Deploy main app (.env)
+#   ./bin/deploy-env-railway.sh servers/chat/.env  # Deploy chat server
 
 set -e
 
@@ -9,11 +12,20 @@ ENV_FILE="${1:-.env}"
 
 if [ ! -f "$ENV_FILE" ]; then
     echo "❌ Environment file '$ENV_FILE' not found!"
-    echo "💡 Create a .env file with your environment variables first."
+    if [[ "$ENV_FILE" == "servers/chat/.env" ]]; then
+        echo "💡 Create servers/chat/.env from servers/chat/.env.example first."
+    else
+        echo "💡 Create a .env file with your environment variables first."
+    fi
     exit 1
 fi
 
-echo "🚀 Deploying environment variables from '$ENV_FILE' to Railway..."
+# Determine deployment type based on file path
+if [[ "$ENV_FILE" == *"servers/chat"* ]]; then
+    echo "🚀 Deploying chat server environment variables from '$ENV_FILE' to Railway..."
+else
+    echo "🚀 Deploying main app environment variables from '$ENV_FILE' to Railway..."
+fi
 
 # Check if railway CLI is installed
 if ! command -v railway &> /dev/null; then
@@ -61,6 +73,21 @@ deploy_variable() {
     return 1
 }
 
+# Function to clean environment variable value
+clean_env_value() {
+    local value="$1"
+    
+    # Remove leading/trailing whitespace (including newlines, tabs, etc.)
+    value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    
+    # Remove quotes if they wrap the entire value
+    if [[ "$value" =~ ^\"(.*)\"$ ]] || [[ "$value" =~ ^\'(.*)\'$ ]]; then
+        value="${BASH_REMATCH[1]}"
+    fi
+    
+    echo "$value"
+}
+
 # Read .env file and collect all variables
 variables=()
 while IFS= read -r line || [ -n "$line" ]; do
@@ -77,8 +104,8 @@ while IFS= read -r line || [ -n "$line" ]; do
         # Remove leading/trailing whitespace from key
         key=$(echo "$key" | xargs)
         
-        # Remove quotes from value if present
-        value=$(echo "$value" | sed 's/^["'\'']\|["'\'']$//g')
+        # Clean the value (remove whitespace, newlines, quotes)
+        value=$(clean_env_value "$value")
         
         variables+=("$key=$value")
     fi

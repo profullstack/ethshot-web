@@ -26,9 +26,8 @@ export const supabase = hasValidConfig
         autoRefreshToken: browser,
       },
       realtime: {
-        params: {
-          eventsPerSecond: 10,
-        },
+        // Disable realtime since we use our own chat server
+        enabled: false,
       },
     })
   : null;
