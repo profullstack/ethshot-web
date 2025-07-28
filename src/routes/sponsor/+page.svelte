@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { get } from 'svelte/store';
   import { gameStore, currentSponsor } from '$lib/stores/game/index.js';
   import { walletStore } from '$lib/stores/wallet.js';
   import { toastStore } from '$lib/stores/toast.js';
@@ -54,11 +55,22 @@
 
     submitting = true;
     try {
-      await gameStore.sponsorRound(
-        sponsorName.trim(),
-        sponsorLogoUrl.trim(),
-        sponsorUrl.trim() || null
-      );
+      const { GameActions } = await import('../../lib/stores/game/index.js');
+      const { gameStore } = await import('../../lib/stores/game/index.js');
+      const gameState = gameStore.getGameState();
+      const walletStore = gameStore.getWalletStore();
+      const wallet = get(walletStore);
+      
+      await GameActions.sponsorRound({
+        name: sponsorName.trim(),
+        logoUrl: sponsorLogoUrl.trim(),
+        sponsorUrl: sponsorUrl.trim() || null,
+        gameState,
+        wallet,
+        contract: gameStore.getContract(),
+        ethers: gameStore.getEthers(),
+        loadGameState: gameStore.loadGameState
+      });
       
       // Reset form on success
       sponsorName = '';

@@ -280,13 +280,24 @@
           <div class="space-y-3">
             <button
               class="w-full bg-black hover:bg-gray-900 text-white py-2 px-4 rounded-lg transition-colors text-sm border border-gray-700"
-              on:click={() => gameStore.shareOnTwitter()}
+              on:click={async () => {
+                const { SocialActions } = await import('../lib/stores/game/index.js');
+                const { gameStore } = await import('../lib/stores/game/index.js');
+                const gameState = gameStore.getGameState();
+                SocialActions.shareOnTwitter({
+                  currentPot: gameState.currentPot,
+                  activeCrypto: gameState.activeCrypto
+                });
+              }}
             >
               Share on 𝕏
             </button>
             <button
               class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors text-sm"
-              on:click={() => gameStore.copyLink()}
+              on:click={async () => {
+                const { SocialActions } = await import('../lib/stores/game/index.js');
+                await SocialActions.copyLink();
+              }}
             >
               Copy Link
             </button>

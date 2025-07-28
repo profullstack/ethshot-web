@@ -1,7 +1,8 @@
 <script>
-  import { gameStore, availableDiscounts, discountCount, canUseDiscount, isLoading, nextDiscount } from '../stores/game/index.js';
+  import { gameStore, availableDiscounts, discountCount, canUseDiscount, isLoading, nextDiscount, GameActions } from '../stores/game/index.js';
   import { walletStore } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
+  import { get } from 'svelte/store';
 
   // Reactive statements
   $: wallet = $walletStore;
@@ -30,8 +31,22 @@
     }
 
     try {
-      // Use the new takeShot API with discount parameters
-      await gameStore.takeShot(true, discount.id); // Pass true to use discount and discount ID
+      const gameState = gameStore.getGameState();
+      const walletStore = gameStore.getWalletStore();
+      const walletData = get(walletStore);
+      
+      await GameActions.takeShot({
+        useDiscount: true,
+        discountId: discount.id,
+        customShotCost: null,
+        gameState,
+        wallet: walletData,
+        contract: gameStore.getContract(),
+        ethers: gameStore.getEthers(),
+        updateGameState: gameStore.updateState,
+        loadGameState: gameStore.loadGameState,
+        loadPlayerData: gameStore.loadPlayerData
+      });
     } catch (error) {
       console.error('Failed to take discount shot:', error);
       toastStore.error('Failed to apply discount');

@@ -1,30 +1,20 @@
 /**
  * Core Game Store Module
- * 
- * Main game store implementation with initialization and core functionality
+ *
+ * Pure state management for game data - business logic moved to services
  */
 
 import { writable, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { multiCryptoWalletStore } from '../wallet-multi-crypto.js';
 import { walletStore } from '../wallet.js';
-import { toastStore } from '../toast.js';
 import { getCryptoGameConfig, getCurrentCrypto } from '../../crypto/config.js';
-import { GAME_CONFIG, SOCIAL_CONFIG } from '../../config.js';
-import { shareOnTwitter as shareOnTwitterExternal } from '../../utils/external-links.js';
-import { 
-  processReferralOnLoad,
-  clearStoredReferralCode
-} from '../../utils/referral.js';
-import { 
-  notificationManager
-} from '../../utils/notifications.js';
+import { GAME_CONFIG } from '../../config.js';
 import { db } from '../../database/index.js';
 import { rpcCache } from './cache.js';
 import { createInitialGameState, updateUSDValues, formatTimeRemaining } from './utils.js';
 import { loadGameState, initializeEthContract, initializeMultiCryptoAdapter } from './contract-operations.js';
-import { loadPlayerData, takeShot, revealShot } from './player-operations.js';
-import { processReferralSignup } from './referral-operations.js';
+import { loadPlayerData } from './player-operations.js';
 import { startRealTimeUpdates, stopRealTimeUpdates } from './real-time.js';
 
 // Winner event store for triggering animations
@@ -180,205 +170,10 @@ const createUnifiedGameStore = () => {
     });
   };
 
-  const takeShotWrapper = async (useDiscount = false, discountId = null, customShotCost = null) => {
-    const state = get({ subscribe });
-    const walletStore = getWalletStore();
-    const wallet = get(walletStore);
-    
-    await takeShot({
-      useDiscount,
-      discountId,
-      customShotCost,
-      state,
-      contract,
-      ethers,
-      wallet,
-      db,
-      updateState: update,
-      loadGameState: loadGameStateWrapper,
-      loadPlayerData: loadPlayerDataWrapper,
-      walletStore
-    });
-  };
-
-  const revealShotWrapper = async (secret) => {
-    const state = get({ subscribe });
-    const walletStore = getWalletStore();
-    const wallet = get(walletStore);
-    
-    await revealShot({
-      secret,
-      state,
-      contract,
-      ethers,
-      wallet,
-      db,
-      updateState: update,
-      loadGameState: loadGameStateWrapper,
-      loadPlayerData: loadPlayerDataWrapper,
-      walletStore
-    });
-  };
-
-  // Sponsor a round
-  const sponsorRound = async (name, logoUrl, sponsorUrl = null) => {
-    if (!browser) {
-      toastStore.error('Not available on server');
-      return;
-    }
-
-    const state = get({ subscribe });
-    const walletStore = getWalletStore();
-    const wallet = get(walletStore);
-    
-    if (!wallet.connected || !wallet.address) {
-      toastStore.error('Please connect your wallet first');
-      return;
-    }
-
-    if (state.contractDeployed === false) {
-      toastStore.error(`${state.activeCrypto} contract not deployed yet.`);
-      return;
-    }
-
-    if (!name || !logoUrl) {
-      toastStore.error('Please provide sponsor name and logo URL');
-      return;
-    }
-
-    try {
-      let result;
-
-      if (state.isMultiCryptoMode) {
-        // Multi-crypto mode: use adapter
-        const adapter = getActiveAdapter();
-        if (!adapter) {
-          throw new Error('No active cryptocurrency adapter');
-        }
-
-        result = await adapter.sponsorRound(name, logoUrl);
-      } else {
-        // ETH-only mode: direct contract interaction
-        if (!contract || !ethers || !wallet.signer) {
-          throw new Error('Contract or signer not available');
-        }
-
-        const contractWithSigner = contract.connect(wallet.signer);
-        const sponsorCost = await contract.SPONSOR_COST();
-
-        // Check user balance
-        const balance = await wallet.provider.getBalance(wallet.address);
-        
-        // Estimate gas
-        let gasEstimate;
-        try {
-          gasEstimate = await contractWithSigner.sponsorRound.estimateGas(name, logoUrl, {
-            value: sponsorCost
-          });
-        } catch (estimateError) {
-          console.warn('Failed to estimate gas, using default:', estimateError.message);
-          gasEstimate = 100000n;
-        }
-        
-        const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
-        
-        // Get gas price and calculate total cost
-        const feeData = await wallet.provider.getFeeData();
-        const gasPrice = feeData.gasPrice || feeData.maxFeePerGas;
-        const estimatedGasCost = gasLimit * gasPrice;
-        const totalCost = sponsorCost + estimatedGasCost;
-        
-        if (balance < totalCost) {
-          const shortfall = ethers.formatEther(totalCost - balance);
-          throw new Error(`Insufficient ETH. Need ${shortfall} more ETH for gas fees.`);
-        }
-
-        const tx = await contractWithSigner.sponsorRound(name, logoUrl, {
-          value: sponsorCost,
-          gasLimit: gasLimit
-        });
-
-        toastStore.info('Sponsorship submitted! Waiting for confirmation...');
-        const receipt = await tx.wait();
-        
-        result = {
-          hash: receipt.hash,
-          receipt
-        };
-      }
-      
-      toastStore.success('Round sponsored successfully!');
-      
-      // Log sponsorship to database
-      try {
-        await db.recordSponsor({
-          sponsorAddress: wallet.address,
-          name,
-          logoUrl,
-          sponsorUrl,
-          amount: state.sponsorCost,
-          txHash: result.hash,
-          blockNumber: result.receipt.blockNumber,
-          timestamp: new Date().toISOString(),
-          active: true,
-          cryptoType: state.activeCrypto
-        });
-      } catch (dbError) {
-        console.error('Failed to log sponsorship to database:', dbError);
-      }
-      
-      // Clear cache and refresh state
-      rpcCache.clear();
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      await loadGameStateWrapper();
-      await walletStore.updateBalance();
-
-    } catch (error) {
-      console.error('Failed to sponsor round:', error);
-      
-      let errorMessage = 'Failed to sponsor round';
-      if (error.message.includes('insufficient funds')) {
-        errorMessage = `Insufficient ${state.activeCrypto} balance`;
-      } else if (error.message.includes('user rejected')) {
-        errorMessage = 'Transaction cancelled';
-      } else if (error.message.includes('not yet implemented')) {
-        errorMessage = error.message;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      toastStore.error(errorMessage);
-    }
-  };
-
-  // Share on X (formerly Twitter)
-  const shareOnTwitter = () => {
-    if (!browser) return;
-
-    const state = get({ subscribe });
-    const cryptoSymbol = state.activeCrypto || 'ETH';
-    // Ensure we have a valid pot value, fallback to "the current pot" if not loaded
-    const potValue = state.currentPot && state.currentPot !== '0' ? `${state.currentPot} ${cryptoSymbol}` : 'the current pot';
-    const text = `I just took a shot at #${cryptoSymbol}Shot and the pot is now ${potValue}! 🎯 Try your luck: #${cryptoSymbol.toLowerCase()}`;
-    const url = SOCIAL_CONFIG.APP_URL;
-    
-    console.log('🐦 Sharing on X:', { currentPot: state.currentPot, cryptoSymbol, potValue, text });
-    
-    // Use the external links utility to properly handle webviews
-    shareOnTwitterExternal(text, url);
-  };
-
-  // Copy link to clipboard
-  const copyLink = async () => {
-    if (!browser) return;
-
-    try {
-      await navigator.clipboard.writeText(SOCIAL_CONFIG.APP_URL);
-      toastStore.success('Link copied to clipboard!');
-    } catch (error) {
-      toastStore.error('Failed to copy link');
-    }
-  };
+  // These wrapper functions now just provide access to state for external services
+  const getGameState = () => get({ subscribe });
+  const getContract = () => contract;
+  const getEthers = () => ethers;
 
   // Start real-time updates wrapper
   const startRealTimeUpdatesWrapper = () => {
@@ -535,24 +330,18 @@ const createUnifiedGameStore = () => {
     switchCrypto,
     loadGameState: loadGameStateWrapper,
     loadPlayerData: loadPlayerDataWrapper,
-    takeShot: takeShotWrapper,
-    revealShot: revealShotWrapper,
-    sponsorRound,
-    shareOnTwitter,
-    copyLink,
     formatTimeRemaining,
     stopRealTimeUpdates: stopRealTimeUpdatesWrapper,
     cleanupExpiredPendingShot,
-    // Referral system functions
-    processReferralOnLoad: () => processReferralOnLoad(),
-    processReferralSignup: (address) => processReferralSignup(address, db, update),
-    // Notification management
-    requestNotificationPermission: () => notificationManager.requestPermission(),
-    getNotificationPermissionStatus: () => notificationManager.getPermissionStatus(),
-    isNotificationsEnabled: () => notificationManager.isEnabled(),
-    // Expose contract and ethers for components that need direct access
-    get contract() { return contract; },
-    get ethers() { return ethers; },
+    // State access functions for external services
+    getGameState,
+    getWalletStore,
+    getContract,
+    getEthers,
+    // Database access
+    get db() { return db; },
+    // State update function for external services
+    updateState: update
   };
 };
 

@@ -1,10 +1,11 @@
 <script>
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { walletStore } from '../stores/wallet.js';
   import { gameStore } from '../stores/game/core.js';
   import { toastStore } from '../stores/toast.js';
   import { debugMode } from '../stores/debug.js';
-  import { cleanupExpiredPendingShot } from '../utils/pending-shot-cleanup.js';
+  import { GameActions } from '../stores/game/index.js';
 
   let pendingShot = null;
   let loading = false;
@@ -138,8 +139,18 @@
     try {
       console.log('🧹 Starting cleanup of expired pending shot...');
       
-      // Use the proper utility function instead of gameStore method
-      await cleanupExpiredPendingShot();
+      // Use the service function instead of utility
+      const currentGameState = gameStore.getGameState();
+      const currentWalletStore = gameStore.getWalletStore();
+      const currentWallet = get(currentWalletStore);
+      
+      await GameActions.cleanupExpiredPendingShot({
+        playerAddress: currentWallet.address,
+        gameState: currentGameState,
+        wallet: currentWallet,
+        contract: gameStore.getContract(),
+        ethers: gameStore.getEthers()
+      });
       
       console.log('✅ Cleanup successful!');
       toastStore.success('Expired pending shot cleaned up successfully');
@@ -164,20 +175,37 @@
   const handleRevealShot = async () => {
     loading = true;
     try {
-      // For now, we'll prompt the user for their secret since we don't store it
+      // Ask for the secret - this is the proper way to reveal a shot
       const secret = prompt('Enter your secret from when you committed the shot:');
       if (!secret) {
         toastStore.error('Secret is required to reveal the shot');
         return;
       }
 
-      // Call the reveal function from the game store
-      await state.revealShot(secret);
+      console.log('🎯 Revealing pending shot with provided secret...');
+      toastStore.info('Revealing pending shot...');
+      
+      // Call the reveal function from the service
+      const currentGameState = gameStore.getGameState();
+      const currentWalletStore = gameStore.getWalletStore();
+      const currentWallet = get(currentWalletStore);
+      
+      await GameActions.revealShot({
+        secret,
+        gameState: currentGameState,
+        wallet: currentWallet,
+        contract: gameStore.getContract(),
+        ethers: gameStore.getEthers(),
+        loadGameState: gameStore.loadGameState,
+        loadPlayerData: gameStore.loadPlayerData
+      });
+      
+      console.log('✅ Pending shot revealed successfully!');
       toastStore.success('Shot revealed successfully!');
       await checkPendingShot();
     } catch (error) {
-      console.error('Failed to reveal shot:', error);
-      toastStore.error('Failed to reveal shot: ' + error.message);
+      console.error('❌ Failed to reveal pending shot:', error);
+      toastStore.error('Failed to reveal pending shot: ' + error.message);
     } finally {
       loading = false;
     }
@@ -263,9 +291,13 @@
     <div class="pending-shot-info">
       <h3>⏳ Pending Shot Detected</h3>
       <p>You have a pending shot of <strong>{pendingShot.amount} ETH</strong></p>
-      <p>Committed at block: <strong>{pendingShot.blockNumber}</strong></p>
-      <p>Current block: <strong>{pendingShot.currentBlock}</strong></p>
+      {#if pendingShot.revealExpired}
+        <p>Wait <strong>0 blocks</strong> to clear (expired - can clear now)</p>
+      {:else}
+        <p>Wait <strong>{256 - (pendingShot.currentBlock - pendingShot.blockNumber)} blocks</strong> to clear (about <strong>{getTimeEstimate(256 - (pendingShot.currentBlock - pendingShot.blockNumber))}</strong>)</p>
+      {/if}
       
+      <!-- Simplified: Only show cleanup for expired shots, refresh for everything else -->
       {#if pendingShot.revealExpired}
         <div class="status expired">
           <p>❌ <strong>Reveal window expired</strong></p>
@@ -287,33 +319,15 @@
             </button>
           </div>
         </div>
-      {:else if pendingShot.canReveal}
-        <div class="status ready">
-          <p>✅ <strong>Ready to reveal!</strong></p>
-          <p>Your shot is ready to be revealed. You'll need the secret from when you committed.</p>
-          <div class="button-group">
-            <button
-              class="action-btn reveal-btn"
-              on:click={handleRevealShot}
-              disabled={loading}
-            >
-              {loading ? 'Revealing...' : 'Reveal Pending Shot'}
-            </button>
-            <button
-              class="action-btn refresh-btn secondary"
-              on:click={handleRefreshPage}
-              disabled={loading}
-            >
-              Or Start Over (Refresh)
-            </button>
-          </div>
-          <p class="note">💡 <strong>Note:</strong> You'll be prompted for your original secret. If you don't have it, use "Start Over" instead.</p>
-        </div>
       {:else}
         <div class="status waiting">
-          <p>⏳ <strong>Waiting for reveal window</strong></p>
-          <p>Please wait {pendingShot.blocksToWait} more block(s) before the reveal window opens.</p>
-          <p class="time-estimate">⏰ <strong>Estimated time:</strong> {getTimeEstimate(pendingShot.blocksToWait)}</p>
+          <p>🔄 <strong>Pending shot blocking new shots</strong></p>
+          {#if pendingShot.canReveal}
+            <p>Shot can be revealed, but since the secret is unknown, refresh the page to start over.</p>
+          {:else}
+            <p>Please wait {pendingShot.blocksToWait} more block(s) or refresh the page to start over.</p>
+            <p class="time-estimate">⏰ <strong>Estimated time:</strong> {getTimeEstimate(pendingShot.blocksToWait)}</p>
+          {/if}
           <div class="button-group">
             <button
               class="action-btn refresh-btn"
@@ -321,13 +335,6 @@
               disabled={loading}
             >
               Start Over (Refresh Page)
-            </button>
-            <button
-              class="action-btn wait-btn secondary"
-              on:click={handleWaitForBlocks}
-              disabled={loading}
-            >
-              Or Wait for Reveal Window
             </button>
           </div>
         </div>

@@ -5,7 +5,7 @@
  * This file maintains backward compatibility with the original game-unified.js exports.
  */
 
-import { derived } from 'svelte/store';
+import { derived, get } from 'svelte/store';
 import { gameStore, winnerEventStore } from './core.js';
 
 // Re-export the main game store and winner event store
@@ -67,13 +67,15 @@ export const nextDiscount = derived(gameStore, $game => {
 // Legacy exports for backward compatibility
 export const multiCryptoGameStore = gameStore;
 
-// Export core game functions for direct access
-export const takeShot = (...args) => gameStore.takeShot(...args);
-export const sponsorRound = (...args) => gameStore.sponsorRound(...args);
+// Export service modules for business logic (moved from store)
+export * as GameActions from '../../services/game-actions.js';
+export * as SocialActions from '../../services/social-actions.js';
+export * as NotificationService from '../../services/notification-service.js';
+export * as ReferralService from '../../services/referral-service.js';
+
+// Export core game functions for direct access (state management only)
 export const loadGameState = (...args) => gameStore.loadGameState(...args);
 export const loadPlayerData = (...args) => gameStore.loadPlayerData(...args);
-export const shareOnTwitter = (...args) => gameStore.shareOnTwitter(...args);
-export const copyLink = (...args) => gameStore.copyLink(...args);
 export const init = (...args) => gameStore.init(...args);
 export const switchCrypto = (...args) => gameStore.switchCrypto(...args);
 

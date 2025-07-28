@@ -1,7 +1,7 @@
 <script>
   console.log('🔧 GameButton component loading...');
   
-  import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError, currentPot } from '../stores/game/index.js';
+  import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError, currentPot, GameActions } from '../stores/game/index.js';
   import { walletStore, isConnected, isCorrectNetwork } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
   import { debugMode } from '../stores/debug.js';
@@ -95,8 +95,23 @@
     console.log('🚀 About to call gameStore.takeShot()...');
     
     try {
-      const result = await gameStore.takeShot();
-      console.log('✅ gameStore.takeShot() completed:', result);
+      const gameState = gameStore.getGameState();
+      const walletStore = gameStore.getWalletStore();
+      const wallet = get(walletStore);
+      
+      const result = await GameActions.takeShot({
+        useDiscount: false,
+        discountId: null,
+        customShotCost: null,
+        gameState,
+        wallet,
+        contract: gameStore.getContract(),
+        ethers: gameStore.getEthers(),
+        updateGameState: gameStore.updateState,
+        loadGameState: gameStore.loadGameState,
+        loadPlayerData: gameStore.loadPlayerData
+      });
+      console.log('✅ GameActions.takeShot() completed:', result);
     } catch (error) {
       console.error('❌ Failed to take shot:', error);
       console.error('Error details:', {
@@ -145,10 +160,23 @@
     console.log('🚀 About to call gameStore.takeShot() for first shot...');
     
     try {
-      // Use the first shot cost instead of regular shot cost
-      // Parameters: useDiscount, discountId, customShotCost
-      const result = await gameStore.takeShot(false, null, GAME_CONFIG.FIRST_SHOT_COST_ETH);
-      console.log('✅ gameStore.takeShot() (first shot) completed:', result);
+      const gameState = gameStore.getGameState();
+      const walletStore = gameStore.getWalletStore();
+      const wallet = get(walletStore);
+      
+      const result = await GameActions.takeShot({
+        useDiscount: false,
+        discountId: null,
+        customShotCost: GAME_CONFIG.FIRST_SHOT_COST_ETH,
+        gameState,
+        wallet,
+        contract: gameStore.getContract(),
+        ethers: gameStore.getEthers(),
+        updateGameState: gameStore.updateState,
+        loadGameState: gameStore.loadGameState,
+        loadPlayerData: gameStore.loadPlayerData
+      });
+      console.log('✅ GameActions.takeShot() (first shot) completed:', result);
     } catch (error) {
       console.error('❌ Failed to take first shot:', error);
       console.error('Error details:', {
@@ -175,8 +203,21 @@
     }
 
     try {
-      const result = await gameStore.sponsorRound();
-      console.log('✅ gameStore.sponsorRound() completed:', result);
+      const gameState = gameStore.getGameState();
+      const walletStore = gameStore.getWalletStore();
+      const wallet = get(walletStore);
+      
+      const result = await GameActions.sponsorRound({
+        name: 'Anonymous Sponsor',
+        logoUrl: '/icons/sponsor-default.png',
+        sponsorUrl: null,
+        gameState,
+        wallet,
+        contract: gameStore.getContract(),
+        ethers: gameStore.getEthers(),
+        loadGameState: gameStore.loadGameState
+      });
+      console.log('✅ GameActions.sponsorRound() completed:', result);
     } catch (error) {
       console.error('❌ Failed to sponsor round:', error);
       toastStore.error('Failed to sponsor round: ' + error.message);
@@ -362,8 +403,18 @@
       console.log('🧹 Attempting to clean up expired pending shot for:', wallet.address);
       toastStore.info('Attempting to clean up expired pending shot...');
       
-      // Call the cleanup function - this will be added to the game store
-      await gameStore.cleanupExpiredPendingShot(wallet.address);
+      // Call the cleanup function from the service
+      const cleanupGameState = gameStore.getGameState();
+      const cleanupWalletStore = gameStore.getWalletStore();
+      const cleanupWallet = get(cleanupWalletStore);
+      
+      await GameActions.cleanupExpiredPendingShot({
+        playerAddress: cleanupWallet.address,
+        gameState: cleanupGameState,
+        wallet: cleanupWallet,
+        contract: gameStore.getContract(),
+        ethers: gameStore.getEthers()
+      });
       
       console.log('✅ Expired pending shot cleanup completed');
       toastStore.success('Expired pending shot cleaned up! You can now take shots again.');

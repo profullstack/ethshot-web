@@ -67,7 +67,8 @@
   async function requestPermission() {
     isLoading = true;
     try {
-      const granted = await gameStore.requestNotificationPermission();
+      const { NotificationService } = await import('../stores/game/index.js');
+      const granted = await NotificationService.requestNotificationPermission();
       permissionStatus = granted ? 'granted' : 'denied';
       showPrompt = false;
     } catch (error) {
