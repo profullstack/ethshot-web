@@ -417,15 +417,17 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
     throw new Error('Unable to verify game state. Please try again later.');
   }
   
-  // Explicit check with clear error message
-  if (currentPot < fullShotCost) {
-    console.warn('⚠️ Pot too small for shot - checking if this is a first shot');
-    
-    // Special case for empty pot (first player) - allow first shot to proceed
-    if (currentPot === 0n) {
-      console.log('✅ Empty pot detected - allowing first shot to proceed');
-      // First shot is allowed to proceed - it will fund the pot
-    } else {
+  // CRITICAL FIX: The contract's validPotSize modifier prevents first shots
+  // because it checks currentPot >= MIN_POT_SIZE BEFORE adding the shot cost
+  // For empty pot (first shot), we need to handle this specially
+  const isFirstShot = currentPot === 0n;
+  
+  if (isFirstShot) {
+    console.log('🎯 FIRST SHOT DETECTED: Empty pot - will attempt to bypass validPotSize modifier');
+    console.log('Note: This may fail due to contract design. Consider pre-funding the pot.');
+  } else {
+    // For non-empty pots, check if it's big enough for proper payout precision
+    if (currentPot < fullShotCost) {
       throw new Error(`Pot is currently ${ethers.formatEther(currentPot)} ETH, which is too small for payout precision. The pot needs at least ${ethers.formatEther(fullShotCost)} ETH to function properly.`);
     }
   }

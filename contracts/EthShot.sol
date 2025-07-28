@@ -132,7 +132,8 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         _;
     }
     
-    modifier validPotSize() {
+    // FIXED: Create separate modifiers for commit and reveal phases
+    modifier validPotSizeForReveal() {
         require(currentPot >= MIN_POT_SIZE, "Pot too small for payout precision");
         _;
     }
@@ -179,15 +180,16 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
      * @dev Commit to taking a shot (step 1 of commit-reveal)
      * @param commitment Hash of (secret + player address)
      * @notice Costs SHOT_COST ETH per shot, uses commit-reveal for randomness
+     * @notice FIXED: Removed validPotSize modifier to allow first shots
      */
-    function commitShot(bytes32 commitment) 
-        external 
-        payable 
-        whenNotPaused 
-        nonReentrant 
+    function commitShot(bytes32 commitment)
+        external
+        payable
+        whenNotPaused
+        nonReentrant
         canCommit(msg.sender)
         correctPayment(SHOT_COST)
-        validPotSize
+        // REMOVED: validPotSize - this was preventing first shots
     {
         require(commitment != bytes32(0), "Invalid commitment");
         
@@ -218,12 +220,14 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     /**
      * @dev Reveal the shot and determine outcome (step 2 of commit-reveal)
      * @param secret The secret used in the commitment
+     * @notice FIXED: Pot size validation moved here to ensure sufficient funds for payout
      */
     function revealShot(uint256 secret)
         external
         whenNotPaused
         nonReentrant
         canReveal(msg.sender)
+        validPotSizeForReveal  // MOVED: Pot validation to reveal phase
     {
         PendingShot storage shot = pendingShots[msg.sender];
         
