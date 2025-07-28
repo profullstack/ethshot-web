@@ -31,10 +31,10 @@ export const GAME_CONFIG = {
 // Network Configuration
 export const NETWORK_CONFIG = {
   CHAIN_ID: parseInt(import.meta.env.VITE_CHAIN_ID || import.meta.env.PUBLIC_CHAIN_ID || '11155111'),
-  RPC_URL: import.meta.env.VITE_RPC_URL || import.meta.env.PUBLIC_RPC_URL || 'https://sepolia.infura.io/v3/demo',
-  NETWORK_NAME: import.meta.env.VITE_NETWORK_NAME || import.meta.env.PUBLIC_NETWORK_NAME || 'Sepolia Testnet',
-  BLOCK_EXPLORER_URL: import.meta.env.VITE_BLOCK_EXPLORER_URL || import.meta.env.PUBLIC_BLOCK_EXPLORER_URL || 'https://sepolia.etherscan.io',
-  CONTRACT_ADDRESS: import.meta.env.VITE_CONTRACT_ADDRESS || import.meta.env.PUBLIC_CONTRACT_ADDRESS || '',
+  RPC_URL: (import.meta.env.VITE_RPC_URL || import.meta.env.PUBLIC_RPC_URL || 'https://sepolia.infura.io/v3/demo').trim(),
+  NETWORK_NAME: (import.meta.env.VITE_NETWORK_NAME || import.meta.env.PUBLIC_NETWORK_NAME || 'Sepolia Testnet').trim(),
+  BLOCK_EXPLORER_URL: (import.meta.env.VITE_BLOCK_EXPLORER_URL || import.meta.env.PUBLIC_BLOCK_EXPLORER_URL || 'https://sepolia.etherscan.io').trim(),
+  CONTRACT_ADDRESS: (import.meta.env.VITE_CONTRACT_ADDRESS || import.meta.env.PUBLIC_CONTRACT_ADDRESS || '').trim(),
 };
 
 // Social Media & External URLs

@@ -1035,7 +1035,7 @@ export const NETWORKS = {
 // Default configuration - reads from environment variables
 export const DEFAULT_CONFIG = {
   network: 'sepolia',
-  contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS || '0x5B575c09E7276358fd4C0f5B70abaaBDbeF9160f',
+  contractAddress: (import.meta.env.VITE_CONTRACT_ADDRESS || '').trim(),
   shotCost: import.meta.env.VITE_SHOT_COST_ETH || '0.0005',
   sponsorCost: import.meta.env.VITE_SPONSOR_COST_ETH || '0.001',
   cooldownPeriod: parseInt(import.meta.env.VITE_COOLDOWN_HOURS || '1') * 3600 // Convert hours to seconds
