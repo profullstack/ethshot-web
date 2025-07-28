@@ -8,7 +8,7 @@
 
 set -e
 
-ENV_FILE="${1:-.env}"
+ENV_FILE="${1:-servers/chat/.env}"
 
 if [ ! -f "$ENV_FILE" ]; then
     echo "❌ Environment file '$ENV_FILE' not found!"
