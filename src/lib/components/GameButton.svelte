@@ -267,75 +267,78 @@
     }
 
     try {
-      // Get the contract directly to check actual state
+      console.log('🔍 COMPREHENSIVE GAME STATE CHECK:');
+      console.log('=====================================');
+      
+      // Get current game state
       const gameState = get(gameStore);
-      if (!gameState.contract) {
-        toastStore.error('Contract not available');
-        return;
-      }
-
-      console.log('🔍 COMPREHENSIVE CONTRACT STATE CHECK:');
-      console.log('=====================================');
+      console.log('📋 Current game state:', {
+        contractDeployed: gameState.contractDeployed,
+        canShoot: gameState.canShoot,
+        cooldownRemaining: gameState.cooldownRemaining,
+        currentPot: gameState.currentPot,
+        loading: gameState.loading,
+        takingShot: gameState.takingShot,
+        error: gameState.error
+      });
       
-      // Check if player has pending shot
-      const hasPending = await gameState.contract.hasPendingShot(wallet.address);
-      console.log('📋 Has pending shot:', hasPending);
+      // Check wallet state
+      console.log('📋 Wallet state:', {
+        connected: wallet.connected,
+        address: wallet.address,
+        network: wallet.network
+      });
       
-      if (hasPending) {
-        // Get pending shot details
-        const [exists, blockNumber, amount] = await gameState.contract.getPendingShot(wallet.address);
-        console.log('📋 Pending shot details:', { exists, blockNumber: blockNumber.toString(), amount: amount.toString() });
-        
-        // Check if can reveal
-        const canReveal = await gameState.contract.canRevealShot(wallet.address);
-        console.log('📋 Can reveal shot:', canReveal);
-        
-        // Calculate blocks elapsed
-        const currentBlock = await gameState.contract.provider.getBlockNumber();
-        const blocksElapsed = currentBlock - Number(blockNumber);
-        console.log('📋 Current block:', currentBlock);
-        console.log('📋 Commit block:', Number(blockNumber));
-        console.log('📋 Blocks elapsed:', blocksElapsed);
-        console.log('📋 Time elapsed (est):', Math.floor(blocksElapsed * 12 / 60), 'minutes');
-        
-        if (blocksElapsed > 256) {
-          console.log('🚨 EXPIRED PENDING SHOT FOUND!');
-          console.log('🚨 Your pending shot expired after 256 blocks but is still blocking new shots.');
-          console.log('🚨 This is a contract design issue - expired shots should auto-cleanup.');
-          toastStore.error('FOUND THE ISSUE: You have an expired pending shot that should have auto-cleaned up. This is a contract bug.');
-        } else if (canReveal) {
-          console.log('✅ You can reveal your pending shot now!');
-          toastStore.info('You have a pending shot that can be revealed. You need to call revealShot() with your secret.');
-        } else if (blocksElapsed <= 1) {
-          console.log('⏳ Pending shot in reveal delay (need to wait 1+ blocks)');
-          toastStore.info('Your shot is in reveal delay. Wait 1+ blocks then reveal.');
-        } else {
-          console.log('❓ Pending shot exists but cannot be revealed - checking why...');
-        }
-      }
-      
-      // Check cooldown
-      const canCommit = await gameState.contract.canCommitShot(wallet.address);
-      const cooldownRemaining = await gameState.contract.getCooldownRemaining(wallet.address);
-      console.log('📋 Can commit shot:', canCommit);
-      console.log('📋 Cooldown remaining:', cooldownRemaining.toString(), 'seconds');
-      
-      // Check last shot time
-      const lastShot = await gameState.contract.lastShotTime(wallet.address);
-      console.log('📋 Last shot time:', new Date(Number(lastShot) * 1000).toLocaleString());
-      
-      console.log('=====================================');
-      
-      if (!hasPending && canCommit && cooldownRemaining.toString() === '0') {
-        console.log('✅ CONTRACT SAYS YOU CAN SHOOT - This might be a UI bug!');
-        toastStore.success('Contract says you can shoot! Try refreshing player data.');
-      }
-      
+      // Force refresh player data and check again
+      console.log('🔄 Force refreshing player data...');
       await gameStore.loadPlayerData(wallet.address);
       
+      // Get updated state after refresh
+      const updatedState = get(gameStore);
+      console.log('📋 Updated game state after refresh:', {
+        canShoot: updatedState.canShoot,
+        cooldownRemaining: updatedState.cooldownRemaining,
+        lastShotTime: updatedState.playerStats?.lastShotTime,
+        totalShots: updatedState.playerStats?.totalShots
+      });
+      
+      // Analyze the issue
+      if (updatedState.contractDeployed === false) {
+        console.log('🚨 CONTRACT NOT DEPLOYED!');
+        toastStore.error('Contract is not deployed. This is the root issue.');
+      } else if (updatedState.cooldownRemaining > 0) {
+        console.log('⏳ COOLDOWN STILL ACTIVE:', updatedState.cooldownRemaining, 'seconds');
+        toastStore.info(`Cooldown still active: ${Math.ceil(updatedState.cooldownRemaining / 60)} minutes remaining`);
+      } else if (!updatedState.canShoot) {
+        console.log('🚨 CANNOT SHOOT - LIKELY PENDING SHOT ISSUE');
+        console.log('🚨 This suggests you have a pending shot that was never revealed.');
+        console.log('🚨 The commit-reveal process requires both commit AND reveal steps.');
+        console.log('🚨 If you only did the commit (first shot), you need to reveal it.');
+        console.log('🚨 If the reveal window expired (>256 blocks), this is a contract bug.');
+        
+        toastStore.error('LIKELY ISSUE: You have an unrevealed pending shot blocking new shots. This is a contract design flaw.');
+        
+        // Provide specific guidance
+        console.log('');
+        console.log('🔧 POSSIBLE SOLUTIONS:');
+        console.log('  1. If you remember your secret from the first shot, try to reveal it');
+        console.log('  2. Wait for the contract to be updated with a cleanup function');
+        console.log('  3. Contact the developers about this expired pending shot issue');
+        
+      } else if (updatedState.canShoot && updatedState.cooldownRemaining === 0) {
+        console.log('✅ CONTRACT STATE SAYS YOU CAN SHOOT!');
+        console.log('✅ This might be a UI synchronization issue.');
+        toastStore.success('Game state says you can shoot! The UI might be out of sync.');
+      } else {
+        console.log('❓ UNKNOWN ISSUE - Check the debug info above');
+        toastStore.info('Unknown issue. Check console for detailed debug information.');
+      }
+      
+      console.log('=====================================');
+      
     } catch (error) {
-      console.error('❌ Contract state check failed:', error);
-      toastStore.error('Contract check failed: ' + error.message);
+      console.error('❌ Game state check failed:', error);
+      toastStore.error('State check failed: ' + error.message);
     }
   };
 
