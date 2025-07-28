@@ -4,6 +4,7 @@
 import { BaseCryptoAdapter } from './base.js';
 import { WALLET_PROVIDERS } from '../config.js';
 import { defaultProviderManager, setupProvidersFromEnv } from '../rpc-provider-manager.js';
+import { WALLET_CONFIG } from '../../config.js';
 
 /**
  * Ethereum adapter for handling ETH transactions and wallet interactions
@@ -80,7 +81,7 @@ export class EthereumAdapter extends BaseCryptoAdapter {
       if (!instance && walletType === 'walletconnect') {
         console.log('🔗 Initializing WalletConnect...');
         
-        const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
+        const projectId = WALLET_CONFIG.WALLETCONNECT_PROJECT_ID;
         if (!projectId) {
           throw new Error('WalletConnect Project ID not configured.');
         }

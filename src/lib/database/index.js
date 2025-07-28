@@ -8,7 +8,7 @@
 import { supabase, TABLES, isSupabaseAvailable, getSupabaseClient } from './client.js';
 import { getPlayer, upsertPlayer, getTopPlayers, getLeaderboard } from './players.js';
 import { NETWORK_CONFIG } from '../config.js';
-import { upsertUserProfileAPI, getUserProfileAPI, isNicknameAvailableAPI } from '../utils/client-profile.js';
+import { profileAPI } from '../api/profile.js';
 import {
   createReferralCodeAPI,
   processReferralSignupAPI,
@@ -480,15 +480,15 @@ export const db = {
   // User Profile operations
   async getUserProfile(walletAddress) {
     try {
-      console.log('🔍 Getting user profile via secure API:', { walletAddress });
+      console.log('🔍 Getting user profile via ProfileAPI:', { walletAddress });
 
-      // Use the new API-based profile retrieval
-      const result = await getUserProfileAPI(walletAddress);
+      // Use the new ProfileAPI client
+      const result = await profileAPI.getProfile(walletAddress);
       
-      console.log('✅ User profile retrieved successfully via API:', result);
+      console.log('✅ User profile retrieved successfully via ProfileAPI:', result);
       return result;
     } catch (error) {
-      console.error('❌ Error getting user profile via API:', error);
+      console.error('❌ Error getting user profile via ProfileAPI:', error);
       // Return null for profile not found, but throw for other errors
       if (error.message?.includes('not found') || error.message?.includes('404')) {
         return null;
@@ -499,35 +499,35 @@ export const db = {
 
   async upsertUserProfile(profileData) {
     try {
-      console.log('🔄 Upserting user profile via secure API:', {
+      console.log('🔄 Upserting user profile via ProfileAPI:', {
         nickname: profileData.nickname,
         avatar_url: profileData.avatarUrl,
         bio: profileData.bio,
         notifications_enabled: profileData.notificationsEnabled
       });
 
-      // Use the new API-based profile upsert with JWT authentication
-      const result = await upsertUserProfileAPI(profileData);
+      // Use the new ProfileAPI client with JWT authentication
+      const result = await profileAPI.upsertProfile(profileData);
       
-      console.log('✅ User profile upserted successfully via API:', result);
+      console.log('✅ User profile upserted successfully via ProfileAPI:', result);
       return result;
     } catch (error) {
-      console.error('❌ Error upserting user profile via API:', error);
+      console.error('❌ Error upserting user profile via ProfileAPI:', error);
       throw error;
     }
   },
 
   async isNicknameAvailable(nickname, excludeWalletAddress = null) {
     try {
-      console.log('🔍 Checking nickname availability via secure API:', { nickname, excludeWalletAddress });
+      console.log('🔍 Checking nickname availability via ProfileAPI:', { nickname, excludeWalletAddress });
 
-      // Use the new API-based nickname availability check
-      const result = await isNicknameAvailableAPI(nickname, excludeWalletAddress);
+      // Use the new ProfileAPI client
+      const result = await profileAPI.checkNicknameAvailability(nickname, excludeWalletAddress);
       
-      console.log('✅ Nickname availability checked successfully via API:', result);
+      console.log('✅ Nickname availability checked successfully via ProfileAPI:', result);
       return result;
     } catch (error) {
-      console.error('❌ Error checking nickname availability via API:', error);
+      console.error('❌ Error checking nickname availability via ProfileAPI:', error);
       // Return false on error to be safe (assume nickname is not available)
       return false;
     }

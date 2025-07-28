@@ -7,15 +7,17 @@
 
 import { supabaseServer, isSupabaseServerAvailable } from '../database/server-client.js';
 import {
-  generateNonce,
-  createAuthMessage,
-  verifySignature,
-  generateJWT,
-  verifyJWT,
-  getChecksumAddress,
-  isValidWalletAddress
-} from '../server/jwt-auth.js';
-import { validateServerConfig, createConfigurationError } from '../config-server.js';
+  generateNonceSecure,
+  createAuthMessageSecure,
+  verifySignatureSecure,
+  generateJWTSecure,
+  verifyJWTSecure,
+  getChecksumAddressSecure,
+  isValidWalletAddressSecure,
+  hasJWTSecret,
+  validateServerConfig,
+  createConfigurationError
+} from '../server/jwt-auth-secure.js';
 
 /**
  * Generate and store a nonce for wallet authentication
@@ -34,7 +36,7 @@ export async function generateAuthNonce(walletAddress) {
     validateServerConfig('Nonce generation');
 
     // Validate wallet address format
-    if (!isValidWalletAddress(walletAddress)) {
+    if (!isValidWalletAddressSecure(walletAddress)) {
       throw new Error('Invalid wallet address format');
     }
 
@@ -42,10 +44,10 @@ export async function generateAuthNonce(walletAddress) {
     const normalizedAddress = walletAddress.toLowerCase();
     
     // Generate unique nonce
-    const nonce = generateNonce();
+    const nonce = generateNonceSecure();
     
     // Create the message to be signed
-    const message = createAuthMessage(normalizedAddress, nonce);
+    const message = createAuthMessageSecure(normalizedAddress, nonce);
     
     // Store nonce in database (upsert to handle existing users)
     const { error: dbError } = await supabaseServer
@@ -100,7 +102,7 @@ export async function verifyAndAuthenticate(walletAddress, signature) {
       throw new Error('Wallet address and signature are required');
     }
 
-    if (!isValidWalletAddress(walletAddress)) {
+    if (!isValidWalletAddressSecure(walletAddress)) {
       throw new Error('Invalid wallet address format');
     }
 
@@ -120,17 +122,17 @@ export async function verifyAndAuthenticate(walletAddress, signature) {
     }
 
     // Create the message that should have been signed
-    const message = createAuthMessage(normalizedAddress, userData.nonce);
+    const message = createAuthMessageSecure(normalizedAddress, userData.nonce);
     
     // Verify the signature
-    const isValidSignature = await verifySignature(message, signature, normalizedAddress);
+    const isValidSignature = await verifySignatureSecure(message, signature, normalizedAddress);
     
     if (!isValidSignature) {
       throw new Error('Invalid signature. Authentication failed.');
     }
 
     // Generate JWT token
-    const jwtToken = generateJWT(normalizedAddress);
+    const jwtToken = generateJWTSecure(normalizedAddress);
     
     // Update user record with successful authentication
     const { error: updateError } = await supabaseServer
@@ -179,7 +181,7 @@ export async function validateAuthToken(jwtToken) {
     }
 
     // Verify JWT token
-    const payload = verifyJWT(jwtToken);
+    const payload = verifyJWTSecure(jwtToken);
     
     // Get user info from database if server is available
     if (isSupabaseServerAvailable()) {
@@ -241,7 +243,7 @@ export async function refreshAuthToken(currentToken) {
     }
 
     // Generate new JWT token
-    const newJwtToken = generateJWT(validation.user.walletAddress);
+    const newJwtToken = generateJWTSecure(validation.user.walletAddress);
     
     console.log('✅ Token refreshed for wallet:', validation.user.walletAddress);
     

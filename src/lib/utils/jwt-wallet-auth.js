@@ -1,23 +1,25 @@
 /**
- * JWT-based Wallet Authentication Utilities
- * 
- * Provides secure wallet-based authentication using JWT tokens and signature verification.
- * This replaces the problematic email/password approach that was causing rate limiting issues.
+ * JWT-based Wallet Authentication Utilities (DEPRECATED - CLIENT UNSAFE)
+ *
+ * This module is deprecated due to security concerns.
+ * Use jwt-wallet-auth-client.js for client-safe operations.
+ * Use jwt-auth-secure.js for server-side operations.
+ *
+ * SECURITY WARNING: This module previously exposed JWT secrets to client code.
  */
 
-import jwt from 'jsonwebtoken';
 import { ethers } from 'ethers';
 
-// Get Supabase JWT secret from environment
-let SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.VITE_SUPABASE_JWT_SECRET;
+console.warn('⚠️ DEPRECATED: jwt-wallet-auth.js is deprecated due to security concerns. Use jwt-wallet-auth-client.js for client operations or jwt-auth-secure.js for server operations.');
 
-// Function to get current JWT secret (allows for runtime updates in tests)
+// JWT secret access is now REMOVED for security
+// These functions will throw errors if called
 function getJWTSecret() {
-  return SUPABASE_JWT_SECRET || process.env.SUPABASE_JWT_SECRET || process.env.VITE_SUPABASE_JWT_SECRET;
+  throw new Error('SECURITY ERROR: JWT secret access is not allowed. Use server-side jwt-auth-secure.js module.');
 }
 
-if (!getJWTSecret()) {
-  console.warn('⚠️ SUPABASE_JWT_SECRET not found in environment variables');
+export function setJWTSecret(secret) {
+  throw new Error('SECURITY ERROR: JWT secret setting is not allowed. Use server-side jwt-auth-secure.js module.');
 }
 
 /**
@@ -67,88 +69,44 @@ export async function verifySignature(message, signature, expectedSigner) {
 }
 
 /**
- * Generate JWT token for Supabase authentication
+ * Generate JWT token for Supabase authentication (DEPRECATED - SECURITY RISK)
  * @param {string} walletAddress - The wallet address to authenticate
  * @param {string} expiresIn - Token expiration time (default: 7 days)
  * @returns {string} JWT token
+ * @throws {Error} Always throws - use server-side jwt-auth-secure.js instead
  */
 export function generateJWT(walletAddress, expiresIn = '7d') {
-  const secret = getJWTSecret();
-  if (!secret) {
-    throw new Error('SUPABASE_JWT_SECRET is required for JWT generation');
-  }
-
-  const normalizedAddress = walletAddress.toLowerCase();
-  
-  const payload = {
-    sub: normalizedAddress, // Use wallet address as unique user identifier
-    aud: 'authenticated',
-    walletAddress: normalizedAddress,
-    role: 'authenticated',
-    iat: Math.floor(Date.now() / 1000),
-  };
-
-  return jwt.sign(payload, secret, {
-    expiresIn,
-    algorithm: 'HS256'
-  });
+  throw new Error('SECURITY ERROR: JWT generation is not allowed in client code. Use server-side API endpoints.');
 }
 
 /**
- * Verify and decode JWT token
+ * Verify and decode JWT token (DEPRECATED - SECURITY RISK)
  * @param {string} token - The JWT token to verify
  * @returns {Object} Decoded token payload
- * @throws {Error} If token is invalid or expired
+ * @throws {Error} Always throws - use server-side jwt-auth-secure.js instead
  */
 export function verifyJWT(token) {
-  const secret = getJWTSecret();
-  if (!secret) {
-    throw new Error('SUPABASE_JWT_SECRET is required for JWT verification');
-  }
-
-  try {
-    return jwt.verify(token, secret, {
-      algorithms: ['HS256'],
-      audience: 'authenticated'
-    });
-  } catch (error) {
-    console.error('❌ JWT verification failed:', error);
-    throw new Error(`Invalid JWT token: ${error.message}`);
-  }
+  throw new Error('SECURITY ERROR: JWT verification is not allowed in client code. Use server-side API endpoints.');
 }
 
 /**
- * Extract wallet address from JWT token without verification
- * Useful for quick checks when you don't need full verification
+ * Extract wallet address from JWT token without verification (DEPRECATED - SECURITY RISK)
  * @param {string} token - The JWT token
  * @returns {string|null} Wallet address or null if invalid
+ * @throws {Error} Always throws - use server-side jwt-auth-secure.js instead
  */
 export function extractWalletFromJWT(token) {
-  try {
-    const decoded = jwt.decode(token);
-    return decoded?.walletAddress || decoded?.sub || null;
-  } catch (error) {
-    console.error('❌ Failed to decode JWT:', error);
-    return null;
-  }
+  throw new Error('SECURITY ERROR: JWT decoding is not allowed in client code. Use server-side API endpoints.');
 }
 
 /**
- * Check if JWT token is expired
+ * Check if JWT token is expired (DEPRECATED - SECURITY RISK)
  * @param {string} token - The JWT token
  * @returns {boolean} True if token is expired
+ * @throws {Error} Always throws - use server-side jwt-auth-secure.js instead
  */
 export function isJWTExpired(token) {
-  try {
-    const decoded = jwt.decode(token);
-    if (!decoded?.exp) return true;
-    
-    const currentTime = Math.floor(Date.now() / 1000);
-    return decoded.exp <= currentTime; // Use <= to handle edge cases
-  } catch (error) {
-    console.error('❌ Failed to check JWT expiration:', error);
-    return true;
-  }
+  throw new Error('SECURITY ERROR: JWT operations are not allowed in client code. Use server-side API endpoints.');
 }
 
 /**

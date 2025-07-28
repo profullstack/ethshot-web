@@ -6,6 +6,7 @@
  */
 
 import { defaultRateLimiter } from './rpc-rate-limiter.js';
+import { NETWORK_CONFIG } from '../config.js';
 
 /**
  * RPC Provider Manager class
@@ -286,8 +287,8 @@ export const createProviderManager = () => {
  * @returns {Promise<void>}
  */
 export const setupProvidersFromEnv = async (manager, ethers) => {
-  // Primary provider from environment
-  const primaryRpcUrl = import.meta.env.VITE_RPC_URL;
+  // Primary provider from centralized config
+  const primaryRpcUrl = NETWORK_CONFIG.RPC_URL;
   if (primaryRpcUrl) {
     try {
       const primaryProvider = new ethers.JsonRpcProvider(primaryRpcUrl);
@@ -295,7 +296,7 @@ export const setupProvidersFromEnv = async (manager, ethers) => {
         name: 'Primary-Infura',
         priority: 10,
         rpcUrl: primaryRpcUrl,
-        chainId: parseInt(import.meta.env.VITE_CHAIN_ID || '11155111')
+        chainId: NETWORK_CONFIG.CHAIN_ID
       });
     } catch (error) {
       console.error('Failed to setup primary provider:', error);

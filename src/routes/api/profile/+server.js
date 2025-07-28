@@ -1,13 +1,13 @@
 /**
- * Server-side Profile API Routes
- * 
- * Handles user profile operations with JWT authentication securely on the server-side.
+ * Server-side Profile API Routes with ES256 JWT
+ *
+ * Handles user profile operations with ES256 JWT authentication securely on the server-side.
  * This prevents exposure of sensitive operations and environment variables to the client.
  */
 
 import { json } from '@sveltejs/kit';
-import { verifyJWT } from '../../../lib/server/jwt-auth.js';
-import { getSupabaseServerClient, isSupabaseServerAvailable } from '../../../lib/database/server-client.js';
+import { verifyJWTSecure } from '../../../lib/server/jwt-auth-secure.js';
+import { getSupabaseJWTClient, getSupabaseServerClient, isSupabaseServerAvailable } from '../../../lib/database/server-client.js';
 
 /**
  * POST /api/profile - Handle profile operations
@@ -74,19 +74,20 @@ async function handleUpsertProfile(request, { profileData }) {
     let walletAddress;
     
     try {
-      const payload = await verifyJWT(token);
-      walletAddress = payload.wallet_address;
+      const payload = verifyJWTSecure(token);
+      walletAddress = payload.walletAddress || payload.wallet_address || payload.sub;
       
       if (!walletAddress) {
+        console.error('❌ JWT payload missing wallet address:', payload);
         return json(
-          { success: false, error: 'Invalid token: no wallet address' }, 
+          { success: false, error: 'Invalid token: no wallet address' },
           { status: 401 }
         );
       }
     } catch (jwtError) {
       console.error('❌ JWT verification failed:', jwtError);
       return json(
-        { success: false, error: 'Invalid or expired token' }, 
+        { success: false, error: 'Invalid or expired token' },
         { status: 401 }
       );
     }
@@ -103,28 +104,47 @@ async function handleUpsertProfile(request, { profileData }) {
       );
     }
 
-    // Create a per-request Supabase client with JWT
-    const supabase = getSupabaseServerClient();
+    // Use Supabase client with JWT authentication for secure operations
+    const supabase = getSupabaseJWTClient(token);
 
-    console.log('🔄 Upserting user profile via server API:', {
+    console.log('🔄 Upserting user profile via secure API:', {
       walletAddress,
       nickname: profileData.nickname,
       avatar_url: profileData.avatarUrl,
-      bio: profileData.bio
+      bio: profileData.bio,
+      twitter_handle: profileData.twitterHandle,
+      discord_handle: profileData.discordHandle,
+      website_url: profileData.websiteUrl
     });
 
+    // Extract all profile fields from profileData
+    const {
+      nickname,
+      bio,
+      avatarUrl,
+      twitterHandle,
+      discordHandle,
+      websiteUrl
+    } = profileData;
+
     console.log('🔧 Calling upsert_user_profile_secure with parameters:', {
-      p_nickname: profileData.nickname || null,
-      p_avatar_url: profileData.avatarUrl || null,
-      p_bio: profileData.bio || null,
-      p_notifications_enabled: profileData.notificationsEnabled ?? true
+      p_wallet_address: walletAddress,
+      p_nickname: nickname || null,
+      p_bio: bio || null,
+      p_avatar_url: avatarUrl || null,
+      p_twitter_handle: twitterHandle || null,
+      p_discord_handle: discordHandle || null,
+      p_website_url: websiteUrl || null
     });
 
     const { data, error } = await supabase.rpc('upsert_user_profile_secure', {
-      p_nickname: profileData.nickname || null,
-      p_avatar_url: profileData.avatarUrl || null,
-      p_bio: profileData.bio || null,
-      p_notifications_enabled: profileData.notificationsEnabled ?? true
+      p_wallet_address: walletAddress,
+      p_nickname: nickname || null,
+      p_bio: bio || null,
+      p_avatar_url: avatarUrl || null,
+      p_twitter_handle: twitterHandle || null,
+      p_discord_handle: discordHandle || null,
+      p_website_url: websiteUrl || null
     });
 
     console.log('📊 Supabase RPC response:', { data, error });
@@ -142,10 +162,10 @@ async function handleUpsertProfile(request, { profileData }) {
       );
     }
 
-    console.log('✅ Profile upserted successfully via server API:', data);
+    console.log('✅ Profile upserted successfully via secure API:', data);
     return json({
       success: true,
-      profile: data && data.length > 0 ? data[0] : data
+      profile: data
     });
   } catch (error) {
     console.error('❌ Profile upsert error:', error);
@@ -254,7 +274,8 @@ async function handleCheckNickname(request, { nickname, excludeWalletAddress }) 
     }
 
     // Check nickname availability via Supabase RPC
-    const { data, error } = await supabaseServer.rpc('is_nickname_available', {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase.rpc('is_nickname_available', {
       p_nickname: nickname,
       exclude_wallet_addr: excludeWalletAddress || null
     });

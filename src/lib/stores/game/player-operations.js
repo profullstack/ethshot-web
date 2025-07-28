@@ -10,7 +10,8 @@ import { getActiveAdapter } from '../../crypto/adapters/index.js';
 import { toastStore } from '../toast.js';
 import { winnerEventStore } from './core.js';
 import { rpcCache } from './cache.js';
-import { 
+import { NETWORK_CONFIG } from '../../config.js';
+import {
   notifyJackpotWon,
   scheduleCooldownNotification
 } from '../../utils/notifications.js';
@@ -582,8 +583,8 @@ const logShotToDatabase = async ({
   try {
     console.log('📝 Recording shot to database...');
 
-    // Get contract address from environment or state
-    const contractAddress = state.contractAddress || process.env.PUBLIC_CONTRACT_ADDRESS;
+    // Get contract address from centralized config or state
+    const contractAddress = state.contractAddress || NETWORK_CONFIG.CONTRACT_ADDRESS;
 
     const shotRecord = await db.recordShot({
       playerAddress: wallet.address,

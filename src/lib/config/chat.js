@@ -5,13 +5,11 @@
 
 import { browser } from '$app/environment';
 
-// Environment variables with fallbacks
+// Environment variables with fallbacks - client-safe implementation
 const getEnvVar = (name, fallback) => {
-  if (browser) {
-    // In browser, use Vite environment variables
-    return import.meta.env[name] || fallback;
-  }
-  return process.env[name] || fallback;
+  // Always use import.meta.env for both client and server in SvelteKit
+  // This ensures consistent behavior and avoids process exposure to client
+  return import.meta.env[name] || fallback;
 };
 
 export const CHAT_CONFIG = {

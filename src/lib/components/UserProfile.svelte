@@ -36,9 +36,10 @@
 
   // Track if we've initialized the form data for this modal session
   let formInitialized = false;
+  let lastProfileData = null;
 
-  // Load current profile data only when modal first opens
-  $: if ($userProfile && show && !formInitialized) {
+  // Load current profile data when modal opens or profile changes
+  $: if (show && $userProfile && (!formInitialized || $userProfile !== lastProfileData)) {
     formData = {
       nickname: $userProfile.nickname || '',
       bio: $userProfile.bio || '',
@@ -49,11 +50,28 @@
     avatarPreview = $userProfile.avatar_url;
     clearErrors();
     formInitialized = true;
+    lastProfileData = $userProfile;
+  }
+
+  // Initialize with empty form if modal opens but no profile data yet
+  $: if (show && !$userProfile && !formInitialized) {
+    formData = {
+      nickname: '',
+      bio: '',
+      avatarFile: null,
+      notificationsEnabled: true
+    };
+    notificationsToggle = true;
+    avatarPreview = null;
+    clearErrors();
+    formInitialized = true;
+    lastProfileData = null;
   }
 
   // Reset form initialization flag when modal closes
   $: if (!show) {
     formInitialized = false;
+    lastProfileData = null;
   }
 
   // Sync the separate notification toggle with formData

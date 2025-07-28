@@ -17,6 +17,12 @@ dist/
 .env.production.local
 .env.*.local
 
+# JWT signing keys (sensitive)
+jwt.json
+private-key.pem
+public-key.pem
+jwk-private-key.json
+
 # IDE
 .vscode/
 .idea/
