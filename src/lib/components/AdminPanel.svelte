@@ -48,6 +48,19 @@
     }
   };
 
+  // Load house funds balance
+  const loadHouseFunds = async () => {
+    if (!browser || !$gameStore.contract) return;
+    
+    try {
+      const contract = $gameStore.contract;
+      const funds = await contract.getHouseFunds();
+      houseFunds = Number(funds);
+    } catch (err) {
+      console.error('Failed to load house funds:', err);
+    }
+  };
+
   // Enable/disable test mode
   const toggleTestMode = async () => {
     if (!$walletStore.signer || !$gameStore.contract) return;
@@ -116,10 +129,38 @@
     }
   };
 
+  // Withdraw house funds to house address
+  const withdrawHouseFunds = async () => {
+    if (!$walletStore.signer || !$gameStore.contract) return;
+    
+    loading = true;
+    error = null;
+    success = null;
+    
+    try {
+      const contract = $gameStore.contract.connect($walletStore.signer);
+      const tx = await contract.withdrawHouseFunds();
+      await tx.wait();
+      
+      const ethers = await import('ethers');
+      const withdrawnAmount = ethers.formatEther(houseFunds);
+      success = `Successfully withdrew ${withdrawnAmount} ETH to house address!`;
+      
+      // Reload house funds balance
+      await loadHouseFunds();
+    } catch (err) {
+      console.error('Failed to withdraw house funds:', err);
+      error = err.reason || err.message || 'Failed to withdraw house funds';
+    } finally {
+      loading = false;
+    }
+  };
+
   onMount(async () => {
     await checkOwnership();
     if (isOwner) {
       await loadTestModeConfig();
+      await loadHouseFunds();
     }
   });
 
@@ -130,6 +171,7 @@
 
   $: if (isOwner && $gameStore.contract) {
     loadTestModeConfig();
+    loadHouseFunds();
   }
 
   // Clear messages after 5 seconds
@@ -162,6 +204,27 @@
             {testModeConfig.currentChainId === 1 ? 'Mainnet' : 'Testnet'}
           </span>
         </div>
+      </div>
+    </div>
+
+    <!-- House Funds Management -->
+    <div class="mb-4 p-3 bg-gray-700/50 rounded-lg">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="font-medium">House Funds</div>
+          <div class="text-xs text-gray-400">
+            {#await import('ethers') then ethers}
+              Available: {ethers.formatEther(houseFunds)} ETH
+            {/await}
+          </div>
+        </div>
+        <button
+          class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={loading || houseFunds === 0}
+          on:click={withdrawHouseFunds}
+        >
+          Withdraw to House
+        </button>
       </div>
     </div>
 
@@ -261,6 +324,8 @@
       <div class="text-xs text-yellow-400">
         <div class="font-medium mb-1">Usage Instructions:</div>
         <ul class="space-y-1 list-disc list-inside">
+          <li>House funds are accumulated from game fees and sponsorships</li>
+          <li>Withdraw sends all house funds to the house commission address</li>
           <li>Test mode is automatically disabled on mainnet</li>
           <li>When test mode is ON: cooldown is 1 minute (for rapid testing)</li>
           <li>When test mode is OFF: cooldown is normal 1 hour from .env</li>

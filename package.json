@@ -38,7 +38,9 @@
     "db:status": "supabase migration list --linked",
     "db:diff": "supabase db diff --linked",
     "db:link": "node scripts/db-link.js",
-    "db:setup": "pnpm run db:link && pnpm run db:migrate"
+    "db:setup": "pnpm run db:link && pnpm run db:migrate",
+    "vercel:update-contract": "node scripts/update-vercel-contract.js",
+    "railway:update-contract": "node scripts/update-railway-contract.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
