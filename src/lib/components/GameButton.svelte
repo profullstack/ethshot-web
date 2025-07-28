@@ -183,22 +183,9 @@
     startCooldownTimer();
   }
   
-  // Check if pot is empty (first shot scenario)
-  $: isPotEmpty = !$currentPot || $currentPot === '0' || $currentPot === '0.0' || $currentPot === '0.00000' || parseFloat($currentPot || '0') === 0;
+  // Check if pot is empty (first shot scenario) - simplified to handle both string and numeric values
+  $: isPotEmpty = parseFloat($currentPot || '0') === 0;
   $: isFirstShotReady = isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0;
-  
-  // Debug logging for pot detection
-  $: {
-    console.log('🔍 Pot Detection Debug:', {
-      currentPot: $currentPot,
-      currentPotType: typeof $currentPot,
-      isPotEmpty,
-      isFirstShotReady,
-      canTakeShot: $canTakeShot,
-      isLoading: $isLoading,
-      timeRemaining
-    });
-  }
 
   onMount(() => {
     console.log('🔧 GameButton onMount called');
