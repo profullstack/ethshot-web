@@ -35,19 +35,39 @@
   let socialProofSubscription = null;
 
   // Listen for winner events from the winner event store
-  $: if ($winnerEventStore && $walletStore.address) {
+  $: if ($winnerEventStore) {
     const winnerEvent = $winnerEventStore;
     const currentUser = $walletStore.address;
     
-    // Check if the winner is the current user
-    if (winnerEvent.winner?.toLowerCase() === currentUser.toLowerCase()) {
+    console.log('🎉 Winner event detected:', {
+      winnerEvent,
+      currentUser,
+      winnerAddress: winnerEvent.winner,
+      amount: winnerEvent.amount,
+      isCurrentUser: winnerEvent.winner?.toLowerCase() === currentUser?.toLowerCase()
+    });
+    
+    // Check if the winner is the current user (allow for wallet address to be available later)
+    if (winnerEvent.winner && currentUser && winnerEvent.winner.toLowerCase() === currentUser.toLowerCase()) {
       winnerAmount = winnerEvent.amount || '0';
       showWinnerAnimation = true;
       
-      // Clear the winner event after showing animation
+      console.log('🎊 Triggering winner animation:', {
+        winnerAmount,
+        showWinnerAnimation
+      });
+      
+      // Clear the winner event after showing animation (longer delay to ensure animation triggers)
       setTimeout(() => {
+        console.log('🧹 Clearing winner event');
         winnerEventStore.set(null);
-      }, 100);
+      }, 1000);
+    } else if (winnerEvent.winner && !currentUser) {
+      // Wallet not connected yet, but winner event exists - wait for wallet
+      console.log('⏳ Winner event exists but wallet not connected yet, waiting...');
+    } else if (winnerEvent.winner && currentUser && winnerEvent.winner.toLowerCase() !== currentUser.toLowerCase()) {
+      // Someone else won
+      console.log('👥 Someone else won the pot:', winnerEvent.winner);
     }
   }
 

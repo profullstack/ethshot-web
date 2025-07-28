@@ -108,7 +108,7 @@
       </h2>
       <div class="text-gray-300 space-y-2">
         <p>Players can sponsor a round for <strong class="text-purple-400">{formatEth(GAME_CONFIG.SPONSOR_COST_ETH)} ETH</strong> to get their name/logo displayed.</p>
-        <p>Sponsorship adds to the pot and gives you visibility to all players.</p>
+        <p>Sponsorship gives you visibility to all players and supports the platform.</p>
         <p>Perfect for promoting your project, brand, or just having fun!</p>
       </div>
     </div>

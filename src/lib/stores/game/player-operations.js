@@ -322,7 +322,14 @@ export const takeShot = async ({
     console.log('✅ Shot transaction completed:', result.hash);
     
     if (result.won) {
-      toastStore.success('🎉 JACKPOT! You won the pot!');
+      const ethers = await import('ethers');
+      const winAmount = ethers.formatEther(state.currentPot || '0');
+      toastStore.success(`🎉 JACKPOT WON! You won ${winAmount} ETH! 🎊`);
+      
+      // Also show a more prominent success message
+      setTimeout(() => {
+        toastStore.success(`💰 Congratulations! ${winAmount} ETH has been sent to your wallet!`);
+      }, 2000);
     } else {
       const message = discountApplied ?
         `Shot taken with ${(discountPercentage * 100).toFixed(0)}% discount! Better luck next time.` :

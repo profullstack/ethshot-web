@@ -7,6 +7,8 @@
 
   let isOwner = false;
   let ownershipChecked = false; // Track if we've successfully checked ownership
+  let cachedContract = null; // Cache the contract reference
+  let cachedWalletAddress = null; // Cache the wallet address
   let testModeConfig = {
     isTestMode: false,
     isFiftyPercentMode: false,
@@ -19,31 +21,57 @@
 
   // Check if current user is contract owner
   const checkOwnership = async () => {
-    if (!browser || !$walletStore.connected || !$gameStore.contract) {
-      console.log('AdminPanel: Missing requirements', {
-        browser,
-        connected: $walletStore.connected,
-        contract: !!$gameStore.contract
-      });
-      // Don't reset isOwner if we've already confirmed ownership
+    console.log('🔍 AdminPanel: Starting ownership check', {
+      browser,
+      walletConnected: $walletStore.connected,
+      walletAddress: $walletStore.address,
+      gameStoreContract: !!$gameStore.contract,
+      cachedContract: !!cachedContract,
+      ownershipChecked,
+      currentIsOwner: isOwner
+    });
+
+    if (!browser || !$walletStore.connected) {
+      console.log('❌ AdminPanel: Browser or wallet not available');
       if (!ownershipChecked) {
         isOwner = false;
       }
       return;
     }
+
+    // Use cached contract if available, otherwise use gameStore contract
+    const contract = cachedContract || $gameStore.contract;
+    const walletAddress = $walletStore.address;
+
+    if (!contract) {
+      console.log('❌ AdminPanel: No contract available');
+      if (!ownershipChecked) {
+        isOwner = false;
+      }
+      return;
+    }
+
+    // Cache the contract and wallet address for future use
+    if (!cachedContract && $gameStore.contract) {
+      cachedContract = $gameStore.contract;
+      console.log('💾 AdminPanel: Cached contract reference');
+    }
+    
+    if (!cachedWalletAddress && walletAddress) {
+      cachedWalletAddress = walletAddress;
+      console.log('💾 AdminPanel: Cached wallet address');
+    }
     
     try {
       const ethers = await import('ethers');
-      const contract = $gameStore.contract;
       
       // Check if contract has owner function
       if (!contract || typeof contract.owner !== 'function') {
-        console.error('AdminPanel: Contract does not have owner() function', {
+        console.error('❌ AdminPanel: Contract does not have owner() function', {
           contract: !!contract,
           hasOwnerFunction: contract && typeof contract.owner === 'function',
           contractMethods: contract ? Object.getOwnPropertyNames(contract) : 'no contract'
         });
-        // Don't reset isOwner if we've already confirmed ownership
         if (!ownershipChecked) {
           isOwner = false;
         }
@@ -51,12 +79,14 @@
       }
       
       const ownerAddress = await contract.owner();
-      const userAddress = $walletStore.address;
+      const userAddress = walletAddress;
       
-      console.log('AdminPanel: Ownership check', {
+      console.log('🔍 AdminPanel: Ownership comparison', {
         ownerAddress,
         userAddress,
-        match: ownerAddress.toLowerCase() === userAddress.toLowerCase()
+        match: ownerAddress.toLowerCase() === userAddress.toLowerCase(),
+        ownershipChecked,
+        currentIsOwner: isOwner
       });
       
       const newIsOwner = ownerAddress.toLowerCase() === userAddress.toLowerCase();
@@ -67,15 +97,19 @@
         ownershipChecked = true;
         
         if (isOwner) {
-          console.log('✅ AdminPanel: User confirmed as contract owner');
+          console.log('✅ AdminPanel: User confirmed as contract owner - PANEL SHOULD BE VISIBLE');
+        } else {
+          console.log('❌ AdminPanel: User is not contract owner');
         }
+      } else {
+        console.log('ℹ️ AdminPanel: Ownership status unchanged, keeping current state');
       }
     } catch (err) {
-      console.error('AdminPanel: Failed to check ownership:', err);
+      console.error('❌ AdminPanel: Failed to check ownership:', err);
       console.error('AdminPanel: Error details:', {
         message: err.message,
         code: err.code,
-        contractExists: !!$gameStore.contract,
+        contractExists: !!contract,
         walletConnected: $walletStore.connected
       });
       
@@ -88,10 +122,10 @@
 
   // Load current test mode configuration
   const loadTestModeConfig = async () => {
-    if (!browser || !$gameStore.contract) return;
+    const contract = cachedContract || $gameStore.contract;
+    if (!browser || !contract) return;
     
     try {
-      const contract = $gameStore.contract;
       const config = await contract.getTestModeConfig();
       testModeConfig = {
         isTestMode: config.isTestMode,
@@ -105,10 +139,10 @@
 
   // Load house funds balance
   const loadHouseFunds = async () => {
-    if (!browser || !$gameStore.contract) return;
+    const contract = cachedContract || $gameStore.contract;
+    if (!browser || !contract) return;
     
     try {
-      const contract = $gameStore.contract;
       const funds = await contract.getHouseFunds();
       houseFunds = Number(funds);
     } catch (err) {
@@ -220,21 +254,26 @@
   });
 
   // Reactive updates when wallet or contract changes - but only check ownership once per session
-  $: if ($walletStore.connected && $gameStore.contract && !ownershipChecked) {
+  $: if ($walletStore.connected && ($gameStore.contract || cachedContract) && !ownershipChecked) {
+    console.log('🔄 AdminPanel: Reactive ownership check triggered');
     checkOwnership();
   }
 
-  // Reset ownership check when wallet disconnects or changes
-  $: if (!$walletStore.connected) {
+  // Reset ownership check when wallet disconnects or address changes
+  $: if (!$walletStore.connected || (cachedWalletAddress && $walletStore.address !== cachedWalletAddress)) {
+    console.log('🔄 AdminPanel: Resetting ownership state due to wallet change');
     ownershipChecked = false;
     isOwner = false;
+    cachedContract = null;
+    cachedWalletAddress = null;
   }
 
   // Load config and funds when owner status is confirmed
-  $: if (isOwner && $gameStore.contract) {
+  $: if (isOwner && (cachedContract || $gameStore.contract)) {
     loadTestModeConfig();
     loadHouseFunds();
   }
+
 
   // Clear messages after 5 seconds
   $: if (success || error) {
@@ -244,6 +283,11 @@
     }, 5000);
   }
 </script>
+
+<!-- Debug info (remove in production) -->
+<div class="text-xs text-gray-500 mb-2">
+  Debug: isOwner={isOwner}, ownershipChecked={ownershipChecked}, wallet={$walletStore.connected}
+</div>
 
 {#if isOwner}
   <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-yellow-500/50">
@@ -278,6 +322,9 @@
             {#await import('ethers') then ethers}
               Available: {ethers.formatEther(houseFunds)} ETH
             {/await}
+          </div>
+          <div class="text-xs text-yellow-400 mt-1">
+            💡 House funds ≠ Pot. Accumulated from sponsorships + win commissions
           </div>
         </div>
         <button
