@@ -180,7 +180,7 @@
             href="/"
             class="text-gray-300 hover:text-white transition-colors"
           >
-            Game
+            Play!
           </a>
           <a
             href="/games"
