@@ -305,24 +305,13 @@ class ChatServer {
    * Handle user authentication with JWT token
    */
   async handleAuthentication(clientId, message) {
-    const { jwtToken, walletAddress } = message;
+    const { jwtToken } = message;
     
-    // Support both JWT token and legacy wallet address authentication
-    if (jwtToken) {
-      await this.handleJWTAuthentication(clientId, jwtToken);
-    } else if (walletAddress) {
-      // Legacy authentication - deprecated but supported for backward compatibility
-      console.warn('⚠️ Legacy wallet address authentication used - please upgrade to JWT tokens');
-      await this.handleLegacyAuthentication(clientId, walletAddress);
-    } else {
-      this.sendError(clientId, 'JWT token or wallet address is required for authentication');
+    if (!jwtToken) {
+      this.sendError(clientId, 'JWT token is required for authentication');
+      return;
     }
-  }
 
-  /**
-   * Handle JWT token authentication
-   */
-  async handleJWTAuthentication(clientId, jwtToken) {
     const client = this.clients.get(clientId);
     if (!client) return;
 
@@ -359,38 +348,6 @@ class ChatServer {
       console.error('JWT authentication error:', error);
       this.sendError(clientId, 'Authentication failed - invalid token');
     }
-  }
-
-  /**
-   * Handle legacy wallet address authentication (deprecated)
-   */
-  async handleLegacyAuthentication(clientId, walletAddress) {
-    const client = this.clients.get(clientId);
-    if (!client) return;
-
-    // Validate wallet address format (basic validation)
-    if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-      this.sendError(clientId, 'Invalid wallet address format');
-      return;
-    }
-
-    // Store wallet address
-    client.walletAddress = walletAddress.toLowerCase();
-
-    // Initialize rate limiting for this user
-    this.rateLimits.set(client.walletAddress, {
-      messages: [],
-      lastReset: Date.now()
-    });
-
-    this.sendToClient(clientId, {
-      type: 'authenticated',
-      walletAddress: client.walletAddress,
-      authMethod: 'legacy',
-      timestamp: new Date().toISOString()
-    });
-
-    console.log(`Client ${clientId} authenticated via legacy method as ${client.walletAddress}`);
   }
 
   /**

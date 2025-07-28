@@ -117,21 +117,28 @@ class ChatStore {
   }
 
   /**
-   * Authenticate with wallet address
+   * Authenticate with JWT token (automatically detected from localStorage)
    */
-  async authenticate(walletAddress) {
+  async authenticate() {
     if (!this.client) {
       throw new Error('Chat client not initialized');
     }
 
     try {
-      await this.client.authenticate(walletAddress);
-      currentWalletAddress.set(walletAddress);
-      chatAuthenticated.set(true);
-      chatError.set(null);
+      // The client will automatically detect JWT token from localStorage
+      const authResult = await this.client.authenticate();
       
-      // Load user chat settings
-      await this.loadUserSettings(walletAddress);
+      // Extract wallet address from authentication result
+      const authenticatedWalletAddress = authResult.walletAddress;
+      
+      if (authenticatedWalletAddress) {
+        currentWalletAddress.set(authenticatedWalletAddress);
+        chatAuthenticated.set(true);
+        chatError.set(null);
+        
+        // Load user chat settings
+        await this.loadUserSettings(authenticatedWalletAddress);
+      }
       
       return true;
     } catch (error) {
@@ -553,7 +560,7 @@ export const chat = {
   init: () => chatStore.init(),
   connect: () => chatStore.connect(),
   disconnect: () => chatStore.disconnect(),
-  authenticate: (walletAddress) => chatStore.authenticate(walletAddress),
+  authenticate: () => chatStore.authenticate(),
   joinRoom: (roomId) => chatStore.joinRoom(roomId),
   leaveRoom: (roomId) => chatStore.leaveRoom(roomId),
   sendMessage: (roomId, content, messageType) => chatStore.sendMessage(roomId, content, messageType),

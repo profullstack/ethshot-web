@@ -101,20 +101,15 @@ export class ChatClient {
   }
 
   /**
-   * Authenticate with JWT token (preferred) or wallet address (legacy)
+   * Authenticate with JWT token (automatically detected from localStorage)
    */
-  async authenticate(walletAddressOrToken) {
+  async authenticate() {
     if (!this.isConnected) {
       throw new Error('Not connected to chat server');
     }
 
-    if (!walletAddressOrToken) {
-      throw new Error('JWT token or wallet address is required');
-    }
-
-    // Try to get JWT token from localStorage first
+    // Get JWT token from localStorage
     let jwtToken = null;
-    let walletAddress = null;
 
     try {
       // Check if we have a stored JWT token
@@ -122,18 +117,13 @@ export class ChatClient {
       if (storedToken) {
         jwtToken = storedToken;
         console.log('🔐 Using stored JWT token for chat authentication');
+      } else {
+        throw new Error('No JWT token found in localStorage');
       }
     } catch (error) {
-      console.warn('⚠️ Could not access localStorage for JWT token:', error);
+      console.error('⚠️ Could not access JWT token for authentication:', error);
+      throw new Error('JWT token is required for chat authentication');
     }
-
-    // If no JWT token, treat the parameter as wallet address (legacy mode)
-    if (!jwtToken) {
-      walletAddress = walletAddressOrToken;
-      console.warn('⚠️ Using legacy wallet address authentication - please upgrade to JWT tokens');
-    }
-
-    this.walletAddress = walletAddress;
     
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -159,18 +149,11 @@ export class ChatClient {
         reject(new Error(data.message));
       });
 
-      // Send authentication message with JWT token or wallet address
-      const authMessage = {
-        type: 'authenticate'
-      };
-
-      if (jwtToken) {
-        authMessage.jwtToken = jwtToken;
-      } else {
-        authMessage.walletAddress = walletAddress;
-      }
-
-      this.send(authMessage);
+      // Send authentication message with JWT token
+      this.send({
+        type: 'authenticate',
+        jwtToken
+      });
     });
   }
 
