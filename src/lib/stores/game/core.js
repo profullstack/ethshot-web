@@ -75,6 +75,14 @@ const createUnifiedGameStore = () => {
         const result = await initializeEthContract({ updateState: update });
         contract = result.contract;
         ethers = result.ethers;
+        
+        // Store contract and ethers in the state so components can access them
+        update(state => ({
+          ...state,
+          contract: result.contract,
+          ethers: result.ethers
+        }));
+        
         if (!contract) return;
       }
       
@@ -396,9 +404,17 @@ const createUnifiedGameStore = () => {
       throw new Error('Not available on server');
     }
 
+    console.log('🧹 GameStore: Starting cleanupExpiredPendingShot...');
+
     const state = get({ subscribe });
     const walletStore = getWalletStore();
     const wallet = get(walletStore);
+    
+    console.log('🧹 GameStore: Wallet check:', {
+      connected: wallet.connected,
+      address: wallet.address,
+      contractDeployed: state.contractDeployed
+    });
     
     if (!wallet.connected || !wallet.address) {
       throw new Error('Please connect your wallet first');
@@ -411,6 +427,8 @@ const createUnifiedGameStore = () => {
     // Default to cleaning up the current user's pending shot
     const targetPlayer = playerAddress || wallet.address;
     
+    console.log('🧹 GameStore: Target player:', targetPlayer);
+    
     // Only allow users to clean up their own pending shots for privacy
     if (targetPlayer !== wallet.address) {
       throw new Error('You can only clean up your own pending shots');
@@ -422,22 +440,39 @@ const createUnifiedGameStore = () => {
         throw new Error('Cleanup function not yet implemented for multi-crypto mode. Please refresh the page.');
       } else {
         // ETH-only mode: try to call the contract function
+        console.log('🧹 GameStore: Checking contract availability:', {
+          contract: !!contract,
+          ethers: !!ethers,
+          signer: !!wallet.signer
+        });
+        
         if (!contract || !ethers || !wallet.signer) {
           throw new Error('Contract or signer not available. Please refresh the page.');
         }
 
+        console.log('🧹 GameStore: Checking if pending shot exists...');
+        
         // First check if the pending shot is actually expired
         const hasPending = await contract.hasPendingShot(targetPlayer);
         if (!hasPending) {
           throw new Error('No pending shot found to clean up');
         }
 
+        console.log('🧹 GameStore: Getting pending shot details...');
         const pendingShot = await contract.getPendingShot(targetPlayer);
         const currentBlock = await wallet.provider.getBlockNumber();
         const commitBlock = Number(pendingShot.blockNumber);
         const maxRevealDelay = 256; // MAX_REVEAL_DELAY from contract
         
         const revealExpired = currentBlock > commitBlock + maxRevealDelay;
+        
+        console.log('🧹 GameStore: Expiration check:', {
+          commitBlock,
+          currentBlock,
+          maxRevealDelay,
+          revealExpired,
+          blocksRemaining: (commitBlock + maxRevealDelay) - currentBlock
+        });
         
         if (!revealExpired) {
           const blocksRemaining = (commitBlock + maxRevealDelay) - currentBlock;
@@ -446,37 +481,49 @@ const createUnifiedGameStore = () => {
 
         // Try to call the cleanup function
         try {
+          console.log('🧹 GameStore: Calling contract cleanup function...');
           const contractWithSigner = contract.connect(wallet.signer);
           
           // Estimate gas
           let gasEstimate;
           try {
+            console.log('🧹 GameStore: Estimating gas...');
             gasEstimate = await contractWithSigner.cleanupExpiredPendingShot.estimateGas(targetPlayer);
+            console.log('🧹 GameStore: Gas estimate:', gasEstimate.toString());
           } catch (estimateError) {
-            console.warn('Failed to estimate gas for cleanup, using default:', estimateError.message);
+            console.warn('🧹 GameStore: Failed to estimate gas for cleanup, using default:', estimateError.message);
             gasEstimate = 100000n;
           }
           
           const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
+          console.log('🧹 GameStore: Using gas limit:', gasLimit.toString());
           
+          console.log('🧹 GameStore: Sending transaction...');
           const tx = await contractWithSigner.cleanupExpiredPendingShot(targetPlayer, {
             gasLimit: gasLimit
           });
 
+          console.log('🧹 GameStore: Transaction sent, waiting for receipt...', tx.hash);
           const receipt = await tx.wait();
+          console.log('🧹 GameStore: Transaction confirmed!', receipt.hash);
           
           return {
             hash: receipt.hash,
             receipt
           };
         } catch (contractError) {
-          console.warn('Contract cleanup failed, falling back to refresh solution:', contractError.message);
+          console.error('🧹 GameStore: Contract cleanup failed:', contractError);
+          console.error('🧹 GameStore: Contract error details:', {
+            message: contractError.message,
+            code: contractError.code,
+            reason: contractError.reason
+          });
           throw new Error('Contract cleanup failed. Please refresh the page to clear the pending shot state.');
         }
       }
       
     } catch (error) {
-      console.error('Failed to cleanup expired pending shot:', error);
+      console.error('🧹 GameStore: Failed to cleanup expired pending shot:', error);
       throw error;
     }
   };

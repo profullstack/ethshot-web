@@ -3,6 +3,7 @@
   import { walletStore } from '../stores/wallet.js';
   import { gameStore } from '../stores/game/core.js';
   import { toastStore } from '../stores/toast.js';
+  import { cleanupExpiredPendingShot } from '../utils/pending-shot-cleanup.js';
 
   let pendingShot = null;
   let loading = false;
@@ -18,25 +19,20 @@
     try {
       console.log('🔍 SimplePendingShotManager: Checking for pending shots...');
       
-      // Use gameStore's contract and ethers directly
+      // Wait for gameStore to be fully initialized
       let contract = state.contract;
       let provider = wallet.provider;
       let ethers = state.ethers;
       
-      if (!contract) {
-        console.log('❌ No contract in gameStore, trying wallet.contract as fallback...');
-        contract = wallet.contract;
-        provider = wallet.provider;
-        ethers = wallet.ethers;
-        if (!contract) {
-          console.log('❌ No contract available in either store!');
-          pendingShot = null;
-          return;
-        }
-        console.log('⚠️ Using fallback contract from wallet');
-      } else {
-        console.log('✅ Using contract from gameStore');
+      // If gameStore isn't ready, don't proceed yet
+      if (!contract || !ethers) {
+        console.log('⏳ GameStore not fully initialized yet, waiting...');
+        console.log('Contract:', !!contract, 'Ethers:', !!ethers);
+        pendingShot = null;
+        return;
       }
+      
+      console.log('✅ Using contract and ethers from gameStore');
 
       // Use the same logic as player-operations.js
       const canCommit = await contract.canCommitShot(wallet.address);
@@ -87,6 +83,12 @@
         };
         
         console.log('✅ Pending shot detected and will be displayed');
+        console.log('🎯 PENDING SHOT OBJECT CREATED:', pendingShot);
+        console.log('🎯 UI SHOULD NOW RENDER WITH:', {
+          exists: pendingShot.exists,
+          revealExpired: pendingShot.revealExpired,
+          canReveal: pendingShot.canReveal
+        });
       } else {
         console.log('✅ No pending shot found');
         pendingShot = null;
@@ -133,14 +135,26 @@
   const handleCleanupExpired = async () => {
     loading = true;
     try {
-      await state.cleanupExpiredPendingShot();
+      console.log('🧹 Starting cleanup of expired pending shot...');
+      
+      // Use the proper utility function instead of gameStore method
+      await cleanupExpiredPendingShot();
+      
+      console.log('✅ Cleanup successful!');
       toastStore.success('Expired pending shot cleaned up successfully');
       await checkPendingShot();
     } catch (error) {
-      console.error('Failed to cleanup expired shot:', error);
+      console.error('❌ Failed to cleanup expired shot:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        code: error.code,
+        reason: error.reason
+      });
+      
+      // Show the actual error to the user - no fallbacks that hide issues
       toastStore.error('Failed to cleanup expired shot: ' + error.message);
-      // Fallback to refresh if cleanup fails
-      handleRefreshPage();
     } finally {
       loading = false;
     }
@@ -213,6 +227,26 @@
     disabled={checkingStatus}
   >
     {checkingStatus ? 'Checking...' : 'Manual Check for Pending Shot'}
+  </button>
+  
+  <!-- Force Test Button -->
+  <button
+    style="background: #ffa500; color: white; border: none; padding: 8px 16px; border-radius: 4px; margin-top: 10px; cursor: pointer;"
+    on:click={() => {
+      console.log('🧪 FORCE TESTING: Setting pendingShot manually');
+      pendingShot = {
+        exists: true,
+        blockNumber: 8860511,
+        amount: '0.001',
+        currentBlock: 8860822,
+        canReveal: true,
+        revealExpired: true,
+        blocksToWait: 0
+      };
+      console.log('🧪 FORCE TEST: pendingShot set to:', pendingShot);
+    }}
+  >
+    🧪 Force Test UI
   </button>
 </div>
 

@@ -25,6 +25,7 @@ export const ETH_SHOT_ABI = [
   'function getPendingPayout(address player) external view returns (uint256)',
   'function getCooldownRemaining(address player) external view returns (uint256)',
   'function claimPayout() external',
+  'function cleanupExpiredPendingShot(address player) external',
   'function getCurrentSponsor() external view returns (tuple(address sponsor, string name, string logoUrl, uint256 timestamp, bool active))',
   'function getRecentWinners() external view returns (tuple(address winner, uint256 amount, uint256 timestamp, uint256 blockNumber)[])',
   'function SHOT_COST() external view returns (uint256)',
