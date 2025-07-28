@@ -57,10 +57,17 @@ while IFS= read -r line || [ -n "$line" ]; do
         
         echo "📝 Setting $key..."
         
+        # Remove existing variable first (ignore errors if it doesn't exist)
+        vercel env rm "$key" production $PROJECT_ARG --yes 2>/dev/null || true
+        vercel env rm "$key" preview $PROJECT_ARG --yes 2>/dev/null || true
+        vercel env rm "$key" development $PROJECT_ARG --yes 2>/dev/null || true
+        
         # Set environment variable for all environments (production, preview, development)
         vercel env add "$key" production $PROJECT_ARG <<< "$value"
         vercel env add "$key" preview $PROJECT_ARG <<< "$value"
         vercel env add "$key" development $PROJECT_ARG <<< "$value"
+        
+        sleep 0.5  # Small delay to avoid rate limiting
     fi
 done < "$ENV_FILE"
 
