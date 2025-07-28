@@ -60,7 +60,7 @@ export const db = {
   // Shot operations
   async recordShot(shotData) {
     try {
-      console.log('🎯 Recording shot to Supabase with authentication:', {
+      console.log('🎯 Recording shot to Supabase with JWT authentication:', {
         player_address: shotData.playerAddress.toLowerCase(),
         amount: shotData.amount,
         won: shotData.won || false,
@@ -70,6 +70,18 @@ export const db = {
         crypto_type: shotData.cryptoType || 'ETH',
         contract_address: shotData.contractAddress
       });
+
+      // Validate JWT token before attempting database operation
+      const jwtToken = localStorage.getItem('ethshot_jwt_token');
+      const storedWalletAddress = localStorage.getItem('ethshot_wallet_address');
+      
+      if (!jwtToken || !storedWalletAddress) {
+        throw new Error('JWT authentication required to record shot. Please reconnect your wallet.');
+      }
+
+      if (storedWalletAddress.toLowerCase() !== shotData.playerAddress.toLowerCase()) {
+        throw new Error('JWT token wallet address does not match shot player address.');
+      }
 
       return await withAuthenticatedClient(async (client) => {
         const { data, error } = await client
@@ -92,11 +104,11 @@ export const db = {
           throw error;
         }
         
-        console.log('✅ Shot recorded successfully with authentication:', data);
+        console.log('✅ Shot recorded successfully with JWT authentication:', data);
         return data;
       });
     } catch (error) {
-      console.error('❌ Error recording shot with authentication:', error);
+      console.error('❌ Error recording shot with JWT authentication:', error);
       throw error;
     }
   },
@@ -263,7 +275,7 @@ export const db = {
   // Winner operations
   async recordWinner(winnerData) {
     try {
-      console.log('🏆 Recording winner to Supabase with authentication:', {
+      console.log('🏆 Recording winner to Supabase with JWT authentication:', {
         winner_address: winnerData.winnerAddress.toLowerCase(),
         amount: winnerData.amount,
         tx_hash: winnerData.txHash,
@@ -272,6 +284,18 @@ export const db = {
         crypto_type: winnerData.cryptoType || 'ETH',
         contract_address: winnerData.contractAddress
       });
+
+      // Validate JWT token before attempting database operation
+      const jwtToken = localStorage.getItem('ethshot_jwt_token');
+      const storedWalletAddress = localStorage.getItem('ethshot_wallet_address');
+      
+      if (!jwtToken || !storedWalletAddress) {
+        throw new Error('JWT authentication required to record winner. Please reconnect your wallet.');
+      }
+
+      if (storedWalletAddress.toLowerCase() !== winnerData.winnerAddress.toLowerCase()) {
+        throw new Error('JWT token wallet address does not match winner address.');
+      }
 
       return await withAuthenticatedClient(async (client) => {
         const { data, error } = await client
@@ -293,11 +317,11 @@ export const db = {
           throw error;
         }
         
-        console.log('✅ Winner recorded successfully with authentication:', data);
+        console.log('✅ Winner recorded successfully with JWT authentication:', data);
         return data;
       });
     } catch (error) {
-      console.error('❌ Error recording winner with authentication:', error);
+      console.error('❌ Error recording winner with JWT authentication:', error);
       throw error;
     }
   },

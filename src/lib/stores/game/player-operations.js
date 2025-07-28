@@ -652,7 +652,7 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
 };
 
 /**
- * Log shot transaction to database
+ * Log shot transaction to database with proper JWT authentication
  * @param {Object} params - Logging parameters
  */
 const logShotToDatabase = async ({
@@ -665,11 +665,29 @@ const logShotToDatabase = async ({
   db
 }) => {
   try {
-    console.log('📝 Recording shot to database...');
+    console.log('📝 Recording shot to database with JWT authentication...');
+
+    // Check if we have valid JWT authentication
+    const jwtToken = localStorage.getItem('ethshot_jwt_token');
+    const storedWalletAddress = localStorage.getItem('ethshot_wallet_address');
+    
+    if (!jwtToken || !storedWalletAddress) {
+      console.error('❌ No JWT token found - cannot record shot to database');
+      toastStore.error('Authentication required to record shot. Please reconnect your wallet.');
+      return;
+    }
+
+    // Verify wallet address matches
+    if (storedWalletAddress.toLowerCase() !== wallet.address.toLowerCase()) {
+      console.error('❌ JWT token wallet address mismatch - cannot record shot');
+      toastStore.error('Wallet address mismatch. Please reconnect your wallet.');
+      return;
+    }
 
     // Get contract address from centralized config or state
     const contractAddress = state.contractAddress || NETWORK_CONFIG.CONTRACT_ADDRESS;
 
+    console.log('🔐 Recording shot with authenticated client...');
     const shotRecord = await db.recordShot({
       playerAddress: wallet.address,
       amount: actualShotCost,
@@ -684,7 +702,7 @@ const logShotToDatabase = async ({
     console.log('✅ Shot recorded successfully:', shotRecord?.id);
 
     if (result.won) {
-      console.log('🏆 Recording winner to database...');
+      console.log('🏆 Recording winner to database with authenticated client...');
       const winnerRecord = await db.recordWinner({
         winnerAddress: wallet.address,
         amount: state.currentPot,
@@ -697,31 +715,22 @@ const logShotToDatabase = async ({
       console.log('✅ Winner recorded successfully:', winnerRecord?.id);
     }
 
-    // Update player record
-    console.log('👤 Updating player record...');
-    const existingPlayer = await db.getPlayer(wallet.address);
-    
-    const newTotalShots = (existingPlayer?.total_shots || 0) + 1;
-    const newTotalSpent = parseFloat(existingPlayer?.total_spent || '0') + parseFloat(actualShotCost);
-    const newTotalWon = result.won ?
-      parseFloat(existingPlayer?.total_won || '0') + parseFloat(state.currentPot) :
-      parseFloat(existingPlayer?.total_won || '0');
-
-    const playerData = {
-      address: wallet.address,
-      totalShots: newTotalShots,
-      totalSpent: newTotalSpent.toString(),
-      totalWon: newTotalWon.toString(),
-      lastShotTime: new Date().toISOString(),
-      cryptoType: state.activeCrypto,
-      contractAddress: contractAddress
-    };
-
-    const playerRecord = await db.upsertPlayer(playerData);
-    console.log('✅ Player record updated successfully:', playerRecord?.address);
+    // Player stats are now automatically updated by the database trigger
+    console.log('✅ Player stats will be updated automatically by database trigger');
 
   } catch (dbError) {
     console.error('❌ Failed to log transaction to database:', dbError);
-    toastStore.error('Shot successful but failed to update leaderboard. Please refresh the page.');
+    
+    // Provide specific error messages based on the error type
+    if (dbError.message?.includes('JWT') || dbError.message?.includes('authentication')) {
+      toastStore.error('Authentication expired. Shot successful but not recorded. Please reconnect your wallet.');
+    } else if (dbError.message?.includes('RLS') || dbError.message?.includes('policy')) {
+      toastStore.error('Database access denied. Please ensure you are properly authenticated.');
+    } else {
+      toastStore.error('Shot successful but failed to update database. Please refresh the page.');
+    }
+    
+    // Don't throw the error - the shot was successful even if database recording failed
+    console.log('🎯 Shot transaction was successful despite database recording failure');
   }
 };
