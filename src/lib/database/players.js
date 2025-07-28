@@ -5,6 +5,7 @@
  */
 
 import { supabase, TABLES } from './client.js';
+import { withAuthenticatedClient } from './authenticated-client.js';
 import { NETWORK_CONFIG } from '../config.js';
 
 /**
@@ -44,13 +45,8 @@ export const getPlayer = async (address) => {
  * @returns {Promise<Object|null>} Upserted player data or null
  */
 export const upsertPlayer = async (playerData) => {
-  if (!supabase) {
-    console.warn('Supabase not configured - returning null for upsertPlayer');
-    return null;
-  }
-
   try {
-    console.log('🔄 Upserting player to Supabase:', {
+    console.log('🔄 Upserting player to Supabase with authentication:', {
       address: playerData.address.toLowerCase(),
       total_shots: playerData.totalShots || 0,
       total_spent: playerData.totalSpent || '0',
@@ -60,32 +56,34 @@ export const upsertPlayer = async (playerData) => {
       contract_address: playerData.contractAddress
     });
 
-    const { data, error } = await supabase
-      .from(TABLES.PLAYERS)
-      .upsert({
-        address: playerData.address.toLowerCase(),
-        total_shots: playerData.totalShots || 0,
-        total_spent: playerData.totalSpent || '0',
-        total_won: playerData.totalWon || '0',
-        last_shot_time: playerData.lastShotTime || null,
-        crypto_type: playerData.cryptoType || 'ETH',
-        contract_address: playerData.contractAddress,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'address',
-      })
-      .select()
-      .single();
+    return await withAuthenticatedClient(async (client) => {
+      const { data, error } = await client
+        .from(TABLES.PLAYERS)
+        .upsert({
+          address: playerData.address.toLowerCase(),
+          total_shots: playerData.totalShots || 0,
+          total_spent: playerData.totalSpent || '0',
+          total_won: playerData.totalWon || '0',
+          last_shot_time: playerData.lastShotTime || null,
+          crypto_type: playerData.cryptoType || 'ETH',
+          contract_address: playerData.contractAddress,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'address',
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('❌ Supabase upsertPlayer error:', error);
-      throw error;
-    }
-    
-    console.log('✅ Player upserted successfully:', data);
-    return data;
+      if (error) {
+        console.error('❌ Authenticated upsertPlayer error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Player upserted successfully with authentication:', data);
+      return data;
+    });
   } catch (error) {
-    console.error('❌ Error upserting player:', error);
+    console.error('❌ Error upserting player with authentication:', error);
     throw error;
   }
 };

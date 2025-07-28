@@ -30,6 +30,18 @@
     try {
       const ethers = await import('ethers');
       const contract = $gameStore.contract;
+      
+      // Check if contract has owner function
+      if (!contract || typeof contract.owner !== 'function') {
+        console.error('AdminPanel: Contract does not have owner() function', {
+          contract: !!contract,
+          hasOwnerFunction: contract && typeof contract.owner === 'function',
+          contractMethods: contract ? Object.getOwnPropertyNames(contract) : 'no contract'
+        });
+        isOwner = false;
+        return;
+      }
+      
       const ownerAddress = await contract.owner();
       const userAddress = $walletStore.address;
       
@@ -42,6 +54,12 @@
       isOwner = ownerAddress.toLowerCase() === userAddress.toLowerCase();
     } catch (err) {
       console.error('AdminPanel: Failed to check ownership:', err);
+      console.error('AdminPanel: Error details:', {
+        message: err.message,
+        code: err.code,
+        contractExists: !!$gameStore.contract,
+        walletConnected: $walletStore.connected
+      });
       isOwner = false;
     }
   };

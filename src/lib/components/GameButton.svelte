@@ -394,6 +394,11 @@
     startCooldownTimer();
   }
   
+  // Get individual loading states from the store
+  $: gameState = $gameStore;
+  $: isPreparingData = gameState.loading && !gameState.takingShot;
+  $: isTakingShot = gameState.takingShot;
+  
   // Check if pot is empty (first shot scenario) - simplified to handle both string and numeric values
   $: isPotEmpty = parseFloat($currentPot || '0') === 0;
   $: isFirstShotReady = isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0;
@@ -460,7 +465,7 @@
         <span class="text-2xl font-bold">Cooldown Active</span>
         <span class="text-sm opacity-80">Next shot in {formatTime(timeRemaining)}</span>
       </button>
-    {:else if $isLoading}
+    {:else if isTakingShot}
       <!-- Taking Shot -->
       <button
         class="btn-game btn-loading"
@@ -471,6 +476,20 @@
           <div class="flex flex-col">
             <span class="text-2xl font-bold">Taking Shot...</span>
             <span class="text-sm opacity-80">Confirm in wallet</span>
+          </div>
+        </div>
+      </button>
+    {:else if isPreparingData}
+      <!-- Preparing Data -->
+      <button
+        class="btn-game btn-loading"
+        disabled
+      >
+        <div class="flex items-center space-x-3">
+          <div class="spinner w-6 h-6"></div>
+          <div class="flex flex-col">
+            <span class="text-2xl font-bold">Preparing Shot Caller</span>
+            <span class="text-sm opacity-80">Loading game data</span>
           </div>
         </div>
       </button>

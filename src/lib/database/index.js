@@ -7,6 +7,7 @@
 
 import { supabase, TABLES, isSupabaseAvailable, getSupabaseClient } from './client.js';
 import { getPlayer, upsertPlayer, getTopPlayers, getLeaderboard } from './players.js';
+import { withAuthenticatedClient } from './authenticated-client.js';
 import { NETWORK_CONFIG } from '../config.js';
 import { profileAPI } from '../api/profile.js';
 import {
@@ -58,13 +59,8 @@ export const db = {
 
   // Shot operations
   async recordShot(shotData) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning null for recordShot');
-      return null;
-    }
-
     try {
-      console.log('🎯 Recording shot to Supabase:', {
+      console.log('🎯 Recording shot to Supabase with authentication:', {
         player_address: shotData.playerAddress.toLowerCase(),
         amount: shotData.amount,
         won: shotData.won || false,
@@ -75,30 +71,32 @@ export const db = {
         contract_address: shotData.contractAddress
       });
 
-      const { data, error } = await supabase
-        .from(TABLES.SHOTS)
-        .insert({
-          player_address: shotData.playerAddress.toLowerCase(),
-          amount: shotData.amount,
-          won: shotData.won || false,
-          tx_hash: shotData.txHash,
-          block_number: shotData.blockNumber,
-          timestamp: shotData.timestamp || new Date().toISOString(),
-          crypto_type: shotData.cryptoType || 'ETH',
-          contract_address: shotData.contractAddress
-        })
-        .select()
-        .single();
+      return await withAuthenticatedClient(async (client) => {
+        const { data, error } = await client
+          .from(TABLES.SHOTS)
+          .insert({
+            player_address: shotData.playerAddress.toLowerCase(),
+            amount: shotData.amount,
+            won: shotData.won || false,
+            tx_hash: shotData.txHash,
+            block_number: shotData.blockNumber,
+            timestamp: shotData.timestamp || new Date().toISOString(),
+            crypto_type: shotData.cryptoType || 'ETH',
+            contract_address: shotData.contractAddress
+          })
+          .select()
+          .single();
 
-      if (error) {
-        console.error('❌ Supabase recordShot error:', error);
-        throw error;
-      }
-      
-      console.log('✅ Shot recorded successfully:', data);
-      return data;
+        if (error) {
+          console.error('❌ Authenticated recordShot error:', error);
+          throw error;
+        }
+        
+        console.log('✅ Shot recorded successfully with authentication:', data);
+        return data;
+      });
     } catch (error) {
-      console.error('❌ Error recording shot:', error);
+      console.error('❌ Error recording shot with authentication:', error);
       throw error;
     }
   },
@@ -264,30 +262,42 @@ export const db = {
 
   // Winner operations
   async recordWinner(winnerData) {
-    if (!supabase) {
-      console.warn('Supabase not configured - returning null for recordWinner');
-      return null;
-    }
-
     try {
-      const { data, error } = await supabase
-        .from(TABLES.WINNERS)
-        .insert({
-          winner_address: winnerData.winnerAddress.toLowerCase(),
-          amount: winnerData.amount,
-          tx_hash: winnerData.txHash,
-          block_number: winnerData.blockNumber,
-          timestamp: winnerData.timestamp || new Date().toISOString(),
-          crypto_type: winnerData.cryptoType || 'ETH',
-          contract_address: winnerData.contractAddress
-        })
-        .select()
-        .single();
+      console.log('🏆 Recording winner to Supabase with authentication:', {
+        winner_address: winnerData.winnerAddress.toLowerCase(),
+        amount: winnerData.amount,
+        tx_hash: winnerData.txHash,
+        block_number: winnerData.blockNumber,
+        timestamp: winnerData.timestamp || new Date().toISOString(),
+        crypto_type: winnerData.cryptoType || 'ETH',
+        contract_address: winnerData.contractAddress
+      });
 
-      if (error) throw error;
-      return data;
+      return await withAuthenticatedClient(async (client) => {
+        const { data, error } = await client
+          .from(TABLES.WINNERS)
+          .insert({
+            winner_address: winnerData.winnerAddress.toLowerCase(),
+            amount: winnerData.amount,
+            tx_hash: winnerData.txHash,
+            block_number: winnerData.blockNumber,
+            timestamp: winnerData.timestamp || new Date().toISOString(),
+            crypto_type: winnerData.cryptoType || 'ETH',
+            contract_address: winnerData.contractAddress
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ Authenticated recordWinner error:', error);
+          throw error;
+        }
+        
+        console.log('✅ Winner recorded successfully with authentication:', data);
+        return data;
+      });
     } catch (error) {
-      console.error('Error recording winner:', error);
+      console.error('❌ Error recording winner with authentication:', error);
       throw error;
     }
   },

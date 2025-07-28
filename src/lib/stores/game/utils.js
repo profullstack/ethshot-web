@@ -10,6 +10,7 @@ import { GAME_CONFIG, calculateUSDValue } from '../../config.js';
  * ETH Shot contract ABI (for backward compatibility with ETH-only mode)
  */
 export const ETH_SHOT_ABI = [
+  // Game functions
   'function commitShot(bytes32 commitment) external payable',
   'function revealShot(uint256 secret) external',
   'function sponsorRound(string calldata name, string calldata logoUrl) external payable',
@@ -28,9 +29,26 @@ export const ETH_SHOT_ABI = [
   'function getRecentWinners() external view returns (tuple(address winner, uint256 amount, uint256 timestamp, uint256 blockNumber)[])',
   'function SHOT_COST() external view returns (uint256)',
   'function SPONSOR_COST() external view returns (uint256)',
+  
+  // Admin functions (Ownable)
+  'function owner() external view returns (address)',
+  'function transferOwnership(address newOwner) external',
+  'function renounceOwnership() external',
+  
+  // Test mode functions
+  'function setTestMode(bool enabled) external',
+  'function setTestFiftyPercentMode(bool enabled) external',
+  'function setWinningNumber(uint256 number) external',
+  'function getTestModeConfig() external view returns (tuple(bool isTestMode, bool isFiftyPercentMode, uint256 currentChainId))',
+  
+  // House funds management
+  'function withdrawHouseFunds() external',
+  
+  // Events
   'event ShotTaken(address indexed player, uint256 amount, bool won)',
   'event JackpotWon(address indexed winner, uint256 amount, uint256 timestamp)',
   'event SponsorshipActivated(address indexed sponsor, string name, string logoUrl)',
+  'event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)',
 ];
 
 /**

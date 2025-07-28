@@ -50,7 +50,7 @@
     >
       {#if loading}
         <div class="loading-spinner"></div>
-        <span>Taking Discount Shot...</span>
+        <span>Taking Shot...</span>
       {:else}
         <div class="discount-icon">💰</div>
         <div class="discount-content">
