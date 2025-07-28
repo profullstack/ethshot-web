@@ -172,7 +172,7 @@ const createUnifiedGameStore = () => {
     });
   };
 
-  const takeShotWrapper = async (useDiscount = false, discountId = null) => {
+  const takeShotWrapper = async (useDiscount = false, discountId = null, customShotCost = null) => {
     const state = get({ subscribe });
     const walletStore = getWalletStore();
     const wallet = get(walletStore);
@@ -180,6 +180,7 @@ const createUnifiedGameStore = () => {
     await takeShot({
       useDiscount,
       discountId,
+      customShotCost,
       state,
       contract,
       ethers,

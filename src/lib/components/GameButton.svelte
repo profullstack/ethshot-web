@@ -1,7 +1,7 @@
 <script>
   console.log('🔧 GameButton component loading...');
   
-  import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError } from '../stores/game/index.js';
+  import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError, currentPot } from '../stores/game/index.js';
   import { walletStore, isConnected, isCorrectNetwork } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatTime as configFormatTime } from '../config.js';
@@ -93,6 +93,81 @@
     }
   };
 
+  // Handle taking the first shot (when pot is empty)
+  const handleTakeFirstShot = async () => {
+    console.log('🎯 TAKE FIRST SHOT BUTTON CLICKED!');
+    console.log('🔍 First shot handler executing...');
+    
+    console.log('Debug info:', {
+      isConnected: $isConnected,
+      isCorrectNetwork: $isCorrectNetwork,
+      canTakeShot: $canTakeShot,
+      contractDeployed: $contractDeployed,
+      isLoading: $isLoading,
+      currentPot: $currentPot,
+      gameError: $gameError
+    });
+
+    if (!$isConnected) {
+      console.log('❌ Wallet not connected - stopping here');
+      toastStore.error('Please connect your wallet first');
+      return;
+    }
+
+    if (!$isCorrectNetwork) {
+      console.log('❌ Wrong network - stopping here');
+      toastStore.error('Please switch to the correct network');
+      return;
+    }
+
+    if (!$canTakeShot) {
+      console.log('❌ Cannot take shot - stopping here');
+      toastStore.error('Cannot take shot at this time');
+      return;
+    }
+
+    console.log('✅ All checks passed, calling gameStore.takeShot() with first shot cost');
+    console.log('🚀 About to call gameStore.takeShot() for first shot...');
+    
+    try {
+      // Use the first shot cost instead of regular shot cost
+      // Parameters: useDiscount, discountId, customShotCost
+      const result = await gameStore.takeShot(false, null, GAME_CONFIG.FIRST_SHOT_COST_ETH);
+      console.log('✅ gameStore.takeShot() (first shot) completed:', result);
+    } catch (error) {
+      console.error('❌ Failed to take first shot:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      toastStore.error('Failed to take first shot: ' + error.message);
+    }
+  };
+
+  // Handle sponsor round
+  const handleSponsorRound = async () => {
+    console.log('💰 SPONSOR ROUND BUTTON CLICKED!');
+    
+    if (!$isConnected) {
+      toastStore.error('Please connect your wallet first');
+      return;
+    }
+
+    if (!$isCorrectNetwork) {
+      toastStore.error('Please switch to the correct network');
+      return;
+    }
+
+    try {
+      const result = await gameStore.sponsorRound();
+      console.log('✅ gameStore.sponsorRound() completed:', result);
+    } catch (error) {
+      console.error('❌ Failed to sponsor round:', error);
+      toastStore.error('Failed to sponsor round: ' + error.message);
+    }
+  };
+
   // Switch to correct network
   const handleSwitchNetwork = async () => {
     try {
@@ -107,6 +182,10 @@
   $: if (timeRemaining > 0 && !cooldownTimer) {
     startCooldownTimer();
   }
+  
+  // Check if pot is empty (first shot scenario)
+  $: isPotEmpty = $currentPot === 0 || $currentPot === '0' || $currentPot === null || $currentPot === undefined;
+  $: isFirstShotReady = isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0;
 
   onMount(() => {
     console.log('🔧 GameButton onMount called');
@@ -181,6 +260,29 @@
           </div>
         </div>
       </button>
+    {:else if isFirstShotReady}
+      <!-- First Shot (Empty Pot) -->
+      <div class="flex flex-col space-y-3">
+        <button
+          on:click={handleTakeFirstShot}
+          class="btn-game btn-first-shot animate-glow"
+          disabled={false}
+          style="pointer-events: auto; cursor: pointer;"
+        >
+          <span class="text-3xl font-black">🚀 TAKE THE FIRST SHOT</span>
+          <span class="text-sm opacity-90">{formatEth(GAME_CONFIG.FIRST_SHOT_COST_ETH)} ETH • Start the pot!</span>
+        </button>
+        
+        <!-- Sponsor Option -->
+        <button
+          on:click={handleSponsorRound}
+          class="btn-sponsor"
+          disabled={$isLoading}
+        >
+          <span class="text-lg font-bold">💰 Sponsor Round</span>
+          <span class="text-xs opacity-80">{formatEth(GAME_CONFIG.SPONSOR_COST_ETH)} ETH • Add to pot without playing</span>
+        </button>
+      </div>
     {:else if $canTakeShot}
       <!-- Ready to Take Shot -->
       <button
@@ -190,7 +292,7 @@
         style="pointer-events: auto; cursor: pointer;"
       >
         <span class="text-3xl font-black">🎯 TAKE SHOT</span>
-        <span class="text-sm opacity-90">{formatEth(GAME_CONFIG.SHOT_COST)} ETH • {GAME_CONFIG.WIN_PERCENTAGE}% chance to win</span>
+        <span class="text-sm opacity-90">{formatEth(GAME_CONFIG.SHOT_COST_ETH)} ETH • {GAME_CONFIG.WIN_PERCENTAGE}% chance to win</span>
       </button>
     {:else}
       <!-- Cannot Take Shot -->
@@ -204,7 +306,7 @@
     {/if}
 
     <!-- Pulse Effect for Ready State -->
-    {#if $canTakeShot && !$isLoading && timeRemaining <= 0}
+    {#if ($canTakeShot && !$isLoading && timeRemaining <= 0) || isFirstShotReady}
       <div class="absolute inset-0 rounded-2xl bg-red-500/20 animate-ping pointer-events-none"></div>
     {/if}
   </div>
@@ -294,6 +396,30 @@
     @apply focus:ring-purple-500;
   }
 
+  .btn-first-shot {
+    @apply bg-gradient-to-br from-green-500 to-green-600;
+    @apply border-green-400 hover:from-green-400 hover:to-green-500;
+    @apply shadow-lg hover:shadow-xl;
+    @apply focus:ring-green-500;
+  }
+
+  .btn-sponsor {
+    @apply relative flex flex-col items-center justify-center;
+    @apply w-80 h-20 rounded-xl border-2;
+    @apply font-bold text-white transition-all duration-300;
+    @apply focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-gray-900;
+    @apply transform hover:scale-105 active:scale-95;
+    @apply bg-gradient-to-br from-yellow-600 to-yellow-700;
+    @apply border-yellow-500 hover:from-yellow-500 hover:to-yellow-600;
+    @apply shadow-md hover:shadow-lg;
+    @apply focus:ring-yellow-500;
+  }
+
+  .btn-sponsor:disabled {
+    @apply transform-none hover:scale-100;
+    @apply opacity-60 cursor-not-allowed;
+  }
+
   .btn-game:disabled {
     @apply transform-none hover:scale-100;
   }
@@ -334,6 +460,14 @@
     
     .btn-game span:first-child {
       @apply text-xl;
+    }
+    
+    .btn-sponsor {
+      @apply w-72 h-16;
+    }
+    
+    .btn-sponsor span:first-child {
+      @apply text-base;
     }
   }
 </style>

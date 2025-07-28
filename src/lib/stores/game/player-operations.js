@@ -188,18 +188,19 @@ export const loadPlayerData = async ({ address, state, contract, ethers, db, upd
  * @param {Function} params.loadPlayerData - Function to reload player data
  * @param {Object} params.walletStore - Wallet store instance
  */
-export const takeShot = async ({ 
-  useDiscount = false, 
-  discountId = null, 
-  state, 
-  contract, 
-  ethers, 
-  wallet, 
-  db, 
-  updateState, 
-  loadGameState, 
-  loadPlayerData, 
-  walletStore 
+export const takeShot = async ({
+  useDiscount = false,
+  discountId = null,
+  customShotCost = null,
+  state,
+  contract,
+  ethers,
+  wallet,
+  db,
+  updateState,
+  loadGameState,
+  loadPlayerData,
+  walletStore
 }) => {
   console.log('🎯 Player takeShot() called!', { useDiscount, discountId });
   
@@ -415,11 +416,12 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   
   // Explicit check with clear error message
   if (currentPot < fullShotCost) {
-    console.warn('⚠️ Pot too small for shot - aborting transaction');
+    console.warn('⚠️ Pot too small for shot - checking if this is a first shot');
     
-    // Special case for empty pot (first player)
+    // Special case for empty pot (first player) - allow first shot to proceed
     if (currentPot === 0n) {
-      throw new Error(`You appear to be the first player! To start the game, you need to fund the pot with at least ${ethers.formatEther(fullShotCost)} ETH by taking the first shot. This shot will establish the minimum required pot size.`);
+      console.log('✅ Empty pot detected - allowing first shot to proceed');
+      // First shot is allowed to proceed - it will fund the pot
     } else {
       throw new Error(`Pot is currently ${ethers.formatEther(currentPot)} ETH, which is too small for payout precision. The pot needs at least ${ethers.formatEther(fullShotCost)} ETH to function properly.`);
     }
