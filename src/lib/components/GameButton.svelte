@@ -200,6 +200,9 @@
   // Check if pot is empty (first shot scenario) - simplified to handle both string and numeric values
   $: isPotEmpty = parseFloat($currentPot || '0') === 0;
   $: isFirstShotReady = isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0;
+  
+  // CRITICAL FIX: Regular shot should be available when canTakeShot is true AND pot is NOT empty
+  $: isRegularShotReady = !isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0;
 
   onMount(() => {
     console.log('🔧 GameButton onMount called');
@@ -297,7 +300,7 @@
           <span class="text-xs opacity-80">{formatEth(GAME_CONFIG.SPONSOR_COST_ETH)} ETH • Add to pot without playing</span>
         </button>
       </div>
-    {:else if $canTakeShot}
+    {:else if isRegularShotReady}
       <!-- Ready to Take Shot -->
       <button
         on:click={handleTakeShot}
@@ -320,7 +323,7 @@
     {/if}
 
     <!-- Pulse Effect for Ready State -->
-    {#if ($canTakeShot && !$isLoading && timeRemaining <= 0) || isFirstShotReady}
+    {#if isRegularShotReady || isFirstShotReady}
       <div class="absolute inset-0 rounded-2xl bg-red-500/20 animate-ping pointer-events-none"></div>
     {/if}
   </div>
