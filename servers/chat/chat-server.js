@@ -6,13 +6,62 @@
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { createClient } from '@supabase/supabase-js';
+import jwt from 'jsonwebtoken';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { createPublicKey } from 'crypto';
 import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
 
+// Get the directory of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY;
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.VITE_SUPABASE_JWT_SECRET;
+
+// Load JWT keys for token validation
+let publicKey = null;
+let jwtSecret = null;
+
+// Try to load ES256 public key first, then fallback to HS256 secret
+try {
+  let publicKeyData;
+  
+  // Try to load from environment variables first (production)
+  if (process.env.JWT_PUBLIC_KEY_JWK) {
+    console.log('🔑 Loading JWT public key from environment variables...');
+    publicKeyData = JSON.parse(process.env.JWT_PUBLIC_KEY_JWK);
+    publicKey = createPublicKey({ key: publicKeyData, format: 'jwk' });
+    console.log('✅ ES256 public key loaded successfully');
+  } else {
+    // Fallback to file loading for development
+    console.log('🔑 Attempting to load JWT public key from file (development mode)...');
+    try {
+      const publicKeyPath = join(__dirname, '../../jwt.json');
+      publicKeyData = JSON.parse(readFileSync(publicKeyPath, 'utf8'));
+      publicKey = createPublicKey({ key: publicKeyData, format: 'jwk' });
+      console.log('✅ ES256 public key loaded from file successfully');
+    } catch (fileError) {
+      console.warn('⚠️ Could not load ES256 public key from file:', fileError.message);
+    }
+  }
+} catch (error) {
+  console.warn('⚠️ Failed to load ES256 public key:', error.message);
+}
+
+// Fallback to HS256 secret if ES256 key is not available
+if (!publicKey && SUPABASE_JWT_SECRET) {
+  console.log('🔑 Using HS256 JWT secret for token validation');
+  jwtSecret = SUPABASE_JWT_SECRET;
+} else if (!publicKey && !SUPABASE_JWT_SECRET) {
+  console.error('❌ No JWT validation method available - missing both ES256 keys and HS256 secret');
+  console.error('❌ Chat server authentication will not work properly');
+}
 
 let supabase = null;
 
@@ -22,6 +71,73 @@ if (SUPABASE_URL && SUPABASE_ANON_KEY) {
   console.log('Supabase client initialized');
 } else {
   console.warn('Supabase configuration missing - running in limited mode');
+}
+
+/**
+ * Validate JWT token and extract wallet address
+ * @param {string} token - The JWT token to validate
+ * @returns {Promise<{valid: boolean, walletAddress?: string, error?: string}>}
+ */
+async function validateJWTToken(token) {
+  if (!token) {
+    return { valid: false, error: 'Token is required' };
+  }
+
+  try {
+    let decoded;
+
+    // Try ES256 verification first
+    if (publicKey) {
+      try {
+        decoded = jwt.verify(token, publicKey, {
+          algorithms: ['ES256'],
+          audience: 'authenticated'
+        });
+      } catch (es256Error) {
+        console.warn('⚠️ ES256 verification failed, trying HS256 fallback:', es256Error.message);
+        
+        // Fallback to HS256 if available
+        if (jwtSecret) {
+          decoded = jwt.verify(token, jwtSecret, {
+            algorithms: ['HS256'],
+            audience: 'authenticated'
+          });
+        } else {
+          throw es256Error;
+        }
+      }
+    } else if (jwtSecret) {
+      // Use HS256 verification
+      decoded = jwt.verify(token, jwtSecret, {
+        algorithms: ['HS256'],
+        audience: 'authenticated'
+      });
+    } else {
+      return { valid: false, error: 'No JWT validation method available' };
+    }
+
+    // Extract wallet address from token
+    const walletAddress = decoded.walletAddress || decoded.wallet_address || decoded.sub;
+    
+    if (!walletAddress) {
+      return { valid: false, error: 'No wallet address found in token' };
+    }
+
+    // Validate wallet address format
+    if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+      return { valid: false, error: 'Invalid wallet address format in token' };
+    }
+
+    return {
+      valid: true,
+      walletAddress: walletAddress.toLowerCase(),
+      tokenData: decoded
+    };
+
+  } catch (error) {
+    console.error('❌ JWT validation failed:', error.message);
+    return { valid: false, error: `Invalid token: ${error.message}` };
+  }
 }
 
 // Chat server configuration
@@ -186,16 +302,69 @@ class ChatServer {
   }
 
   /**
-   * Handle user authentication
+   * Handle user authentication with JWT token
    */
   async handleAuthentication(clientId, message) {
-    const { walletAddress } = message;
+    const { jwtToken, walletAddress } = message;
     
-    if (!walletAddress) {
-      this.sendError(clientId, 'Wallet address is required');
-      return;
+    // Support both JWT token and legacy wallet address authentication
+    if (jwtToken) {
+      await this.handleJWTAuthentication(clientId, jwtToken);
+    } else if (walletAddress) {
+      // Legacy authentication - deprecated but supported for backward compatibility
+      console.warn('⚠️ Legacy wallet address authentication used - please upgrade to JWT tokens');
+      await this.handleLegacyAuthentication(clientId, walletAddress);
+    } else {
+      this.sendError(clientId, 'JWT token or wallet address is required for authentication');
     }
+  }
 
+  /**
+   * Handle JWT token authentication
+   */
+  async handleJWTAuthentication(clientId, jwtToken) {
+    const client = this.clients.get(clientId);
+    if (!client) return;
+
+    try {
+      // Validate JWT token and extract wallet address
+      const validation = await validateJWTToken(jwtToken);
+      
+      if (!validation.valid) {
+        this.sendError(clientId, `Authentication failed: ${validation.error}`);
+        return;
+      }
+
+      // Store wallet address and token data
+      client.walletAddress = validation.walletAddress;
+      client.jwtToken = jwtToken;
+      client.tokenData = validation.tokenData;
+
+      // Initialize rate limiting for this user
+      this.rateLimits.set(client.walletAddress, {
+        messages: [],
+        lastReset: Date.now()
+      });
+
+      this.sendToClient(clientId, {
+        type: 'authenticated',
+        walletAddress: client.walletAddress,
+        authMethod: 'jwt',
+        timestamp: new Date().toISOString()
+      });
+
+      console.log(`Client ${clientId} authenticated via JWT as ${client.walletAddress}`);
+
+    } catch (error) {
+      console.error('JWT authentication error:', error);
+      this.sendError(clientId, 'Authentication failed - invalid token');
+    }
+  }
+
+  /**
+   * Handle legacy wallet address authentication (deprecated)
+   */
+  async handleLegacyAuthentication(clientId, walletAddress) {
     const client = this.clients.get(clientId);
     if (!client) return;
 
@@ -217,10 +386,11 @@ class ChatServer {
     this.sendToClient(clientId, {
       type: 'authenticated',
       walletAddress: client.walletAddress,
+      authMethod: 'legacy',
       timestamp: new Date().toISOString()
     });
 
-    console.log(`Client ${clientId} authenticated as ${client.walletAddress}`);
+    console.log(`Client ${clientId} authenticated via legacy method as ${client.walletAddress}`);
   }
 
   /**

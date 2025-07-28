@@ -101,15 +101,36 @@ export class ChatClient {
   }
 
   /**
-   * Authenticate with wallet address
+   * Authenticate with JWT token (preferred) or wallet address (legacy)
    */
-  async authenticate(walletAddress) {
+  async authenticate(walletAddressOrToken) {
     if (!this.isConnected) {
       throw new Error('Not connected to chat server');
     }
 
-    if (!walletAddress) {
-      throw new Error('Wallet address is required');
+    if (!walletAddressOrToken) {
+      throw new Error('JWT token or wallet address is required');
+    }
+
+    // Try to get JWT token from localStorage first
+    let jwtToken = null;
+    let walletAddress = null;
+
+    try {
+      // Check if we have a stored JWT token
+      const storedToken = localStorage.getItem('ethshot_jwt_token');
+      if (storedToken) {
+        jwtToken = storedToken;
+        console.log('🔐 Using stored JWT token for chat authentication');
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not access localStorage for JWT token:', error);
+    }
+
+    // If no JWT token, treat the parameter as wallet address (legacy mode)
+    if (!jwtToken) {
+      walletAddress = walletAddressOrToken;
+      console.warn('⚠️ Using legacy wallet address authentication - please upgrade to JWT tokens');
     }
 
     this.walletAddress = walletAddress;
@@ -126,6 +147,7 @@ export class ChatClient {
         this.removeMessageHandler('authenticated');
         this.removeMessageHandler('error');
         this.isAuthenticated = true;
+        this.walletAddress = data.walletAddress; // Update wallet address from server response
         this.emit('authenticated', data);
         resolve(data);
       });
@@ -137,10 +159,18 @@ export class ChatClient {
         reject(new Error(data.message));
       });
 
-      this.send({
-        type: 'authenticate',
-        walletAddress
-      });
+      // Send authentication message with JWT token or wallet address
+      const authMessage = {
+        type: 'authenticate'
+      };
+
+      if (jwtToken) {
+        authMessage.jwtToken = jwtToken;
+      } else {
+        authMessage.walletAddress = walletAddress;
+      }
+
+      this.send(authMessage);
     });
   }
 
