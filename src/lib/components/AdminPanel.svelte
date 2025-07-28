@@ -18,6 +18,7 @@
   let loading = false;
   let error = null;
   let success = null;
+  let withdrawalTxHash = null;
 
   // Check if current user is contract owner
   const checkOwnership = async () => {
@@ -157,6 +158,7 @@
     loading = true;
     error = null;
     success = null;
+    withdrawalTxHash = null;
     
     try {
       const contract = $gameStore.contract.connect($walletStore.signer);
@@ -180,6 +182,7 @@
     loading = true;
     error = null;
     success = null;
+    withdrawalTxHash = null;
     
     try {
       const contract = $gameStore.contract.connect($walletStore.signer);
@@ -203,6 +206,7 @@
     loading = true;
     error = null;
     success = null;
+    withdrawalTxHash = null;
     
     try {
       const contract = $gameStore.contract.connect($walletStore.signer);
@@ -225,15 +229,17 @@
     loading = true;
     error = null;
     success = null;
+    withdrawalTxHash = null;
     
     try {
       const contract = $gameStore.contract.connect($walletStore.signer);
       const tx = await contract.withdrawHouseFunds();
-      await tx.wait();
+      const receipt = await tx.wait();
       
       const ethers = await import('ethers');
       const withdrawnAmount = ethers.formatEther(houseFunds);
       success = `Successfully withdrew ${withdrawnAmount} ETH to house address!`;
+      withdrawalTxHash = receipt.hash;
       
       // Reload house funds balance
       await loadHouseFunds();
@@ -280,8 +286,17 @@
     setTimeout(() => {
       success = null;
       error = null;
+      withdrawalTxHash = null;
     }, 5000);
   }
+
+  // Helper function to get Etherscan URL
+  const getEtherscanUrl = (txHash) => {
+    const baseUrl = testModeConfig.currentChainId === 1
+      ? 'https://etherscan.io'
+      : 'https://sepolia.etherscan.io';
+    return `${baseUrl}/tx/${txHash}`;
+  };
 </script>
 
 <!-- Debug info (remove in production) -->
@@ -418,7 +433,20 @@
 
     {#if success}
       <div class="mt-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg">
-        <span class="text-green-400">✅ {success}</span>
+        <div class="text-green-400">✅ {success}</div>
+        {#if withdrawalTxHash}
+          <div class="mt-2">
+            <a
+              href={getEtherscanUrl(withdrawalTxHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm underline transition-colors"
+            >
+              <span>🔗</span>
+              <span>View tx on Etherscan</span>
+            </a>
+          </div>
+        {/if}
       </div>
     {/if}
 

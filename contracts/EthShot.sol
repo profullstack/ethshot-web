@@ -21,6 +21,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     uint256 public immutable WIN_CHANCE_BP; // Basis points
     uint256 public immutable MAX_RECENT_WINNERS;
     uint256 public immutable MIN_POT_SIZE;
+    address public immutable HOUSE_ADDRESS; // Address to receive house funds
     
     // Commit-reveal scheme variables
     uint256 private constant REVEAL_DELAY = 1; // blocks
@@ -160,6 +161,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     
     constructor(
         address initialOwner,
+        address _houseAddress,
         uint256 _shotCost,
         uint256 _sponsorCost,
         uint256 _cooldownPeriod,
@@ -170,6 +172,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         uint256 _minPotSize
     ) Ownable(initialOwner) {
         // Validate parameters
+        require(_houseAddress != address(0), "House address cannot be zero");
         require(_shotCost > 0, "Shot cost must be greater than 0");
         require(_sponsorCost > 0, "Sponsor cost must be greater than 0");
         require(_cooldownPeriod > 0 && _cooldownPeriod <= MAX_COOLDOWN, "Invalid cooldown period");
@@ -181,6 +184,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         require(_minPotSize >= _shotCost, "Min pot size too small");
         
         // Set immutable parameters
+        HOUSE_ADDRESS = _houseAddress;
         SHOT_COST = _shotCost;
         SPONSOR_COST = _sponsorCost;
         COOLDOWN_PERIOD = _cooldownPeriod;
@@ -397,10 +401,10 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         
         houseFunds = 0;
         
-        (bool success, ) = payable(owner()).call{value: amount}("");
+        (bool success, ) = payable(HOUSE_ADDRESS).call{value: amount}("");
         require(success, "Withdrawal failed");
         
-        emit HouseFundsWithdrawn(owner(), amount);
+        emit HouseFundsWithdrawn(HOUSE_ADDRESS, amount);
     }
     
     /**

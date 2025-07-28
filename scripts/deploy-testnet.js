@@ -16,6 +16,7 @@ async function main() {
   
   // Contract constructor parameters (from environment variables)
   const initialOwner = signer.address; // Contract owner should be the deployer (for admin privileges)
+  const houseAddress = process.env.HOUSE_COMMISSION_ADDRESS || signer.address; // House address for commission withdrawals
   const shotCost = ethers.parseEther(process.env.VITE_SHOT_COST_ETH || "0.001");
   const sponsorCost = ethers.parseEther(process.env.VITE_SPONSOR_COST_ETH || "0.01");
   const cooldownPeriod = (parseInt(process.env.VITE_COOLDOWN_HOURS || "1")) * 60 * 60;
@@ -27,6 +28,7 @@ async function main() {
   
   console.log('📋 Contract parameters:');
   console.log(`  Initial Owner: ${initialOwner}`);
+  console.log(`  House Address: ${houseAddress}`);
   console.log(`  Shot Cost: ${ethers.formatEther(shotCost)} ETH`);
   console.log(`  Sponsor Cost: ${ethers.formatEther(sponsorCost)} ETH`);
   console.log(`  Cooldown Period: ${cooldownPeriod} seconds (${cooldownPeriod / 3600} hours)`);
@@ -38,6 +40,7 @@ async function main() {
   
   const ethShot = await EthShot.deploy(
     initialOwner,
+    houseAddress,
     shotCost,
     sponsorCost,
     cooldownPeriod,

@@ -26,6 +26,7 @@
     "deploy:mainnet": "hardhat run scripts/deploy.js --network mainnet",
     "verify:testnet": "hardhat verify --network sepolia",
     "verify:mainnet": "hardhat verify --network mainnet",
+    "verify:contract": "node scripts/verify-contract.js",
     "server:dev": "nodemon server/index.js",
     "server:start": "node server/index.js",
     "chat:dev": "nodemon servers/chat/chat-server.js",
