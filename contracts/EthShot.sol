@@ -54,6 +54,11 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     // Test mode variables (for testing only)
     bool public testMode = false;
     uint256 private testWinningNumber = 0;
+    bool public testFiftyPercentMode = false; // 50% win rate for testing payouts
+    uint256 private constant TEST_COOLDOWN_PERIOD = 60; // 1 minute cooldown for test mode
+    
+    // Network detection - mainnet chain ID is 1
+    uint256 private constant MAINNET_CHAIN_ID = 1;
     
     // Structs
     struct PlayerStats {
@@ -101,8 +106,10 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     
     // Modifiers
     modifier canCommit(address player) {
+        // Use test cooldown if test mode is enabled, otherwise use normal cooldown
+        uint256 cooldownToUse = testMode ? TEST_COOLDOWN_PERIOD : COOLDOWN_PERIOD;
         require(
-            block.timestamp >= lastShotTime[player] + COOLDOWN_PERIOD,
+            block.timestamp >= lastShotTime[player] + cooldownToUse,
             "Cooldown period not elapsed"
         );
         
@@ -307,7 +314,8 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
      * @return bool True if player can commit a shot
      */
     function canCommitShot(address player) external view returns (bool) {
-        return block.timestamp >= lastShotTime[player] + COOLDOWN_PERIOD && 
+        uint256 cooldownToUse = testMode ? TEST_COOLDOWN_PERIOD : COOLDOWN_PERIOD;
+        return block.timestamp >= lastShotTime[player] + cooldownToUse &&
                !pendingShots[player].exists;
     }
     
@@ -372,7 +380,8 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
      * @return uint256 Seconds remaining in cooldown (0 if can shoot)
      */
     function getCooldownRemaining(address player) external view returns (uint256) {
-        uint256 nextShotTime = lastShotTime[player] + COOLDOWN_PERIOD;
+        uint256 cooldownToUse = testMode ? TEST_COOLDOWN_PERIOD : COOLDOWN_PERIOD;
+        uint256 nextShotTime = lastShotTime[player] + cooldownToUse;
         if (block.timestamp >= nextShotTime) {
             return 0;
         }
@@ -440,14 +449,36 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         emit PendingShotExpired(player, commitBlock, block.number);
     }
     
-    // Test functions (only available in test mode)
+    // Test functions (only available in test mode and not on mainnet)
     function setTestMode(bool _testMode) external onlyOwner {
+        require(block.chainid != MAINNET_CHAIN_ID, "Test mode not allowed on mainnet");
         testMode = _testMode;
     }
     
     function setWinningNumber(uint256 _winningNumber) external onlyOwner {
         require(testMode, "Test mode not enabled");
+        require(block.chainid != MAINNET_CHAIN_ID, "Test mode not allowed on mainnet");
         testWinningNumber = _winningNumber;
+    }
+    
+    function setTestFiftyPercentMode(bool _enabled) external onlyOwner {
+        require(testMode, "Test mode not enabled");
+        require(block.chainid != MAINNET_CHAIN_ID, "Test mode not allowed on mainnet");
+        testFiftyPercentMode = _enabled;
+    }
+    
+    /**
+     * @dev Get test mode configuration
+     * @return isTestMode Whether test mode is enabled
+     * @return isFiftyPercentMode Whether 50% win rate mode is enabled
+     * @return currentChainId Current blockchain chain ID
+     */
+    function getTestModeConfig() external view returns (
+        bool isTestMode,
+        bool isFiftyPercentMode,
+        uint256 currentChainId
+    ) {
+        return (testMode, testFiftyPercentMode, block.chainid);
     }
     
     /**
@@ -504,8 +535,18 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
      * @dev Internal function to check win in test mode
      * @return bool True if shot wins
      */
-    function _checkWinTest() private view returns (bool) {
-        return testWinningNumber == 1;
+    function _checkWinTest() private returns (bool) {
+        if (testFiftyPercentMode) {
+            // 50% win rate for testing pot wins and payouts
+            // Use simple alternating pattern based on global nonce
+            unchecked {
+                nonce++;
+            }
+            return (nonce % 2) == 1;
+        } else {
+            // Original behavior: controlled by testWinningNumber
+            return testWinningNumber == 1;
+        }
     }
     
     /**

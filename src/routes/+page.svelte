@@ -14,6 +14,7 @@
   import MetaTags from '$lib/components/MetaTags.svelte';
   import ReferralSystem from '$lib/components/ReferralSystem.svelte';
   import DiscountButton from '$lib/components/DiscountButton.svelte';
+  import AdminPanel from '$lib/components/AdminPanel.svelte';
   
   // Social Proof Components
   import LiveActivityFeed from '$lib/components/LiveActivityFeed.svelte';
@@ -222,6 +223,11 @@
               {/if}
             </div>
           </div>
+        {/if}
+
+        <!-- Admin Panel (Owner Only) -->
+        {#if $walletStore.connected}
+          <AdminPanel />
         {/if}
 
         <!-- Referral System -->
