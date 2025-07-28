@@ -316,7 +316,7 @@
         console.log('🚨 If you only did the commit (first shot), you need to reveal it.');
         console.log('🚨 If the reveal window expired (>256 blocks), this is a contract bug.');
         
-        toastStore.error('LIKELY ISSUE: You have an unrevealed pending shot blocking new shots. This is a contract design flaw.');
+        toastStore.info('You have a pending shot that needs to be resolved. Check the pending shot manager above for options.');
         
         // Provide specific guidance
         console.log('');

@@ -159,7 +159,15 @@
 
         <!-- Pending Shot Manager -->
         {#if $walletStore.connected}
+          <div class="debug-info">
+            <p>Debug: Wallet connected = {$walletStore.connected}</p>
+            <p>Debug: Wallet address = {$walletStore.address}</p>
+          </div>
           <SimplePendingShotManager />
+        {:else}
+          <div class="debug-info">
+            <p>Debug: Wallet NOT connected</p>
+          </div>
         {/if}
 
         <!-- Game Rules -->
