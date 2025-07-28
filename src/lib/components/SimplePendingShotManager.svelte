@@ -184,20 +184,25 @@
   };
 
   onMount(() => {
-    checkPendingShot();
-    
-    // Check every 15 seconds
-    const interval = setInterval(checkPendingShot, 15000);
-    return () => clearInterval(interval);
+    // Only run automated checking if debug mode is disabled
+    if (!$debugMode) {
+      checkPendingShot();
+      
+      // Check every 15 seconds
+      const interval = setInterval(checkPendingShot, 15000);
+      return () => clearInterval(interval);
+    } else {
+      console.log('🔧 Debug mode enabled - automated pending shot checking disabled');
+    }
   });
 
-  // Re-check when wallet connects or contract changes
-  $: if (wallet.connected && (state.contract || wallet.contract)) {
+  // Re-check when wallet connects or contract changes (only if debug mode is disabled)
+  $: if (!$debugMode && wallet.connected && (state.contract || wallet.contract)) {
     checkPendingShot();
   }
   
-  // Also check when gameStore contract becomes available
-  $: if (wallet.connected && state.contract && state.ethers) {
+  // Also check when gameStore contract becomes available (only if debug mode is disabled)
+  $: if (!$debugMode && wallet.connected && state.contract && state.ethers) {
     console.log('🔄 GameStore contract became available, checking for pending shots...');
     checkPendingShot();
   }

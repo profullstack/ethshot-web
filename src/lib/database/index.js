@@ -9,7 +9,7 @@ import { supabase, TABLES, isSupabaseAvailable, getSupabaseClient } from './clie
 import { getPlayer, upsertPlayer, getTopPlayers, getLeaderboard } from './players.js';
 import { withAuthenticatedClient } from './authenticated-client.js';
 import { NETWORK_CONFIG } from '../config.js';
-import { ProfileAPI } from '../api/profile.js';
+import { ProfileAPI, profileAPI } from '../api/profile.js';
 import {
   createReferralCodeAPI,
   processReferralSignupAPI,

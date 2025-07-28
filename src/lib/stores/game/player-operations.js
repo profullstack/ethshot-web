@@ -11,6 +11,7 @@ import { toastStore } from '../toast.js';
 import { winnerEventStore } from './core.js';
 import { rpcCache } from './cache.js';
 import { NETWORK_CONFIG } from '../../config.js';
+import { shotsAPI } from '../../api/shots.js';
 import {
   notifyJackpotWon,
   scheduleCooldownNotification
@@ -790,15 +791,27 @@ export const revealShot = async ({
       won = parsed.args.won;
       console.log('🎲 Shot result:', won ? 'WON!' : 'Lost');
       
-      // Immediate, prominent result feedback
+      // Enhanced, prominent result feedback with multiple notifications
       if (won) {
-        toastStore.success('🎉 JACKPOT! YOU WON! 🎊', { duration: 8000 });
+        // Multiple success messages for maximum visibility
+        toastStore.success('🎉 JACKPOT! YOU WON! 🎊', { duration: 10000 });
+        setTimeout(() => {
+          toastStore.success('💰 CONGRATULATIONS! You hit the jackpot! 💰', { duration: 8000 });
+        }, 1000);
+        setTimeout(() => {
+          toastStore.success('🏆 WINNER! Check your wallet for the payout! 🏆', { duration: 6000 });
+        }, 3000);
       } else {
-        toastStore.info('🎲 Shot complete - Better luck next time!', { duration: 4000 });
+        // Clear loss indication
+        toastStore.info('🎲 Shot revealed - No win this time. Better luck next shot!', { duration: 6000 });
+        setTimeout(() => {
+          toastStore.info('💪 Keep trying! The next shot could be the winner!', { duration: 4000 });
+        }, 2000);
       }
     } else {
-      // Fallback if we can't parse the event
-      toastStore.info('🎲 Shot complete - Check the leaderboard for results!', { duration: 4000 });
+      // Enhanced fallback with clearer messaging
+      console.warn('⚠️ Could not parse ShotRevealed event - result unclear');
+      toastStore.warning('🎲 Shot revealed but result unclear. Check the leaderboard or recent activity!', { duration: 6000 });
     }
 
     const result = {
@@ -868,7 +881,7 @@ export const revealShot = async ({
 };
 
 /**
- * Log shot transaction to database with proper JWT authentication
+ * Log shot transaction to database via local API with proper JWT authentication
  * @param {Object} params - Logging parameters
  */
 const logShotToDatabase = async ({
@@ -881,13 +894,13 @@ const logShotToDatabase = async ({
   db
 }) => {
   try {
-    console.log('📝 Recording shot to database...');
+    console.log('📝 Recording shot via local API...');
 
     // Get contract address from centralized config or state
     const contractAddress = state.contractAddress || NETWORK_CONFIG.CONTRACT_ADDRESS;
 
-    console.log('🔐 Recording shot with authenticated client...');
-    const shotRecord = await db.recordShot({
+    console.log('🔐 Recording shot via shots API...');
+    const shotRecord = await shotsAPI.recordShot({
       playerAddress: wallet.address,
       amount: actualShotCost,
       won: result.won,
@@ -898,11 +911,11 @@ const logShotToDatabase = async ({
       contractAddress: contractAddress
     });
 
-    console.log('✅ Shot recorded successfully:', shotRecord?.id);
+    console.log('✅ Shot recorded successfully via API:', shotRecord?.id);
 
     if (result.won) {
-      console.log('🏆 Recording winner to database...');
-      const winnerRecord = await db.recordWinner({
+      console.log('🏆 Recording winner via shots API...');
+      const winnerRecord = await shotsAPI.recordWinner({
         winnerAddress: wallet.address,
         amount: state.currentPot,
         txHash: result.hash,
@@ -911,19 +924,19 @@ const logShotToDatabase = async ({
         cryptoType: state.activeCrypto,
         contractAddress: contractAddress
       });
-      console.log('✅ Winner recorded successfully:', winnerRecord?.id);
+      console.log('✅ Winner recorded successfully via API:', winnerRecord?.id);
     }
 
     // Player stats are now automatically updated by the database trigger
     console.log('✅ Player stats will be updated automatically by database trigger');
 
-  } catch (dbError) {
-    console.error('❌ Failed to log transaction to database:', dbError);
+  } catch (apiError) {
+    console.error('❌ Failed to log transaction via API:', apiError);
     
     // Provide specific error messages based on the error type
-    if (dbError.message?.includes('JWT') || dbError.message?.includes('authentication')) {
+    if (apiError.message?.includes('Authentication required') || apiError.message?.includes('authentication')) {
       toastStore.error('Authentication expired. Shot successful but not recorded. Please reconnect your wallet.');
-    } else if (dbError.message?.includes('RLS') || dbError.message?.includes('policy')) {
+    } else if (apiError.message?.includes('Access denied') || apiError.message?.includes('policy')) {
       toastStore.error('Database access denied. Please ensure you are properly authenticated.');
     } else {
       toastStore.error('Shot successful but failed to update database. Please refresh the page.');
