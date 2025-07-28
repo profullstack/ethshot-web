@@ -30,15 +30,24 @@ if (!SUPABASE_JWT_SECRET) {
 let privateKey = null;
 let publicKey = null;
 
-// Load JWK keys and convert to KeyObject format for jsonwebtoken library
+// Load JWK keys from environment variables or files (fallback for development)
 try {
-  // Load private key for signing
-  const privateKeyPath = join(__dirname, '../../../jwk-private-key.json');
-  const privateKeyData = JSON.parse(readFileSync(privateKeyPath, 'utf8'));
+  let privateKeyData, publicKeyData;
   
-  // Load public key for verification
-  const publicKeyPath = join(__dirname, '../../../jwt.json');
-  const publicKeyData = JSON.parse(readFileSync(publicKeyPath, 'utf8'));
+  // Try to load from environment variables first (production)
+  if (process.env.JWT_PRIVATE_KEY_JWK && process.env.JWT_PUBLIC_KEY_JWK) {
+    console.log('🔑 Loading JWT keys from environment variables...');
+    privateKeyData = JSON.parse(process.env.JWT_PRIVATE_KEY_JWK);
+    publicKeyData = JSON.parse(process.env.JWT_PUBLIC_KEY_JWK);
+  } else {
+    // Fallback to file loading for development
+    console.log('🔑 Loading JWT keys from files (development mode)...');
+    const privateKeyPath = join(__dirname, '../../../jwk-private-key.json');
+    const publicKeyPath = join(__dirname, '../../../jwt.json');
+    
+    privateKeyData = JSON.parse(readFileSync(privateKeyPath, 'utf8'));
+    publicKeyData = JSON.parse(readFileSync(publicKeyPath, 'utf8'));
+  }
   
   // Convert JWK to KeyObject format for jsonwebtoken library
   privateKey = createPrivateKey({ key: privateKeyData, format: 'jwk' });
@@ -48,9 +57,12 @@ try {
   console.log('🔑 Private key type:', privateKey.asymmetricKeyType);
   console.log('🔑 Public key type:', publicKey.asymmetricKeyType);
 } catch (error) {
-  console.error('❌ CRITICAL: Failed to load ES256 JWK keys:', error.message);
-  console.error('❌ ES256 keys are REQUIRED for JWT authentication');
-  throw new Error(`ES256 key loading failed: ${error.message}`);
+  console.error('❌ Failed to load ES256 JWK keys:', error.message);
+  console.warn('⚠️ Falling back to HS256 JWT signing for compatibility');
+  
+  // Don't throw error - allow fallback to HS256
+  privateKey = null;
+  publicKey = null;
 }
 
 // Server configuration validation
@@ -156,14 +168,29 @@ export async function verifySignatureSecure(message, signature, expectedSigner) 
  * @throws {Error} If private key is not available
  */
 export function generateJWTSecure(walletAddress, additionalPayload = {}) {
-  if (!privateKey) {
-    throw new Error('ES256 private key is required for JWT generation - key loading failed');
-  }
-
   if (!walletAddress) {
     throw new Error('Wallet address is required for JWT generation');
   }
 
+  // Use ES256 if available, otherwise fallback to HS256
+  if (privateKey) {
+    console.log('🔐 Using ES256 JWT signing');
+    return generateJWTWithES256(walletAddress, additionalPayload);
+  } else if (SUPABASE_JWT_SECRET) {
+    console.log('🔐 Using HS256 JWT signing (fallback)');
+    return generateJWTWithHS256(walletAddress, additionalPayload);
+  } else {
+    throw new Error('No JWT signing method available - missing both ES256 keys and HS256 secret');
+  }
+}
+
+/**
+ * Generate JWT token using ES256 algorithm with JWK private key
+ * @param {string} walletAddress - The wallet address to authenticate
+ * @param {Object} additionalPayload - Additional data to include in the JWT payload
+ * @returns {string} JWT token
+ */
+function generateJWTWithES256(walletAddress, additionalPayload = {}) {
   const normalizedAddress = walletAddress.toLowerCase();
   const now = Math.floor(Date.now() / 1000);
   
@@ -246,23 +273,28 @@ function generateJWTWithHS256(walletAddress, additionalPayload = {}) {
  * @throws {Error} If token is invalid or expired or public key is not available
  */
 export function verifyJWTSecure(token) {
-  if (!publicKey) {
-    throw new Error('ES256 public key is required for JWT verification - key loading failed');
-  }
-
   if (!token) {
     throw new Error('Token is required for verification');
   }
 
-  try {
-    return jwt.verify(token, publicKey, {
-      algorithms: ['ES256'],
-      audience: 'authenticated'
-    });
-  } catch (error) {
-    console.error('❌ JWT verification failed:', error);
-    throw new Error(`Invalid JWT token: ${error.message}`);
+  // Try ES256 verification first, then fallback to HS256
+  if (publicKey) {
+    try {
+      return jwt.verify(token, publicKey, {
+        algorithms: ['ES256'],
+        audience: 'authenticated'
+      });
+    } catch (error) {
+      console.warn('⚠️ ES256 verification failed, trying HS256 fallback:', error.message);
+    }
   }
+
+  // Fallback to HS256 verification
+  if (SUPABASE_JWT_SECRET) {
+    return verifyJWTWithHS256(token);
+  }
+
+  throw new Error('No JWT verification method available - missing both ES256 keys and HS256 secret');
 }
 
 /**
