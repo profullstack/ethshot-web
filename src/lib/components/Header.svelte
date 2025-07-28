@@ -390,7 +390,7 @@
                   style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
                 >
                   <img src="/logo.svg" alt="ETH Shot" class="w-4 h-4" />
-                  <span>Game</span>
+                  <span>Play!</span>
                 </a>
                 <a
                   href="/games"
