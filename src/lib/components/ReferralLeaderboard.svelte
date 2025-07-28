@@ -353,10 +353,8 @@
   }
 
   .table-header {
-    @apply grid p-4 bg-gray-900/50 border-b border-gray-700;
+    @apply grid grid-cols-5 gap-4 p-4 bg-gray-900/50 border-b border-gray-700;
     @apply text-gray-300 font-semibold text-sm;
-    grid-template-columns: 60px 1fr 80px 80px 80px;
-    gap: 12px;
   }
 
   .table-body {
@@ -364,9 +362,7 @@
   }
 
   .table-row {
-    @apply grid p-4 hover:bg-gray-700/30 transition-colors;
-    grid-template-columns: 60px 1fr 80px 80px 80px;
-    gap: 12px;
+    @apply grid grid-cols-5 gap-4 p-4 hover:bg-gray-700/30 transition-colors;
   }
 
   .table-row.current-user {
@@ -394,11 +390,11 @@
   }
 
   .cell-player {
-    @apply flex items-center min-w-0;
+    @apply flex items-center;
   }
 
   .player-info {
-    @apply flex items-center space-x-2 min-w-0 truncate;
+    @apply flex items-center space-x-2;
   }
 
   .player-address {
@@ -410,7 +406,7 @@
   }
 
   .cell-referrals, .cell-active, .cell-rate {
-    @apply flex items-center justify-center text-white font-semibold;
+    @apply flex items-center text-white font-semibold;
   }
 
   .referral-count, .active-count {
@@ -464,9 +460,7 @@
     }
 
     .table-header, .table-row {
-      grid-template-columns: 50px 1fr 70px;
-      gap: 8px;
-      @apply text-sm;
+      @apply grid-cols-3 gap-2 text-sm;
     }
 
     .header-active, .header-rate,
@@ -479,15 +473,4 @@
     }
   }
 
-  /* Tablet Responsive */
-  @media (max-width: 1024px) and (min-width: 769px) {
-    .table-header, .table-row {
-      grid-template-columns: 60px 1fr 70px 70px;
-      gap: 10px;
-    }
-
-    .header-rate, .cell-rate {
-      @apply hidden;
-    }
-  }
 </style>
