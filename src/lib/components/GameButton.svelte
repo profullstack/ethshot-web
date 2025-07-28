@@ -267,20 +267,75 @@
     }
 
     try {
-      // This is likely the issue - you have a pending shot that was never revealed
-      toastStore.info('This might be the issue: You may have an unrevealed shot blocking new shots. Check console for details.');
-      console.log('🔍 LIKELY ISSUE: You probably have a pending shot that was never revealed.');
-      console.log('🔍 The smart contract prevents new shots if you have pending shots.');
-      console.log('🔍 You need to either:');
-      console.log('  1. Reveal your pending shot (if in reveal window)');
-      console.log('  2. Wait for it to expire (after 256 blocks)');
-      console.log('  3. Or the contract needs a cleanup function');
+      // Get the contract directly to check actual state
+      const gameState = get(gameStore);
+      if (!gameState.contract) {
+        toastStore.error('Contract not available');
+        return;
+      }
+
+      console.log('🔍 COMPREHENSIVE CONTRACT STATE CHECK:');
+      console.log('=====================================');
+      
+      // Check if player has pending shot
+      const hasPending = await gameState.contract.hasPendingShot(wallet.address);
+      console.log('📋 Has pending shot:', hasPending);
+      
+      if (hasPending) {
+        // Get pending shot details
+        const [exists, blockNumber, amount] = await gameState.contract.getPendingShot(wallet.address);
+        console.log('📋 Pending shot details:', { exists, blockNumber: blockNumber.toString(), amount: amount.toString() });
+        
+        // Check if can reveal
+        const canReveal = await gameState.contract.canRevealShot(wallet.address);
+        console.log('📋 Can reveal shot:', canReveal);
+        
+        // Calculate blocks elapsed
+        const currentBlock = await gameState.contract.provider.getBlockNumber();
+        const blocksElapsed = currentBlock - Number(blockNumber);
+        console.log('📋 Current block:', currentBlock);
+        console.log('📋 Commit block:', Number(blockNumber));
+        console.log('📋 Blocks elapsed:', blocksElapsed);
+        console.log('📋 Time elapsed (est):', Math.floor(blocksElapsed * 12 / 60), 'minutes');
+        
+        if (blocksElapsed > 256) {
+          console.log('🚨 EXPIRED PENDING SHOT FOUND!');
+          console.log('🚨 Your pending shot expired after 256 blocks but is still blocking new shots.');
+          console.log('🚨 This is a contract design issue - expired shots should auto-cleanup.');
+          toastStore.error('FOUND THE ISSUE: You have an expired pending shot that should have auto-cleaned up. This is a contract bug.');
+        } else if (canReveal) {
+          console.log('✅ You can reveal your pending shot now!');
+          toastStore.info('You have a pending shot that can be revealed. You need to call revealShot() with your secret.');
+        } else if (blocksElapsed <= 1) {
+          console.log('⏳ Pending shot in reveal delay (need to wait 1+ blocks)');
+          toastStore.info('Your shot is in reveal delay. Wait 1+ blocks then reveal.');
+        } else {
+          console.log('❓ Pending shot exists but cannot be revealed - checking why...');
+        }
+      }
+      
+      // Check cooldown
+      const canCommit = await gameState.contract.canCommitShot(wallet.address);
+      const cooldownRemaining = await gameState.contract.getCooldownRemaining(wallet.address);
+      console.log('📋 Can commit shot:', canCommit);
+      console.log('📋 Cooldown remaining:', cooldownRemaining.toString(), 'seconds');
+      
+      // Check last shot time
+      const lastShot = await gameState.contract.lastShotTime(wallet.address);
+      console.log('📋 Last shot time:', new Date(Number(lastShot) * 1000).toLocaleString());
+      
+      console.log('=====================================');
+      
+      if (!hasPending && canCommit && cooldownRemaining.toString() === '0') {
+        console.log('✅ CONTRACT SAYS YOU CAN SHOOT - This might be a UI bug!');
+        toastStore.success('Contract says you can shoot! Try refreshing player data.');
+      }
       
       await gameStore.loadPlayerData(wallet.address);
       
     } catch (error) {
-      console.error('❌ Pending shot check failed:', error);
-      toastStore.error('Check failed: ' + error.message);
+      console.error('❌ Contract state check failed:', error);
+      toastStore.error('Contract check failed: ' + error.message);
     }
   };
 
@@ -420,13 +475,29 @@
           <div class="text-xs text-gray-400 text-center">
             Debug: canShoot={$canTakeShot}, cooldown={$cooldownRemaining}s, pot={$currentPot}
           </div>
-          <button
-            on:click={handleManualRefresh}
-            class="btn-debug"
-            disabled={$isLoading}
-          >
-            🔄 Refresh Player Data
-          </button>
+          <div class="flex flex-col space-y-2">
+            <button
+              on:click={handleManualRefresh}
+              class="btn-debug"
+              disabled={$isLoading}
+            >
+              🔄 Refresh Player Data
+            </button>
+            <button
+              on:click={handleCheckPendingShot}
+              class="btn-debug"
+              disabled={$isLoading}
+            >
+              🔍 Check Pending Shots
+            </button>
+            <button
+              on:click={handleDeepDebug}
+              class="btn-debug"
+              disabled={$isLoading}
+            >
+              🔧 Deep Debug
+            </button>
+          </div>
         {/if}
       </div>
     {/if}
@@ -576,6 +647,17 @@
 
   .animate-ping {
     animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  .btn-debug {
+    @apply px-4 py-2 text-xs font-medium text-gray-300;
+    @apply bg-gray-700 hover:bg-gray-600 border border-gray-600;
+    @apply rounded-lg transition-colors duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-gray-500;
+  }
+
+  .btn-debug:disabled {
+    @apply opacity-50 cursor-not-allowed;
   }
 
   /* Mobile Responsive */
