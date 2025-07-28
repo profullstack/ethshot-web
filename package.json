@@ -40,7 +40,8 @@
     "db:link": "node scripts/db-link.js",
     "db:setup": "pnpm run db:link && pnpm run db:migrate",
     "vercel:update-contract": "node scripts/update-vercel-contract.js",
-    "railway:update-contract": "node scripts/update-railway-contract.js"
+    "railway:update-contract": "node scripts/update-railway-contract.js",
+    "check-address": "node scripts/check-address.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
