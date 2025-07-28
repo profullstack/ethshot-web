@@ -1,17 +1,23 @@
 <script>
   import { onMount } from 'svelte';
   import { gameStore } from '../stores/game/index.js';
-  import { db, formatAddress } from '../database/index.js';
+  import { db, formatAddress, formatTimeAgo } from '../database/index.js';
   import UserDisplay from './UserDisplay.svelte';
 
   let topPlayers = [];
+  let recentWinners = [];
   let userProfiles = new Map();
   let loading = true;
+  let winnersLoading = true;
   let error = null;
+  let winnersError = null;
 
   // Load leaderboard from database on mount
   onMount(async () => {
-    await loadLeaderboard();
+    await Promise.all([
+      loadLeaderboard(),
+      loadRecentWinners()
+    ]);
   });
 
   async function loadLeaderboard() {
@@ -53,6 +59,44 @@
       userProfiles = new Map();
     } finally {
       loading = false;
+    }
+  }
+
+  async function loadRecentWinners() {
+    try {
+      winnersLoading = true;
+      winnersError = null;
+      
+      // Get recent winners from database
+      const dbWinners = await db.getRecentWinners(5);
+      
+      if (dbWinners && dbWinners.length > 0) {
+        // Transform database format to component format
+        recentWinners = dbWinners.map((winner) => ({
+          address: winner.winner_address,
+          amount: winner.amount,
+          timestamp: winner.timestamp,
+          txHash: winner.tx_hash
+        }));
+
+        // Fetch user profiles for winners (merge with existing profiles)
+        const winnerAddresses = recentWinners.map(winner => winner.address);
+        const winnerProfiles = await db.getUserProfiles(winnerAddresses);
+        
+        // Add winner profiles to the existing map
+        winnerProfiles.forEach(profile => {
+          userProfiles.set(profile.wallet_address.toLowerCase(), profile);
+        });
+      } else {
+        // No winners in database yet
+        recentWinners = [];
+      }
+    } catch (err) {
+      console.error('Error loading recent winners:', err);
+      winnersError = 'Failed to load recent winners';
+      recentWinners = [];
+    } finally {
+      winnersLoading = false;
     }
   }
 
@@ -112,7 +156,7 @@
           <p class="text-red-400">{error}</p>
           <button
             class="retry-button"
-            on:click={loadLeaderboard}
+            on:click={() => Promise.all([loadLeaderboard(), loadRecentWinners()])}
           >
             Try Again
           </button>
@@ -165,6 +209,71 @@
         </div>
       </div>
     {/if}
+  </div>
+
+  <!-- Recent Winners Section -->
+  <div class="recent-winners-section">
+    <div class="section-header">
+      <h4 class="text-md font-bold text-white flex items-center space-x-2">
+        <span>🎉</span>
+        <span>Recent Winners</span>
+      </h4>
+      <p class="text-xs text-gray-400">Latest jackpot winners</p>
+    </div>
+
+    <div class="winners-list">
+      {#if winnersLoading}
+        <div class="loading-state">
+          <div class="loading-spinner"></div>
+          <p class="text-gray-400 text-sm">Loading winners...</p>
+        </div>
+      {:else if winnersError}
+        <div class="error-state">
+          <div class="error-icon">⚠️</div>
+          <div class="error-text">
+            <p class="text-red-400 text-sm">{winnersError}</p>
+            <button
+              class="retry-button"
+              on:click={loadRecentWinners}
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      {:else if recentWinners.length > 0}
+        {#each recentWinners as winner (winner.txHash)}
+          <div class="winner-row">
+            <!-- Winner Info -->
+            <div class="winner-info">
+              <UserDisplay
+                walletAddress={winner.address}
+                profile={getPlayerProfile(winner.address)}
+                size="sm"
+                showAddress={false}
+                className="mb-1"
+              />
+              <div class="winner-time">
+                <span class="time-label">{formatTimeAgo(winner.timestamp)}</span>
+              </div>
+            </div>
+
+            <!-- Win Amount -->
+            <div class="win-amount">
+              <div class="win-value">+{parseFloat(winner.amount).toFixed(3)} ETH</div>
+              <div class="win-label">won</div>
+            </div>
+          </div>
+        {/each}
+      {:else}
+        <div class="no-winners">
+          <div class="no-winners-icon">🎉</div>
+          <div class="no-winners-text">
+            <p class="text-gray-400 text-sm">No winners yet!</p>
+            <p class="text-xs text-gray-500">Be the first to win the pot</p>
+          </div>
+        </div>
+      {/if}
+    </div>
   </div>
 
   <!-- View All Button -->
@@ -246,6 +355,61 @@
 
   .spent-label {
     @apply text-xs text-gray-500;
+  }
+
+  .recent-winners-section {
+    @apply mt-8 pt-6 border-t border-gray-700;
+  }
+
+  .section-header {
+    @apply mb-4 text-center;
+  }
+
+  .winners-list {
+    @apply space-y-2;
+  }
+
+  .winner-row {
+    @apply flex items-center justify-between p-2 rounded-lg;
+    @apply bg-gray-900/30 border border-gray-700/50;
+    @apply hover:bg-gray-900/50 transition-colors;
+  }
+
+  .winner-info {
+    @apply flex-1 min-w-0;
+  }
+
+  .winner-time {
+    @apply mt-1;
+  }
+
+  .time-label {
+    @apply text-xs text-gray-500;
+  }
+
+  .win-amount {
+    @apply text-right flex-shrink-0;
+  }
+
+  .win-value {
+    @apply font-mono text-sm text-green-400 font-medium;
+  }
+
+  .win-label {
+    @apply text-xs text-gray-500;
+  }
+
+  .no-winners {
+    @apply flex items-center space-x-3 p-4 text-center;
+    @apply bg-gray-900/30 rounded-lg border border-gray-700/50;
+  }
+
+  .no-winners-icon {
+    @apply text-2xl opacity-50;
+  }
+
+  .no-winners-text {
+    @apply flex-1;
   }
 
   .leaderboard-footer {
