@@ -23,68 +23,24 @@ import {
  * @param {Function} params.subscribe - Store subscribe function
  * @returns {Object} Update interval object with timer and subscriptions
  */
-export const startRealTimeUpdates = ({ 
-  db, 
-  getWalletStore, 
-  loadGameState, 
-  loadPlayerData, 
-  updateState, 
-  subscribe 
+export const startRealTimeUpdates = ({
+  db,
+  getWalletStore,
+  loadGameState,
+  loadPlayerData,
+  updateState,
+  subscribe
 }) => {
-  // Set up Supabase real-time subscriptions
-  const winnersSubscription = db.subscribeToWinners((payload) => {
-    console.log('New winner:', payload);
-    updateState(state => ({
-      ...state,
-      recentWinners: [payload.new, ...state.recentWinners.slice(0, 9)],
-      lastUpdate: new Date().toISOString()
-    }));
-    
-    // Handle social proof for winner events
-    if (payload.new) {
-      handleWinnerEvent({
-        winnerAddress: payload.new.winner_address,
-        amount: payload.new.amount,
-        txHash: payload.new.tx_hash
-      });
-    }
-  });
+  // DISABLED: Supabase real-time subscriptions to avoid websocket connection errors
+  // Real-time updates are now handled via periodic polling only
+  console.log('🔄 Starting periodic updates (realtime subscriptions disabled)');
+  
+  // Placeholder subscriptions that return null to avoid errors
+  const winnersSubscription = null;
+  const shotsSubscription = null;
+  const sponsorsSubscription = null;
 
-  const shotsSubscription = db.subscribeToShots((payload) => {
-    console.log('New shot:', payload);
-    
-    // Notify about new shot taken (only if it's not the current user)
-    const walletStore = getWalletStore();
-    const wallet = get(walletStore);
-    if (payload.new && payload.new.player_address !== wallet.address?.toLowerCase()) {
-      const currentState = get({ subscribe });
-      notifyShotTaken(currentState.currentPot || 'the current pot');
-    }
-    
-    // Handle social proof for shot events
-    if (payload.new) {
-      handleShotEvent({
-        playerAddress: payload.new.player_address,
-        amount: payload.new.amount,
-        won: payload.new.won,
-        txHash: payload.new.tx_hash
-      });
-    }
-    
-    // Refresh game state when new shots are taken
-    loadGameState();
-  });
-
-  const sponsorsSubscription = db.subscribeToSponsors((payload) => {
-    console.log('New sponsor:', payload);
-    updateState(state => ({
-      ...state,
-      currentSponsor: payload.new,
-      lastUpdate: new Date().toISOString()
-    }));
-  });
-
-  // Update every 60 seconds as fallback
+  // Update every 30 seconds for more responsive updates (since realtime is disabled)
   const timer = setInterval(async () => {
     const previousState = get({ subscribe });
     const previousPot = previousState.currentPot;
@@ -103,20 +59,26 @@ export const startRealTimeUpdates = ({
     if (wallet.connected && wallet.address) {
       await loadPlayerData(wallet.address);
     }
-  }, 60000);
+  }, 30000); // Reduced from 60s to 30s for better responsiveness
 
   // Listen for wallet connection changes
   const walletStore = getWalletStore();
   const walletUnsubscribe = walletStore.subscribe(async (wallet) => {
     if (wallet.connected && wallet.address) {
-      await loadPlayerData(wallet.address);
+      console.log('🔄 Wallet connected - refreshing player data immediately');
+      try {
+        await loadPlayerData(wallet.address);
+        console.log('✅ Player data refreshed after wallet connection');
+      } catch (error) {
+        console.error('❌ Failed to refresh player data after wallet connection:', error);
+      }
     }
   });
 
-  // Return subscriptions for cleanup
+  // Return subscriptions for cleanup (subscriptions are null since realtime is disabled)
   return {
     timer,
-    subscriptions: [winnersSubscription, shotsSubscription, sponsorsSubscription],
+    subscriptions: [winnersSubscription, shotsSubscription, sponsorsSubscription].filter(Boolean),
     walletUnsubscribe
   };
 };
