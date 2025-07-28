@@ -191,6 +191,33 @@
     }
   };
 
+  // Manual refresh for debugging
+  const handleManualRefresh = async () => {
+    console.log('🔄 Manual refresh triggered');
+    const wallet = get(walletStore);
+    if (wallet.connected && wallet.address) {
+      console.log('🔄 Refreshing player data manually...', {
+        address: wallet.address,
+        currentCanShoot: $canTakeShot,
+        currentCooldown: $cooldownRemaining,
+        currentPot: $currentPot
+      });
+      try {
+        await gameStore.loadPlayerData(wallet.address);
+        console.log('✅ Manual player data refresh completed', {
+          newCanShoot: $canTakeShot,
+          newCooldown: $cooldownRemaining
+        });
+        toastStore.success('Player data refreshed');
+      } catch (error) {
+        console.error('❌ Manual refresh failed:', error);
+        toastStore.error('Failed to refresh: ' + error.message);
+      }
+    } else {
+      toastStore.error('Wallet not connected');
+    }
+  };
+
   // Reactive statements
   $: timeRemaining = $cooldownRemaining;
   $: if (timeRemaining > 0 && !cooldownTimer) {
@@ -313,13 +340,29 @@
       </button>
     {:else}
       <!-- Cannot Take Shot -->
-      <button
-        class="btn-game btn-disabled"
-        disabled
-      >
-        <span class="text-2xl font-bold">Cannot Take Shot</span>
-        <span class="text-sm opacity-80">Check wallet connection and cooldown</span>
-      </button>
+      <div class="flex flex-col space-y-2">
+        <button
+          class="btn-game btn-disabled"
+          disabled
+        >
+          <span class="text-2xl font-bold">Cannot Take Shot</span>
+          <span class="text-sm opacity-80">Check wallet connection and cooldown</span>
+        </button>
+        
+        <!-- Debug info and manual refresh -->
+        {#if $isConnected}
+          <div class="text-xs text-gray-400 text-center">
+            Debug: canShoot={$canTakeShot}, cooldown={$cooldownRemaining}s, pot={$currentPot}
+          </div>
+          <button
+            on:click={handleManualRefresh}
+            class="btn-debug"
+            disabled={$isLoading}
+          >
+            🔄 Refresh Player Data
+          </button>
+        {/if}
+      </div>
     {/if}
 
     <!-- Pulse Effect for Ready State -->
