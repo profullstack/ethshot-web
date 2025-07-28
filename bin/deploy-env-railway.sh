@@ -95,8 +95,8 @@ echo "⏳ This will take approximately $((${#variables[@]} * 3)) seconds with ra
 # Deploy variables individually with rate limiting
 failed_vars=()
 for var in "${variables[@]}"; do
-    local key="${var%%=*}"
-    local value="${var#*=}"
+    key="${var%%=*}"
+    value="${var#*=}"
     
     if ! deploy_variable "$key" "$value"; then
         failed_vars+=("$key")
