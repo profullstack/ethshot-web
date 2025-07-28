@@ -6,6 +6,7 @@
   import { toastStore } from '../stores/toast.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatTime as configFormatTime } from '../config.js';
   import { onMount, onDestroy } from 'svelte';
+  import { get } from 'svelte/store';
 
   console.log('✅ GameButton imports loaded successfully');
 
@@ -35,11 +36,24 @@
       clearInterval(cooldownTimer);
     }
 
-    cooldownTimer = setInterval(() => {
+    cooldownTimer = setInterval(async () => {
       timeRemaining = $cooldownRemaining;
       if (timeRemaining <= 0) {
         clearInterval(cooldownTimer);
         cooldownTimer = null;
+        
+        // CRITICAL FIX: Refresh player data when cooldown expires
+        // This ensures canShoot is updated properly when cooldown reaches zero
+        const wallet = get(walletStore);
+        if (wallet.connected && wallet.address) {
+          console.log('🔄 Cooldown expired - refreshing player data to update canShoot state');
+          try {
+            await gameStore.loadPlayerData(wallet.address);
+            console.log('✅ Player data refreshed after cooldown expiry');
+          } catch (error) {
+            console.error('❌ Failed to refresh player data after cooldown:', error);
+          }
+        }
       }
     }, 1000);
   };
