@@ -342,6 +342,52 @@
     }
   };
 
+  // Clean up expired pending shot
+  const handleCleanupExpiredShot = async () => {
+    console.log('🧹 Cleaning up expired pending shot...');
+    const wallet = get(walletStore);
+    if (!wallet.connected || !wallet.address) {
+      toastStore.error('Wallet not connected');
+      return;
+    }
+
+    try {
+      const gameState = get(gameStore);
+      if (!gameState.contractDeployed) {
+        toastStore.error('Contract not deployed');
+        return;
+      }
+
+      console.log('🧹 Attempting to clean up expired pending shot for:', wallet.address);
+      toastStore.info('Attempting to clean up expired pending shot...');
+      
+      // Call the cleanup function - this will be added to the game store
+      await gameStore.cleanupExpiredPendingShot(wallet.address);
+      
+      console.log('✅ Expired pending shot cleanup completed');
+      toastStore.success('Expired pending shot cleaned up! You can now take shots again.');
+      
+      // Refresh player data
+      await gameStore.loadPlayerData(wallet.address);
+      
+    } catch (error) {
+      console.error('❌ Cleanup failed:', error);
+      
+      let errorMessage = 'Cleanup failed';
+      if (error.message.includes('No pending shot to clean up')) {
+        errorMessage = 'No pending shot found to clean up';
+      } else if (error.message.includes('Pending shot not yet expired')) {
+        errorMessage = 'Pending shot has not expired yet (need to wait 256 blocks ≈ 51-85 minutes)';
+      } else if (error.message.includes('user rejected')) {
+        errorMessage = 'Transaction cancelled';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toastStore.error(errorMessage);
+    }
+  };
+
   // Reactive statements
   $: timeRemaining = $cooldownRemaining;
   $: if (timeRemaining > 0 && !cooldownTimer) {
@@ -499,6 +545,13 @@
               disabled={$isLoading}
             >
               🔧 Deep Debug
+            </button>
+            <button
+              on:click={handleCleanupExpiredShot}
+              class="btn-debug"
+              disabled={$isLoading}
+            >
+              🧹 Cleanup Expired Shot
             </button>
           </div>
         {/if}

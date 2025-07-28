@@ -97,6 +97,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     event HouseFundsWithdrawn(address indexed owner, uint256 amount);
     event PayoutFailed(address indexed player, uint256 amount);
     event PayoutClaimed(address indexed player, uint256 amount);
+    event PendingShotExpired(address indexed player, uint256 indexed commitBlock, uint256 indexed currentBlock);
     
     // Modifiers
     modifier canCommit(address player) {
@@ -104,7 +105,19 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
             block.timestamp >= lastShotTime[player] + COOLDOWN_PERIOD,
             "Cooldown period not elapsed"
         );
-        require(!pendingShots[player].exists, "Previous shot still pending");
+        
+        // Auto-cleanup expired pending shots
+        if (pendingShots[player].exists) {
+            uint256 commitBlock = pendingShots[player].blockNumber;
+            if (block.number > commitBlock + MAX_REVEAL_DELAY) {
+                // Pending shot expired, clean it up automatically
+                delete pendingShots[player];
+                emit PendingShotExpired(player, commitBlock, block.number);
+            } else {
+                revert("Previous shot still pending");
+            }
+        }
+        
         require(tx.origin == msg.sender, "Must be called directly by EOA");
         _;
     }
@@ -220,7 +233,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     /**
      * @dev Reveal the shot and determine outcome (step 2 of commit-reveal)
      * @param secret The secret used in the commitment
-     * @notice FIXED: Pot size validation moved here to ensure sufficient funds for payout
+     * @notice FIXED: Prevent first shot from winning when pot only contains their contribution
      */
     function revealShot(uint256 secret)
         external
@@ -235,12 +248,18 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         bytes32 hash = keccak256(abi.encodePacked(secret, msg.sender));
         require(hash == shot.commitment, "Invalid secret");
         
+        // CRITICAL FIX: Prevent winning when pot only contains current player's contribution
+        // This prevents the first shot from being able to "win" their own money
+        bool canWin = currentPot > shot.amount;
+        
         // Generate randomness using multiple entropy sources
-        bool won;
-        if (testMode) {
-            won = _checkWinTest();
-        } else {
-            won = _checkWin(secret, shot.blockNumber);
+        bool won = false;
+        if (canWin) {
+            if (testMode) {
+                won = _checkWinTest();
+            } else {
+                won = _checkWin(secret, shot.blockNumber);
+            }
         }
         
         // Clean up pending shot
@@ -402,6 +421,23 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         require(success, "Payout claim failed");
         
         emit PayoutClaimed(msg.sender, amount);
+    }
+    
+    /**
+     * @dev Clean up expired pending shot for any player (can be called by anyone)
+     * @param player Address of player with expired pending shot
+     * @notice This helps clean up expired pending shots to unblock players
+     */
+    function cleanupExpiredPendingShot(address player) external {
+        require(pendingShots[player].exists, "No pending shot to clean up");
+        
+        uint256 commitBlock = pendingShots[player].blockNumber;
+        require(block.number > commitBlock + MAX_REVEAL_DELAY, "Pending shot not yet expired");
+        
+        // Clean up the expired pending shot
+        delete pendingShots[player];
+        
+        emit PendingShotExpired(player, commitBlock, block.number);
     }
     
     // Test functions (only available in test mode)

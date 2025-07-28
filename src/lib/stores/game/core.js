@@ -371,6 +371,65 @@ const createUnifiedGameStore = () => {
     updateInterval = null;
   };
 
+  // Clean up expired pending shot
+  const cleanupExpiredPendingShot = async (playerAddress) => {
+    if (!browser) {
+      throw new Error('Not available on server');
+    }
+
+    const state = get({ subscribe });
+    const walletStore = getWalletStore();
+    const wallet = get(walletStore);
+    
+    if (!wallet.connected || !wallet.address) {
+      throw new Error('Please connect your wallet first');
+    }
+
+    if (state.contractDeployed === false) {
+      throw new Error(`${state.activeCrypto} contract not deployed yet.`);
+    }
+
+    try {
+      if (state.isMultiCryptoMode) {
+        // Multi-crypto mode: use adapter pattern
+        throw new Error('Cleanup function not yet implemented for multi-crypto mode');
+      } else {
+        // ETH-only mode: direct ethers.js integration
+        if (!contract || !ethers || !wallet.signer) {
+          throw new Error('Contract or signer not available');
+        }
+
+        const contractWithSigner = contract.connect(wallet.signer);
+        
+        // Estimate gas
+        let gasEstimate;
+        try {
+          gasEstimate = await contractWithSigner.cleanupExpiredPendingShot.estimateGas(playerAddress);
+        } catch (estimateError) {
+          console.warn('Failed to estimate gas, using default:', estimateError.message);
+          gasEstimate = 100000n;
+        }
+        
+        const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
+        
+        const tx = await contractWithSigner.cleanupExpiredPendingShot(playerAddress, {
+          gasLimit: gasLimit
+        });
+
+        const receipt = await tx.wait();
+        
+        return {
+          hash: receipt.hash,
+          receipt
+        };
+      }
+      
+    } catch (error) {
+      console.error('Failed to cleanup expired pending shot:', error);
+      throw error;
+    }
+  };
+
   return {
     subscribe,
     init,
@@ -383,6 +442,7 @@ const createUnifiedGameStore = () => {
     copyLink,
     formatTimeRemaining,
     stopRealTimeUpdates: stopRealTimeUpdatesWrapper,
+    cleanupExpiredPendingShot,
     // Referral system functions
     processReferralOnLoad: () => processReferralOnLoad(),
     processReferralSignup: (address) => processReferralSignup(address, db, update),
