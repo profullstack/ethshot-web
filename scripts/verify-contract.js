@@ -1,15 +1,14 @@
-import pkg from 'hardhat';
-const { run } = pkg;
+import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import 'dotenv/config';
 
 /**
  * Contract Verification Script
- * 
+ *
  * This script verifies the deployed EthShot contract on Etherscan
  * so that function names appear properly instead of raw signatures.
- * 
+ *
  * Usage: node scripts/verify-contract.js
  */
 
@@ -35,6 +34,9 @@ async function main() {
   console.log(`📋 Contract Address: ${contractAddress}`);
   console.log(`🌐 Network: ${deploymentInfo.network || 'sepolia'}`);
 
+  // Import ethers
+  const { ethers } = await import('ethers');
+
   // Constructor arguments (must match deployment script)
   const initialOwner = deploymentInfo.deployer;
   const houseAddress = process.env.HOUSE_COMMISSION_ADDRESS || deploymentInfo.deployer;
@@ -47,18 +49,19 @@ async function main() {
   const maxRecentWinners = parseInt(process.env.VITE_RECENT_WINNERS_LIMIT || "100");
   const minPotSize = shotCost;
 
+  // Format constructor arguments for CLI
   const constructorArgs = [
-    initialOwner,
-    houseAddress,
-    shotCost,
-    sponsorCost,
-    cooldownPeriod,
-    winPercentageBP,
-    housePercentageBP,
-    winChanceBP,
-    maxRecentWinners,
-    minPotSize
-  ];
+    `"${initialOwner}"`,
+    `"${houseAddress}"`,
+    shotCost.toString(),
+    sponsorCost.toString(),
+    cooldownPeriod.toString(),
+    winPercentageBP.toString(),
+    housePercentageBP.toString(),
+    winChanceBP.toString(),
+    maxRecentWinners.toString(),
+    minPotSize.toString()
+  ].join(' ');
 
   console.log('\n📝 Constructor Arguments:');
   console.log(`  Initial Owner: ${initialOwner}`);
@@ -75,11 +78,16 @@ async function main() {
   try {
     console.log('⏳ Starting verification process...');
     
-    await run('verify:verify', {
-      address: contractAddress,
-      constructorArguments: constructorArgs,
+    // Use hardhat CLI directly with proper network specification
+    const command = `npx hardhat verify --network sepolia ${contractAddress} ${constructorArgs}`;
+    console.log(`🔧 Running: ${command}\n`);
+    
+    const output = execSync(command, {
+      encoding: 'utf8',
+      stdio: 'pipe'
     });
-
+    
+    console.log(output);
     console.log('\n✅ Contract verification completed successfully!');
     console.log(`🔗 View verified contract: https://sepolia.etherscan.io/address/${contractAddress}#code`);
     console.log('\n📋 After verification:');
