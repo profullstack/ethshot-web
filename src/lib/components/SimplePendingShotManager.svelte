@@ -323,18 +323,25 @@
         <div class="status waiting">
           <p>🔄 <strong>Pending shot blocking new shots</strong></p>
           {#if pendingShot.canReveal}
-            <p>Shot can be revealed, but since the secret is unknown, refresh the page to start over.</p>
+            <p>Shot can be revealed, but since the secret is unknown, you can clear it to start over.</p>
           {:else}
-            <p>Please wait {pendingShot.blocksToWait} more block(s) or refresh the page to start over.</p>
+            <p>Please wait {pendingShot.blocksToWait} more block(s) or clear the pending shot to start over.</p>
             <p class="time-estimate">⏰ <strong>Estimated time:</strong> {getTimeEstimate(pendingShot.blocksToWait)}</p>
           {/if}
           <div class="button-group">
             <button
-              class="action-btn refresh-btn"
+              class="action-btn cleanup-btn"
+              on:click={handleCleanupExpired}
+              disabled={loading}
+            >
+              {loading ? 'Clearing...' : 'Clear Pending Shot'}
+            </button>
+            <button
+              class="action-btn refresh-btn secondary"
               on:click={handleRefreshPage}
               disabled={loading}
             >
-              Start Over (Refresh Page)
+              Or Refresh Page
             </button>
           </div>
         </div>

@@ -82,7 +82,8 @@
     // Initialize game store for real-time updates
     gameStore.init();
     // Process any referral code from URL
-    gameStore.processReferralOnLoad();
+    const { ReferralService } = await import('$lib/stores/game/index.js');
+    ReferralService.processReferralOnLoad();
     
     // Initialize social proof system
     await initializeSocialProofIntegration();

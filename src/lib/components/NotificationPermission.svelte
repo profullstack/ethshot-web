@@ -50,7 +50,8 @@
 
   onMount(async () => {
     // Check initial browser permission status
-    permissionStatus = gameStore.getNotificationPermissionStatus();
+    const { NotificationService } = await import('../stores/game/index.js');
+    permissionStatus = NotificationService.getNotificationPermissionStatus();
     
     // Load user profile to check notification preference
     await loadUserProfile();
