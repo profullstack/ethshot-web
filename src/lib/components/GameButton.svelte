@@ -436,12 +436,48 @@
       });
       
       console.log('✅ Shot revealed successfully:', result);
-      toastStore.success('Shot revealed! Check if you won!');
+      
+      // Show appropriate message based on win/loss
+      if (result.won) {
+        toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
+        console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
+      } else {
+        toastStore.info('🎲 Shot revealed - No win this time. Better luck next shot!');
+        console.log('🎲 Shot revealed - No win this time');
+      }
       
       // Close the modal and clear state
       showRevealModal = false;
       pendingSecret = null;
       pendingTxHash = null;
+      
+      // Remove the revealed secret from localStorage
+      try {
+        const wallet = get(walletStore);
+        if (wallet.connected && wallet.address) {
+          const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+          const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+          
+          // Filter out the revealed secret
+          const updatedSecrets = existingSecrets.filter(key => {
+            const secretDataStr = localStorage.getItem(key);
+            if (secretDataStr) {
+              const secretData = JSON.parse(secretDataStr);
+              return secretData.txHash !== result.receipt.hash;
+            }
+            return true;
+          });
+          
+          // Update the saved secrets list
+          localStorage.setItem(savedSecretsKey, JSON.stringify(updatedSecrets));
+          
+          // Also remove the individual secret entry
+          const secretKey = `ethshot_secret_${wallet.address}_${result.receipt.hash.slice(0, 10)}`;
+          localStorage.removeItem(secretKey);
+        }
+      } catch (error) {
+        console.error('❌ Failed to remove revealed secret from localStorage:', error);
+      }
       
     } catch (error) {
       console.error('❌ Failed to reveal shot:', error);
@@ -589,9 +625,65 @@
   // CRITICAL FIX: Regular shot should be available when canTakeShot is true AND pot is NOT empty
   $: isRegularShotReady = !isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0;
 
+  // Check for saved secrets in localStorage on component mount
+  const checkForSavedSecrets = () => {
+    try {
+      const wallet = get(walletStore);
+      if (!wallet.connected || !wallet.address) {
+        return;
+      }
+
+      // Get the list of saved secrets for this wallet
+      const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+      let savedSecretKeys = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+      
+      // Filter out any invalid or expired secrets
+      savedSecretKeys = savedSecretKeys.filter(key => {
+        try {
+          const secretDataStr = localStorage.getItem(key);
+          if (!secretDataStr) return false;
+          
+          const secretData = JSON.parse(secretDataStr);
+          // Basic validation - check if required fields exist
+          return secretData.secret && secretData.txHash && secretData.walletAddress === wallet.address;
+        } catch (e) {
+          // Remove invalid entries
+          return false;
+        }
+      });
+      
+      // Update the saved secrets list in localStorage
+      localStorage.setItem(savedSecretsKey, JSON.stringify(savedSecretKeys));
+      
+      // If we have saved secrets, get the most recent one
+      if (savedSecretKeys.length > 0) {
+        // Get the most recent secret (last in the array)
+        const mostRecentKey = savedSecretKeys[savedSecretKeys.length - 1];
+        const secretDataStr = localStorage.getItem(mostRecentKey);
+        
+        if (secretDataStr) {
+          const secretData = JSON.parse(secretDataStr);
+          
+          // Set the pending secret and show the reveal modal
+          pendingSecret = secretData.secret;
+          pendingTxHash = secretData.txHash;
+          showRevealModal = true;
+          
+          toastStore.info('Found saved shot! Click "Reveal Now" to complete your shot.');
+          console.log('💾 Found saved secret in localStorage:', mostRecentKey);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to check for saved secrets in localStorage:', error);
+    }
+  };
+
   onMount(() => {
     console.log('🔧 GameButton onMount called');
     console.log('🔧 Cooldown remaining:', $cooldownRemaining);
+    
+    // Check for saved secrets in localStorage
+    checkForSavedSecrets();
     
     if ($cooldownRemaining > 0) {
       startCooldownTimer();

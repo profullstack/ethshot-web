@@ -380,9 +380,26 @@ export const revealShot = async ({
 
     const receipt = await tx.wait();
     
+    // Check if user won by looking at ShotRevealed events
+    const shotRevealedEvent = receipt.logs.find(log => {
+      try {
+        const parsed = contract.interface.parseLog(log);
+        return parsed.name === 'ShotRevealed';
+      } catch {
+        return false;
+      }
+    });
+
+    let won = false;
+    if (shotRevealedEvent) {
+      const parsed = contract.interface.parseLog(shotRevealedEvent);
+      won = parsed.args.won;
+    }
+    
     result = {
       hash: receipt.hash,
-      receipt
+      receipt,
+      won
     };
   }
 
