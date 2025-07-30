@@ -288,29 +288,44 @@ export const takeShot = async ({
 
     // Execute the shot transaction
     if (state.isMultiCryptoMode) {
-      // Multi-crypto mode: use adapter
+      // Multi-crypto mode: use adapter with commit-reveal pattern
       const adapter = getActiveAdapter();
       if (!adapter) {
         throw new Error('No active cryptocurrency adapter');
       }
 
-      // For multi-crypto mode, we need to implement commit-reveal logic in the adapter
-      // For now, we'll use the regular commitShot and handle discounts separately
+      // Generate secret and commitment for commit-reveal
       const secret = adapter.generateSecret();
       const commitment = adapter.generateCommitment(secret, wallet.address);
+      
+      // Store the secret for later reveal (in a secure way)
+      // This should be handled by the game state management
+      updateState(state => ({
+        ...state,
+        pendingShot: {
+          secret,
+          commitment,
+          timestamp: new Date().toISOString(),
+          actualShotCost,
+          discountApplied,
+          discountPercentage
+        }
+      }));
       
       // First commit the shot
       const commitResult = await adapter.commitShot(commitment, actualShotCost);
       console.log('✅ Shot committed:', commitResult.hash);
       
-      // Wait for reveal delay (this should be handled by the UI in practice)
+      // Show commit confirmation and wait for user to manually reveal
       toastStore.info('Shot committed! Waiting for reveal window...');
       
-      // For now, we'll immediately try to reveal (in production, this should be delayed)
-      // TODO: Implement proper reveal timing in UI
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-      
-      result = await adapter.revealShot(secret);
+      // Return early - the reveal will be handled by a separate user action
+      result = {
+        hash: commitResult.hash,
+        receipt: commitResult,
+        won: false, // Unknown until revealed
+        isCommitOnly: true
+      };
     } else {
       // ETH-only mode: direct contract interaction
       if (!contract || !ethers || !wallet.signer) {
@@ -329,6 +344,26 @@ export const takeShot = async ({
     
     console.log('✅ Shot transaction completed:', result.hash);
     
+    // Handle commit-only transactions (multi-crypto mode)
+    if (result.isCommitOnly) {
+      const message = discountApplied ?
+        `Shot committed with ${(discountPercentage * 100).toFixed(0)}% discount! Waiting for reveal window...` :
+        'Shot committed! Waiting for reveal window...';
+      toastStore.info(message);
+      
+      // Don't log to database yet - wait for reveal
+      // Don't trigger winner animations - wait for reveal
+      // Still update wallet balance since commit costs money
+      await walletStore.updateBalance();
+      
+      // Refresh game state to show pending shot
+      await loadGameState();
+      await loadPlayerData(wallet.address);
+      
+      return; // Exit early for commit-only transactions
+    }
+    
+    // Handle completed reveal transactions
     if (result.won) {
       const ethers = await import('ethers');
       const winAmount = ethers.formatEther(state.currentPot || '0');
@@ -742,105 +777,128 @@ export const revealShot = async ({
     return;
   }
 
-  if (!contract || !ethers || !wallet.signer) {
-    console.log('❌ Contract or signer not available');
-    toastStore.error('Contract not available');
-    return;
-  }
-
-  if (!secret) {
-    console.log('❌ No secret provided');
-    toastStore.error('Secret is required to reveal shot');
-    return;
-  }
-
   try {
     updateState(state => ({ ...state, takingShot: true, error: null }));
 
-    const contractWithSigner = contract.connect(wallet.signer);
+    let result;
     
-    // Check if user can reveal
-    const canReveal = await contract.canRevealShot(wallet.address);
-    if (!canReveal) {
-      throw new Error('Cannot reveal shot. Either no pending shot exists or reveal window is not open.');
-    }
-
-    console.log('🔓 Revealing shot with secret:', secret.slice(0, 10) + '...');
-    
-    // Reveal the shot
-    const revealTx = await contractWithSigner.revealShot(secret);
-    toastStore.info('🎲 Revealing shot result...');
-
-    const receipt = await revealTx.wait();
-    
-    console.log('✅ Reveal transaction confirmed:', receipt.hash);
-    
-    // Check if user won by looking at ShotRevealed events
-    const shotRevealedEvent = receipt.logs.find(log => {
-      try {
-        const parsed = contract.interface.parseLog(log);
-        return parsed.name === 'ShotRevealed';
-      } catch {
-        return false;
+    // Handle multi-crypto mode vs ETH-only mode
+    if (state.isMultiCryptoMode) {
+      // Multi-crypto mode: use adapter
+      const adapter = getActiveAdapter();
+      if (!adapter) {
+        throw new Error('No active cryptocurrency adapter');
       }
-    });
 
-    let won = false;
-    if (shotRevealedEvent) {
-      const parsed = contract.interface.parseLog(shotRevealedEvent);
-      won = parsed.args.won;
-      console.log('🎲 Shot result:', won ? 'WON!' : 'Lost');
+      // Get the secret from pending shot if not provided
+      const pendingShot = state.pendingShot;
+      const revealSecret = secret || pendingShot?.secret;
       
-      // Enhanced, prominent result feedback with multiple notifications
-      if (won) {
-        // Multiple success messages for maximum visibility
-        toastStore.success('🎉 JACKPOT! YOU WON! 🎊', { duration: 10000 });
-        setTimeout(() => {
-          toastStore.success('💰 CONGRATULATIONS! You hit the jackpot! 💰', { duration: 8000 });
-        }, 1000);
-        setTimeout(() => {
-          toastStore.success('🏆 WINNER! Check your wallet for the payout! 🏆', { duration: 6000 });
-        }, 3000);
-      } else {
-        // Clear loss indication
-        toastStore.info('🎲 Shot revealed - No win this time. Better luck next shot!', { duration: 6000 });
-        setTimeout(() => {
-          toastStore.info('💪 Keep trying! The next shot could be the winner!', { duration: 4000 });
-        }, 2000);
+      if (!revealSecret) {
+        throw new Error('No secret available for reveal. Please take a new shot.');
       }
+
+      console.log('🔓 Revealing shot with adapter...');
+      toastStore.info('🎲 Revealing shot result...');
+      
+      // Reveal using adapter
+      result = await adapter.revealShot(revealSecret);
+      
+      // Clear pending shot from state
+      updateState(state => ({ ...state, pendingShot: null }));
+      
     } else {
-      // Enhanced fallback with clearer messaging
-      console.warn('⚠️ Could not parse ShotRevealed event - result unclear');
-      toastStore.warning('🎲 Shot revealed but result unclear. Check the leaderboard or recent activity!', { duration: 6000 });
+      // ETH-only mode: direct contract interaction
+      if (!contract || !ethers || !wallet.signer) {
+        throw new Error('Contract or signer not available');
+      }
+
+      if (!secret) {
+        throw new Error('Secret is required to reveal shot');
+      }
+
+      const contractWithSigner = contract.connect(wallet.signer);
+      
+      // Check if user can reveal
+      const canReveal = await contract.canRevealShot(wallet.address);
+      if (!canReveal) {
+        throw new Error('Cannot reveal shot. Either no pending shot exists or reveal window is not open.');
+      }
+
+      console.log('🔓 Revealing shot with secret:', secret.slice(0, 10) + '...');
+      
+      // Reveal the shot
+      const revealTx = await contractWithSigner.revealShot(secret);
+      toastStore.info('🎲 Revealing shot result...');
+
+      const receipt = await revealTx.wait();
+      
+      console.log('✅ Reveal transaction confirmed:', receipt.hash);
+      
+      // Check if user won by looking at ShotRevealed events
+      const shotRevealedEvent = receipt.logs.find(log => {
+        try {
+          const parsed = contract.interface.parseLog(log);
+          return parsed.name === 'ShotRevealed';
+        } catch {
+          return false;
+        }
+      });
+
+      let won = false;
+      if (shotRevealedEvent) {
+        const parsed = contract.interface.parseLog(shotRevealedEvent);
+        won = parsed.args.won;
+        console.log('🎲 Shot result:', won ? 'WON!' : 'Lost');
+      }
+
+      result = {
+        hash: receipt.hash,
+        receipt,
+        won
+      };
+    }
+    
+    // Enhanced, prominent result feedback with multiple notifications
+    if (result.won) {
+      // Multiple success messages for maximum visibility
+      toastStore.success('🎉 JACKPOT! YOU WON! 🎊', { duration: 10000 });
+      setTimeout(() => {
+        toastStore.success('💰 CONGRATULATIONS! You hit the jackpot! 💰', { duration: 8000 });
+      }, 1000);
+      setTimeout(() => {
+        toastStore.success('🏆 WINNER! Check your wallet for the payout! 🏆', { duration: 6000 });
+      }, 3000);
+    } else {
+      // Clear loss indication with enhanced messaging
+      toastStore.info('🎲 Shot revealed - No win this time. Better luck next shot!', { duration: 6000 });
+      setTimeout(() => {
+        toastStore.info('💪 Keep trying! The next shot could be the winner!', { duration: 4000 });
+      }, 2000);
     }
 
-    const result = {
-      hash: receipt.hash,
-      receipt,
-      won
-    };
-
-    if (won) {
+    if (result.won) {
       // Trigger winner animation
       winnerEventStore.set({
         winner: wallet.address,
         amount: state.currentPot,
         timestamp: new Date().toISOString(),
-        isDiscountShot: false
+        isDiscountShot: state.pendingShot?.discountApplied || false
       });
       
       // Notify all users about the jackpot win
       notifyJackpotWon(state.currentPot, wallet.address);
     }
 
-    // Log transaction to database
+    // Log transaction to database with pending shot details
+    const pendingShot = state.pendingShot;
     await logShotToDatabase({
       result,
       wallet,
-      actualShotCost: state.shotCost,
+      actualShotCost: pendingShot?.actualShotCost || state.shotCost,
       state,
-      discountApplied: false,
-      discountPercentage: 0,
+      discountApplied: pendingShot?.discountApplied || false,
+      discountPercentage: pendingShot?.discountPercentage || 0,
       db
     });
 

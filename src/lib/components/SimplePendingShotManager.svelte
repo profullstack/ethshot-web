@@ -15,11 +15,37 @@
   $: state = $gameStore;
 
   const checkPendingShot = async () => {
-    if (!wallet.connected || !state.contractDeployed || checkingStatus) return;
+    if (!wallet.connected || checkingStatus) return;
 
     checkingStatus = true;
     try {
       console.log('🔍 SimplePendingShotManager: Checking for pending shots...');
+      
+      // Check if we're in multi-crypto mode and have a pending shot in state
+      if (state.isMultiCryptoMode && state.pendingShot) {
+        console.log('✅ Multi-crypto mode: Found pending shot in game state');
+        
+        pendingShot = {
+          exists: true,
+          blockNumber: 0, // Not applicable in multi-crypto mode
+          amount: state.pendingShot.actualShotCost,
+          currentBlock: 0, // Not applicable in multi-crypto mode
+          canReveal: true, // Always ready to reveal in multi-crypto mode
+          revealExpired: false, // Doesn't expire in multi-crypto mode
+          blocksToWait: 0, // No waiting in multi-crypto mode
+          isMultiCrypto: true,
+          hasSecret: !!state.pendingShot.secret
+        };
+        
+        console.log('✅ Multi-crypto pending shot detected:', pendingShot);
+        return;
+      }
+      
+      // ETH-only mode: check contract state
+      if (!state.contractDeployed) {
+        pendingShot = null;
+        return;
+      }
       
       // Wait for gameStore to be fully initialized
       let contract = state.contract;
@@ -81,10 +107,12 @@
           currentBlock,
           canReveal,
           revealExpired,
-          blocksToWait
+          blocksToWait,
+          isMultiCrypto: false,
+          hasSecret: false // ETH-only mode doesn't store secrets in state
         };
         
-        console.log('✅ Pending shot detected and will be displayed');
+        console.log('✅ ETH-only pending shot detected and will be displayed');
         console.log('🎯 PENDING SHOT OBJECT CREATED:', pendingShot);
         console.log('🎯 UI SHOULD NOW RENDER WITH:', {
           exists: pendingShot.exists,
@@ -175,14 +203,22 @@
   const handleRevealShot = async () => {
     loading = true;
     try {
-      // Ask for the secret - this is the proper way to reveal a shot
-      const secret = prompt('Enter your secret from when you committed the shot:');
-      if (!secret) {
-        toastStore.error('Secret is required to reveal the shot');
-        return;
+      let secret = null;
+      
+      // For multi-crypto mode, use the secret from state
+      if (pendingShot.isMultiCrypto && pendingShot.hasSecret) {
+        console.log('🎯 Multi-crypto mode: Using secret from game state...');
+        secret = state.pendingShot.secret;
+      } else {
+        // For ETH-only mode, ask for the secret
+        secret = prompt('Enter your secret from when you committed the shot:');
+        if (!secret) {
+          toastStore.error('Secret is required to reveal the shot');
+          return;
+        }
       }
 
-      console.log('🎯 Revealing pending shot with provided secret...');
+      console.log('🎯 Revealing pending shot...');
       toastStore.info('Revealing pending shot...');
       
       // Call the reveal function from the service
@@ -297,8 +333,23 @@
         <p>Wait <strong>{256 - (pendingShot.currentBlock - pendingShot.blockNumber)} blocks</strong> to clear (about <strong>{getTimeEstimate(256 - (pendingShot.currentBlock - pendingShot.blockNumber))}</strong>)</p>
       {/if}
       
-      <!-- Simplified: Only show cleanup for expired shots, refresh for everything else -->
-      {#if pendingShot.revealExpired}
+      <!-- Multi-crypto mode: Show reveal button -->
+      {#if pendingShot.isMultiCrypto}
+        <div class="status ready">
+          <p>🎲 <strong>Ready to reveal shot result!</strong></p>
+          <p>Your shot has been committed and is ready to be revealed.</p>
+          <div class="button-group">
+            <button
+              class="action-btn reveal-btn"
+              on:click={handleRevealShot}
+              disabled={loading}
+            >
+              {loading ? 'Revealing...' : '🎲 Reveal Shot Result'}
+            </button>
+          </div>
+        </div>
+      {:else if pendingShot.revealExpired}
+        <!-- ETH-only mode: Expired shots -->
         <div class="status expired">
           <p>❌ <strong>Reveal window expired</strong></p>
           <p>This shot has expired and needs to be cleared to allow new shots.</p>
@@ -320,30 +371,47 @@
           </div>
         </div>
       {:else}
+        <!-- ETH-only mode: Waiting or ready to reveal -->
         <div class="status waiting">
           <p>🔄 <strong>Pending shot blocking new shots</strong></p>
           {#if pendingShot.canReveal}
-            <p>Shot can be revealed, but since the secret is unknown, you can clear it to start over.</p>
+            <p>Shot can be revealed. Enter your secret to reveal the result.</p>
+            <div class="button-group">
+              <button
+                class="action-btn reveal-btn"
+                on:click={handleRevealShot}
+                disabled={loading}
+              >
+                {loading ? 'Revealing...' : '🎲 Reveal Shot (Enter Secret)'}
+              </button>
+              <button
+                class="action-btn cleanup-btn"
+                on:click={handleCleanupExpired}
+                disabled={loading}
+              >
+                {loading ? 'Clearing...' : 'Or Clear Pending Shot'}
+              </button>
+            </div>
           {:else}
             <p>Please wait {pendingShot.blocksToWait} more block(s) or clear the pending shot to start over.</p>
             <p class="time-estimate">⏰ <strong>Estimated time:</strong> {getTimeEstimate(pendingShot.blocksToWait)}</p>
+            <div class="button-group">
+              <button
+                class="action-btn cleanup-btn"
+                on:click={handleCleanupExpired}
+                disabled={loading}
+              >
+                {loading ? 'Clearing...' : 'Clear Pending Shot'}
+              </button>
+              <button
+                class="action-btn refresh-btn secondary"
+                on:click={handleRefreshPage}
+                disabled={loading}
+              >
+                Or Refresh Page
+              </button>
+            </div>
           {/if}
-          <div class="button-group">
-            <button
-              class="action-btn cleanup-btn"
-              on:click={handleCleanupExpired}
-              disabled={loading}
-            >
-              {loading ? 'Clearing...' : 'Clear Pending Shot'}
-            </button>
-            <button
-              class="action-btn refresh-btn secondary"
-              on:click={handleRefreshPage}
-              disabled={loading}
-            >
-              Or Refresh Page
-            </button>
-          </div>
         </div>
       {/if}
       
