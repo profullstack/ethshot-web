@@ -109,7 +109,7 @@
           revealExpired,
           blocksToWait,
           isMultiCrypto: false,
-          hasSecret: false // ETH-only mode doesn't store secrets in state
+          hasSecret: !!(state.pendingShot && state.pendingShot.secret) // Check if we have a stored secret
         };
         
         console.log('✅ ETH-only pending shot detected and will be displayed');
@@ -205,12 +205,17 @@
     try {
       let secret = null;
       
-      // For multi-crypto mode, use the secret from state
-      if (pendingShot.isMultiCrypto && pendingShot.hasSecret) {
-        console.log('🎯 Multi-crypto mode: Using secret from game state...');
+      // Check if we have a stored secret (works for both multi-crypto and ETH-only modes)
+      if (pendingShot.hasSecret && state.pendingShot && state.pendingShot.secret) {
+        console.log('🎯 Using stored secret from game state...');
         secret = state.pendingShot.secret;
+      } else if (pendingShot.isMultiCrypto) {
+        // Multi-crypto mode should always have a secret
+        toastStore.error('No secret available for multi-crypto reveal. Please take a new shot.');
+        return;
       } else {
-        // For ETH-only mode, ask for the secret
+        // ETH-only mode fallback: ask for the secret manually
+        console.log('🔑 No stored secret found, asking user for manual entry...');
         secret = prompt('Enter your secret from when you committed the shot:');
         if (!secret) {
           toastStore.error('Secret is required to reveal the shot');

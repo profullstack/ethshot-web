@@ -295,31 +295,49 @@ export const takeShot = async ({
         throw new Error('No active cryptocurrency adapter');
       }
 
+      console.log('🎯 Multi-crypto mode: Starting commit-reveal cycle...');
+      toastStore.info('🎯 Starting shot transaction...');
+
       // Generate secret and commitment for commit-reveal
       const secret = adapter.generateSecret();
       const commitment = adapter.generateCommitment(secret, wallet.address);
       
-      console.log('🎯 Multi-crypto mode: Starting commit-reveal cycle...');
+      console.log('🔐 Generated secret and commitment for multi-crypto shot');
       
       // First commit the shot
+      console.log('📝 Committing shot to blockchain...');
+      toastStore.info('📝 Committing shot to blockchain...');
+      
       const commitResult = await adapter.commitShot(commitment, actualShotCost);
-      console.log('✅ Shot committed:', commitResult.hash);
-      toastStore.info('Shot committed! Revealing result...');
+      console.log('✅ Shot committed successfully:', commitResult.hash);
+      toastStore.success('✅ Shot committed! Waiting for reveal...');
       
       // Wait a moment for the commit to be processed
+      console.log('⏳ Waiting 2 seconds for commit to be processed...');
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Now reveal the shot immediately
       console.log('🔓 Auto-revealing shot...');
-      const revealResult = await adapter.revealShot(secret);
-      console.log('✅ Shot revealed:', revealResult.hash);
+      toastStore.info('🔓 Revealing shot result...');
       
-      result = {
-        hash: revealResult.hash,
-        receipt: revealResult,
-        won: revealResult.won,
-        isCommitOnly: false
-      };
+      try {
+        const revealResult = await adapter.revealShot(secret);
+        console.log('✅ Shot revealed successfully:', revealResult.hash);
+        toastStore.success('✅ Shot revealed! Processing result...');
+        
+        result = {
+          hash: revealResult.hash,
+          receipt: revealResult,
+          won: revealResult.won,
+          isCommitOnly: false
+        };
+        
+        console.log('🎲 Multi-crypto shot result:', { won: result.won, hash: result.hash });
+      } catch (revealError) {
+        console.error('❌ Failed to reveal multi-crypto shot:', revealError);
+        toastStore.error('❌ Failed to reveal shot: ' + revealError.message);
+        throw revealError;
+      }
       
       // Clear any existing pending shot state
       updateState(state => ({ ...state, pendingShot: null }));
@@ -329,14 +347,26 @@ export const takeShot = async ({
         throw new Error('Contract or signer not available');
       }
 
-      result = await executeShotTransaction({
-        contract,
-        ethers,
-        wallet,
-        actualShotCost,
-        customShotCost,
-        discountApplied
-      });
+      console.log('🎯 ETH-only mode: Starting commit-reveal cycle...');
+      toastStore.info('🎯 Starting ETH shot transaction...');
+
+      try {
+        result = await executeShotTransaction({
+          contract,
+          ethers,
+          wallet,
+          actualShotCost,
+          customShotCost,
+          discountApplied
+        });
+        
+        console.log('✅ ETH-only shot completed successfully:', result.hash);
+        console.log('🎲 ETH-only shot result:', { won: result.won, hash: result.hash });
+      } catch (ethError) {
+        console.error('❌ Failed to complete ETH-only shot:', ethError);
+        toastStore.error('❌ Failed to complete shot: ' + ethError.message);
+        throw ethError;
+      }
       
       // Clear any existing pending shot state
       updateState(state => ({ ...state, pendingShot: null }));
