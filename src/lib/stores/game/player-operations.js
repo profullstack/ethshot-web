@@ -320,6 +320,9 @@ export const takeShot = async ({
         won: revealResult.won,
         isCommitOnly: false
       };
+      
+      // Clear any existing pending shot state
+      updateState(state => ({ ...state, pendingShot: null }));
     } else {
       // ETH-only mode: direct contract interaction
       if (!contract || !ethers || !wallet.signer) {
@@ -334,6 +337,9 @@ export const takeShot = async ({
         customShotCost,
         discountApplied
       });
+      
+      // Clear any existing pending shot state
+      updateState(state => ({ ...state, pendingShot: null }));
     }
     
     console.log('✅ Shot transaction completed:', result.hash);
