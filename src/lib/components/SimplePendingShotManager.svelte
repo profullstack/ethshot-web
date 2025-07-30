@@ -338,7 +338,7 @@
       {#if pendingShot.revealExpired}
         <p>Wait <strong>0 blocks</strong> to clear (expired - can clear now)</p>
       {:else}
-        <p>Wait <strong>{256 - (pendingShot.currentBlock - pendingShot.blockNumber)} blocks</strong> to clear (about <strong>{getTimeEstimate(256 - (pendingShot.currentBlock - pendingShot.blockNumber))}</strong>)</p>
+        <p>Wait <strong>{Math.max(0, (pendingShot.blockNumber + 256) - pendingShot.currentBlock)} blocks</strong> to clear (about <strong>{getTimeEstimate(Math.max(0, (pendingShot.blockNumber + 256) - pendingShot.currentBlock))}</strong>)</p>
       {/if}
       
       <!-- Multi-crypto mode: Show reveal button -->
@@ -380,10 +380,33 @@
         </div>
       {:else}
         <!-- ETH-only mode: Waiting or ready to reveal -->
-        <div class="status waiting">
-          <p>🔄 <strong>Pending shot blocking new shots</strong></p>
-          {#if pendingShot.canReveal}
-            <p>Shot can be revealed. Enter your secret to reveal the result.</p>
+        {#if pendingShot.canReveal && pendingShot.hasSecret}
+          <!-- Ready to reveal with stored secret -->
+          <div class="status ready">
+            <p>🎲 <strong>Ready to reveal shot result!</strong></p>
+            <p>Your shot is ready to be revealed using your stored secret.</p>
+            <div class="button-group">
+              <button
+                class="action-btn reveal-btn"
+                on:click={handleRevealShot}
+                disabled={loading}
+              >
+                {loading ? 'Revealing...' : '🎲 Reveal Shot Result'}
+              </button>
+              <button
+                class="action-btn cleanup-btn secondary"
+                on:click={handleCleanupExpired}
+                disabled={loading}
+              >
+                {loading ? 'Clearing...' : 'Or Clear Pending Shot'}
+              </button>
+            </div>
+          </div>
+        {:else if pendingShot.canReveal && !pendingShot.hasSecret}
+          <!-- Ready to reveal but need manual secret entry -->
+          <div class="status ready">
+            <p>🔑 <strong>Ready to reveal - Secret required</strong></p>
+            <p>Your shot can be revealed, but you need to enter your secret manually.</p>
             <div class="button-group">
               <button
                 class="action-btn reveal-btn"
@@ -393,39 +416,48 @@
                 {loading ? 'Revealing...' : '🎲 Reveal Shot (Enter Secret)'}
               </button>
               <button
-                class="action-btn cleanup-btn"
+                class="action-btn cleanup-btn secondary"
                 on:click={handleCleanupExpired}
                 disabled={loading}
               >
                 {loading ? 'Clearing...' : 'Or Clear Pending Shot'}
               </button>
             </div>
-          {:else}
-            <p>Please wait {pendingShot.blocksToWait} more block(s) or clear the pending shot to start over.</p>
+          </div>
+        {:else}
+          <!-- Still waiting for reveal window -->
+          <div class="status waiting">
+            <p>⏳ <strong>Waiting for reveal window</strong></p>
+            <p>Please wait {pendingShot.blocksToWait} more block(s) before you can reveal this shot.</p>
             <p class="time-estimate">⏰ <strong>Estimated time:</strong> {getTimeEstimate(pendingShot.blocksToWait)}</p>
             <div class="button-group">
               <button
-                class="action-btn cleanup-btn"
+                class="action-btn wait-btn"
+                on:click={handleWaitForBlocks}
+                disabled={loading}
+              >
+                ⏳ Wait for Reveal Window
+              </button>
+              <button
+                class="action-btn cleanup-btn secondary"
                 on:click={handleCleanupExpired}
                 disabled={loading}
               >
-                {loading ? 'Clearing...' : 'Clear Pending Shot'}
-              </button>
-              <button
-                class="action-btn refresh-btn secondary"
-                on:click={handleRefreshPage}
-                disabled={loading}
-              >
-                Or Refresh Page
+                {loading ? 'Clearing...' : 'Or Clear Pending Shot'}
               </button>
             </div>
-          {/if}
-        </div>
+          </div>
+        {/if}
       {/if}
       
       <div class="help-text">
         <p><strong>What happened?</strong> You started a shot but didn't complete the reveal step. This is part of the commit-reveal process that ensures fair randomness.</p>
-        <p><strong>Quick fix:</strong> Refresh the page to clear this state and take a new shot.</p>
+        {#if pendingShot.canReveal}
+          <p><strong>Good news:</strong> Your shot is ready to reveal! Click the reveal button above to see if you won.</p>
+        {:else}
+          <p><strong>Please wait:</strong> The reveal window opens after {pendingShot.blocksToWait} more block(s). This prevents manipulation of the random outcome.</p>
+        {/if}
+        <p><strong>Alternative:</strong> You can clear the pending shot and start over, but you'll lose the ETH you already spent.</p>
       </div>
     </div>
   </div>

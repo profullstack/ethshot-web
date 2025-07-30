@@ -106,9 +106,29 @@ Special UI components handle the two-step process:
 
 Each button has distinct states for commit and reveal phases, with appropriate loading and disabled states.
 
+## Security Features
+
+### Anti-Manipulation Protections
+
+1. **First Shot Protection**: The contract prevents the first shot from winning when the pot only contains the player's contribution
+2. **Timing Windows**: Enforced delays prevent immediate reveals while block hash limits prevent indefinite delays
+3. **Cooldown Periods**: Prevent rapid-fire attempts and spam attacks
+4. **Nonce Systems**: Global and per-player nonces prevent replay and cross-contamination attacks
+
+### Randomness Security
+
+The commit-reveal scheme provides several security guarantees:
+
+- **Unpredictability**: Multiple entropy sources make outcomes impossible to predict
+- **Verifiability**: All randomness sources are on-chain and auditable
+- **Fairness**: No party (player, miner, or validator) can manipulate the outcome
+- **Transparency**: The randomness generation algorithm is open source and deterministic
+
 ## Best Practices
 
 1. **Always Check Pending Shots**: On page load, check for pending shots that need to be revealed
 2. **Handle Connection Issues**: Provide retry mechanisms for failed transactions
 3. **Clear Storage After Reveal**: Remove pending shot data after successful reveal
 4. **Provide Clear User Feedback**: Inform the user about each step of the process
+5. **Monitor Timing Windows**: Ensure reveals happen within the valid block range
+6. **Validate Entropy**: The contract automatically handles all entropy sources for maximum security
