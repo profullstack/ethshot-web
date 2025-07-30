@@ -441,9 +441,17 @@ class ChatServer {
     try {
       // Leave room in database (if available)
       if (supabase) {
-        await supabase.rpc('leave_chat_room', {
-          p_room_id: roomId,
-          p_user_wallet_address: client.walletAddress
+        // Create authenticated Supabase client with user's JWT
+        const authenticatedSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: {
+            headers: {
+              Authorization: `Bearer ${client.jwtToken}`
+            }
+          }
+        });
+
+        await authenticatedSupabase.rpc('leave_chat_room_secure', {
+          p_room_id: roomId
         });
       } else {
         // If no Supabase connection, reject room operations
@@ -721,10 +729,18 @@ class ChatServer {
       if (client.walletAddress) {
         try {
           // Leave room in database (if available)
-          if (supabase) {
-            await supabase.rpc('leave_chat_room', {
-              p_room_id: roomId,
-              p_user_wallet_address: client.walletAddress
+          if (supabase && client.jwtToken) {
+            // Create authenticated Supabase client with user's JWT
+            const authenticatedSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+              global: {
+                headers: {
+                  Authorization: `Bearer ${client.jwtToken}`
+                }
+              }
+            });
+
+            await authenticatedSupabase.rpc('leave_chat_room_secure', {
+              p_room_id: roomId
             });
           }
 
