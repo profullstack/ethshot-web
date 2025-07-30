@@ -631,6 +631,10 @@
   $: isPreparingData = gameState.loading && !gameState.takingShot;
   $: isTakingShot = gameState.takingShot;
   
+  // Enhanced loading state detection with specific messages
+  $: isLoadingState = $isLoading;
+  $: loadingMessage = isTakingShot ? 'Processing your shot...' : 'Loading game data...';
+  
   // Check if pot is empty (first shot scenario) - simplified to handle both string and numeric values
   $: isPotEmpty = parseFloat($currentPot || '0') === 0;
   $: isFirstShotReady = isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0;
@@ -753,8 +757,8 @@
         <span class="text-2xl font-bold">Cooldown Active</span>
         <span class="text-sm opacity-80">Next shot in {formatTime(timeRemaining)}</span>
       </button>
-    {:else if isTakingShot}
-      <!-- Taking Shot -->
+    {:else if isLoadingState}
+      <!-- Loading State with Spinner -->
       <button
         class="btn-game btn-loading"
         disabled
@@ -762,22 +766,8 @@
         <div class="flex items-center space-x-3">
           <div class="spinner w-6 h-6"></div>
           <div class="flex flex-col">
-            <span class="text-2xl font-bold">Taking Shot...</span>
-            <span class="text-sm opacity-80">Confirm in wallet</span>
-          </div>
-        </div>
-      </button>
-    {:else if isPreparingData}
-      <!-- Preparing Data -->
-      <button
-        class="btn-game btn-loading"
-        disabled
-      >
-        <div class="flex items-center space-x-3">
-          <div class="spinner w-6 h-6"></div>
-          <div class="flex flex-col">
-            <span class="text-2xl font-bold">Preparing Shot Caller</span>
-            <span class="text-sm opacity-80">Loading game data</span>
+            <span class="text-2xl font-bold">{loadingMessage}</span>
+            <span class="text-sm opacity-80">{isTakingShot ? 'Confirm in wallet' : 'Please wait...'}</span>
           </div>
         </div>
       </button>
@@ -868,6 +858,30 @@
     <!-- Pulse Effect for Ready State -->
     {#if isRegularShotReady || isFirstShotReady}
       <div class="absolute inset-0 rounded-2xl bg-red-500/20 animate-ping pointer-events-none"></div>
+    {/if}
+
+    <!-- Status Bar for Loading States -->
+    {#if isLoadingState}
+      <div class="status-bar-container w-80">
+        <div class="status-bar">
+          <div class="status-bar-fill" style="width: 75%;"></div>
+        </div>
+        <div class="status-text">
+          <span class="status-message">{loadingMessage}</span>
+          <span class="status-detail">{isTakingShot ? 'Waiting for wallet confirmation...' : 'Initializing...'}</span>
+        </div>
+      </div>
+    {:else if timeRemaining > 0}
+      <!-- Cooldown Status Bar -->
+      <div class="status-bar-container w-80">
+        <div class="status-bar cooldown-bar">
+          <div class="status-bar-fill cooldown-fill" style="width: {Math.max(0, 100 - (timeRemaining / GAME_CONFIG.COOLDOWN_SECONDS * 100))}%;"></div>
+        </div>
+        <div class="status-text">
+          <span class="status-message">Cooldown Active</span>
+          <span class="status-detail">Next shot in {formatTime(timeRemaining)}</span>
+        </div>
+      </div>
     {/if}
   </div>
 
@@ -1102,6 +1116,74 @@
     @apply border-2 border-gray-300 border-t-white rounded-full animate-spin;
   }
 
+  /* Status Bar Styles */
+  .status-bar-container {
+    @apply w-full mt-4;
+  }
+
+  .status-bar {
+    @apply w-full h-2 bg-gray-700 rounded-full overflow-hidden;
+  }
+
+  .status-bar-fill {
+    @apply h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500 ease-out;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .status-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 2s infinite;
+  }
+
+  .cooldown-bar {
+    @apply bg-gray-600;
+  }
+
+  .cooldown-fill {
+    @apply bg-gradient-to-r from-red-500 to-orange-500 rounded-full transition-all duration-1000 ease-out;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cooldown-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .status-text {
+    @apply mt-2 text-center space-y-1;
+  }
+
+  .status-message {
+    @apply text-sm font-semibold text-white;
+  }
+
+  .status-detail {
+    @apply text-xs text-gray-400;
+  }
+
   @keyframes glow {
     0%, 100% {
       box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
@@ -1303,6 +1385,19 @@
     .save-storage-btn,
     .save-clipboard-btn {
       @apply text-sm py-2;
+    }
+
+    /* Mobile Status Bar Styles */
+    .status-bar-container {
+      @apply w-72;
+    }
+    
+    .status-message {
+      @apply text-xs;
+    }
+    
+    .status-detail {
+      @apply text-xs;
     }
   }
 </style>
