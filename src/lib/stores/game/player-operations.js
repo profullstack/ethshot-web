@@ -289,7 +289,7 @@ export const takeShot = async ({
 
     // Execute the shot transaction
     if (state.isMultiCryptoMode) {
-      // Multi-crypto mode: use adapter with full commit-reveal cycle
+      // Multi-crypto mode: commit only, then show reveal confirmation
       const adapter = getActiveAdapter();
       if (!adapter) {
         throw new Error('No active cryptocurrency adapter');
@@ -299,32 +299,35 @@ export const takeShot = async ({
       const secret = adapter.generateSecret();
       const commitment = adapter.generateCommitment(secret, wallet.address);
       
-      console.log('🎯 Multi-crypto mode: Starting commit-reveal cycle...');
+      console.log('🎯 Multi-crypto mode: Committing shot...');
       
-      // First commit the shot
+      // Only commit the shot, don't reveal yet
       const commitResult = await adapter.commitShot(commitment, actualShotCost);
       console.log('✅ Shot committed:', commitResult.hash);
-      toastStore.info('Shot committed! Revealing result...');
+      toastStore.info('Shot committed! Please reveal when ready...');
       
-      // Wait a moment for the commit to be processed
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Now reveal the shot immediately
-      console.log('🔓 Auto-revealing shot...');
-      const revealResult = await adapter.revealShot(secret);
-      console.log('✅ Shot revealed:', revealResult.hash);
+      // Set pending shot state for reveal confirmation
+      updateState(state => ({
+        ...state,
+        pendingShot: {
+          secret,
+          commitment,
+          actualShotCost,
+          discountApplied,
+          discountPercentage,
+          commitHash: commitResult.hash,
+          timestamp: new Date().toISOString()
+        }
+      }));
       
       result = {
-        hash: revealResult.hash,
-        receipt: revealResult,
-        won: revealResult.won,
-        isCommitOnly: false
+        hash: commitResult.hash,
+        receipt: commitResult,
+        won: false, // Won't know until reveal
+        isCommitOnly: true
       };
-      
-      // Clear any existing pending shot state
-      updateState(state => ({ ...state, pendingShot: null }));
     } else {
-      // ETH-only mode: direct contract interaction
+      // ETH-only mode: commit only, then show reveal confirmation
       if (!contract || !ethers || !wallet.signer) {
         throw new Error('Contract or signer not available');
       }
@@ -335,11 +338,24 @@ export const takeShot = async ({
         wallet,
         actualShotCost,
         customShotCost,
-        discountApplied
+        discountApplied,
+        commitOnly: true // New parameter to only commit
       });
       
-      // Clear any existing pending shot state
-      updateState(state => ({ ...state, pendingShot: null }));
+      // Set pending shot state for reveal confirmation (ETH-only mode)
+      if (result.isCommitOnly) {
+        updateState(state => ({
+          ...state,
+          pendingShot: {
+            secret: result.secret,
+            actualShotCost,
+            discountApplied,
+            discountPercentage,
+            commitHash: result.hash,
+            timestamp: new Date().toISOString()
+          }
+        }));
+      }
     }
     
     console.log('✅ Shot transaction completed:', result.hash);
@@ -453,7 +469,7 @@ export const takeShot = async ({
  * @param {Object} params - Transaction parameters
  * @returns {Promise<Object>} Transaction result
  */
-const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost, customShotCost, discountApplied }) => {
+const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost, customShotCost, discountApplied, commitOnly = false }) => {
   const contractWithSigner = contract.connect(wallet.signer);
   const fullShotCost = await contract.SHOT_COST();
   
@@ -663,7 +679,20 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
     shotCost: ethers.formatEther(fullShotCost)
   });
   
-  toastStore.info('Commitment confirmed! Waiting for reveal window...');
+  toastStore.info('Commitment confirmed! Please reveal when ready...');
+  
+  // If commitOnly is true, stop here and return commit info
+  if (commitOnly) {
+    console.log('✅ Commit-only mode: Stopping after commit phase');
+    return {
+      hash: commitReceipt.hash,
+      receipt: commitReceipt,
+      won: false, // Won't know until reveal
+      isCommitOnly: true,
+      secret: secret, // Return secret for later reveal
+      isDiscountShot: discountApplied
+    };
+  }
   
   // SIMPLIFIED: Wait for reveal delay with more reliable approach
   console.log('⏳ Waiting for reveal delay...');
@@ -863,6 +892,9 @@ export const revealShot = async ({
         receipt,
         won
       };
+      
+      // Clear pending shot from state after successful reveal
+      updateState(state => ({ ...state, pendingShot: null }));
     }
     
     // Enhanced, prominent result feedback with multiple notifications
