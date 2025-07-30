@@ -15,6 +15,12 @@
   let timeRemaining = 0;
   let shotFlowState = 'idle'; // 'idle', 'committing', 'pending_reveal', 'revealing', 'completed'
   let shotFlowMessage = '';
+  
+  // Reveal confirmation modal state
+  let showRevealModal = false;
+  let pendingSecret = null;
+  let pendingTxHash = null;
+  let revealingShot = false;
 
   // Format time remaining for display
   const formatTime = (seconds) => {
@@ -114,6 +120,15 @@
         loadPlayerData: gameStore.loadPlayerData
       });
       console.log('✅ GameActions.takeShot() completed:', result);
+      
+      // CRITICAL FIX: Show reveal confirmation modal with the secret
+      if (result && result.secret) {
+        console.log('🎯 Shot committed successfully, showing reveal modal');
+        pendingSecret = result.secret;
+        pendingTxHash = result.hash;
+        showRevealModal = true;
+        toastStore.success('Shot committed! Click "Reveal Now" to complete your shot.');
+      }
     } catch (error) {
       console.error('❌ Failed to take shot:', error);
       console.error('Error details:', {
@@ -179,6 +194,15 @@
         loadPlayerData: gameStore.loadPlayerData
       });
       console.log('✅ GameActions.takeShot() (first shot) completed:', result);
+      
+      // CRITICAL FIX: Show reveal confirmation modal with the secret
+      if (result && result.secret) {
+        console.log('🎯 First shot committed successfully, showing reveal modal');
+        pendingSecret = result.secret;
+        pendingTxHash = result.hash;
+        showRevealModal = true;
+        toastStore.success('First shot committed! Click "Reveal Now" to complete your shot.');
+      }
     } catch (error) {
       console.error('❌ Failed to take first shot:', error);
       console.error('Error details:', {
@@ -384,6 +408,111 @@
       console.error('❌ Game state check failed:', error);
       toastStore.error('State check failed: ' + error.message);
     }
+  };
+
+  // Handle revealing the shot immediately
+  const handleRevealNow = async () => {
+    if (!pendingSecret) {
+      toastStore.error('No secret available to reveal');
+      return;
+    }
+
+    console.log('🎯 Revealing shot with secret:', pendingSecret);
+    revealingShot = true;
+    
+    try {
+      const gameState = gameStore.getGameState();
+      const walletStore = gameStore.getWalletStore();
+      const wallet = get(walletStore);
+      
+      const result = await GameActions.revealShot({
+        secret: pendingSecret,
+        gameState,
+        wallet,
+        contract: gameStore.getContract(),
+        ethers: gameStore.getEthers(),
+        loadGameState: gameStore.loadGameState,
+        loadPlayerData: gameStore.loadPlayerData
+      });
+      
+      console.log('✅ Shot revealed successfully:', result);
+      toastStore.success('Shot revealed! Check if you won!');
+      
+      // Close the modal and clear state
+      showRevealModal = false;
+      pendingSecret = null;
+      pendingTxHash = null;
+      
+    } catch (error) {
+      console.error('❌ Failed to reveal shot:', error);
+      toastStore.error('Failed to reveal shot: ' + error.message);
+    } finally {
+      revealingShot = false;
+    }
+  };
+
+  // Handle saving secret to localStorage
+  const handleSaveToLocalStorage = () => {
+    if (!pendingSecret || !pendingTxHash) {
+      toastStore.error('No secret or transaction hash available to save');
+      return;
+    }
+
+    try {
+      const wallet = get(walletStore);
+      const secretData = {
+        secret: pendingSecret,
+        txHash: pendingTxHash,
+        walletAddress: wallet.address,
+        timestamp: Date.now(),
+        blockNumber: null // Will be filled when we get block info
+      };
+
+      // Create a unique key for this secret
+      const secretKey = `ethshot_secret_${wallet.address}_${pendingTxHash.slice(0, 10)}`;
+      
+      // Save to localStorage
+      localStorage.setItem(secretKey, JSON.stringify(secretData));
+      
+      // Also maintain a list of all saved secrets for this wallet
+      const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+      const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+      
+      // Add this secret to the list if not already there
+      if (!existingSecrets.includes(secretKey)) {
+        existingSecrets.push(secretKey);
+        localStorage.setItem(savedSecretsKey, JSON.stringify(existingSecrets));
+      }
+      
+      toastStore.success('Secret saved to browser storage! You can retrieve it later from the debug panel.');
+      console.log('💾 Secret saved to localStorage:', secretKey);
+      
+    } catch (error) {
+      console.error('❌ Failed to save secret to localStorage:', error);
+      toastStore.error('Failed to save secret to browser storage');
+    }
+    
+    // Close modal
+    showRevealModal = false;
+    pendingSecret = null;
+    pendingTxHash = null;
+  };
+
+  // Handle saving secret for later (clipboard + localStorage)
+  const handleSaveForLater = () => {
+    if (pendingSecret) {
+      // Copy secret to clipboard
+      navigator.clipboard.writeText(pendingSecret).then(() => {
+        toastStore.success(`Secret copied to clipboard: ${pendingSecret}`);
+      }).catch(() => {
+        toastStore.info(`Save this secret: ${pendingSecret}`);
+      });
+    }
+    
+    // Close modal
+    showRevealModal = false;
+    pendingSecret = null;
+    pendingTxHash = null;
   };
 
   // Clean up expired pending shot
@@ -675,6 +804,83 @@
   </div>
 </div>
 
+<!-- Reveal Confirmation Modal -->
+{#if showRevealModal}
+  <div class="modal-overlay" on:click|self={() => showRevealModal = false}>
+    <div class="reveal-modal">
+      <div class="modal-header">
+        <h2>🎯 Shot Committed Successfully!</h2>
+        <button
+          class="close-btn"
+          on:click={() => showRevealModal = false}
+          disabled={revealingShot}
+        >
+          ✕
+        </button>
+      </div>
+      
+      <div class="modal-content">
+        <p class="success-message">
+          Your shot has been committed to the blockchain! Now you need to reveal it to see if you won.
+        </p>
+        
+        {#if pendingTxHash}
+          <div class="tx-info">
+            <p><strong>Transaction:</strong> <code class="tx-hash">{pendingTxHash.slice(0, 10)}...{pendingTxHash.slice(-8)}</code></p>
+          </div>
+        {/if}
+        
+        <div class="secret-info">
+          <p><strong>Your Secret:</strong></p>
+          <div class="secret-display">
+            <code class="secret-code">{pendingSecret}</code>
+          </div>
+          <p class="secret-warning">
+            ⚠️ <strong>Important:</strong> Save this secret! You'll need it to reveal your shot if you don't do it now.
+          </p>
+        </div>
+        
+        <div class="modal-actions">
+          <button
+            class="reveal-now-btn"
+            on:click={handleRevealNow}
+            disabled={revealingShot}
+          >
+            {#if revealingShot}
+              <div class="spinner-small"></div>
+              Revealing...
+            {:else}
+              🎲 Reveal Now
+            {/if}
+          </button>
+          
+          <button
+            class="save-storage-btn"
+            on:click={handleSaveToLocalStorage}
+            disabled={revealingShot}
+          >
+            💾 Save to Browser
+          </button>
+          
+          <button
+            class="save-clipboard-btn"
+            on:click={handleSaveForLater}
+            disabled={revealingShot}
+          >
+            📋 Copy to Clipboard
+          </button>
+        </div>
+        
+        <div class="modal-footer">
+          <p class="footer-text">
+            You can reveal your shot anytime within 256 blocks (~51-85 minutes) after committing.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   .btn-game {
     @apply relative flex flex-col items-center justify-center;
@@ -789,6 +995,134 @@
     @apply opacity-50 cursor-not-allowed;
   }
 
+  /* Reveal Modal Styles */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50;
+    backdrop-filter: blur(4px);
+  }
+
+  .reveal-modal {
+    @apply bg-gray-900 border-2 border-red-500 rounded-2xl p-6 max-w-md w-full mx-4;
+    @apply shadow-2xl;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    animation: modalSlideIn 0.3s ease-out;
+  }
+
+  @keyframes modalSlideIn {
+    from {
+      transform: translateY(-20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .modal-header {
+    @apply flex justify-between items-center mb-4;
+  }
+
+  .modal-header h2 {
+    @apply text-xl font-bold text-green-400 m-0;
+  }
+
+  .close-btn {
+    @apply text-gray-400 hover:text-white text-xl font-bold;
+    @apply w-8 h-8 flex items-center justify-center rounded-full;
+    @apply hover:bg-gray-700 transition-colors duration-200;
+    @apply border-none bg-transparent cursor-pointer;
+  }
+
+  .close-btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  .modal-content {
+    @apply text-white;
+  }
+
+  .success-message {
+    @apply text-green-300 mb-4 text-sm leading-relaxed;
+  }
+
+  .tx-info {
+    @apply bg-gray-800 rounded-lg p-3 mb-4;
+  }
+
+  .tx-info p {
+    @apply text-sm text-gray-300 m-0;
+  }
+
+  .tx-hash {
+    @apply bg-gray-700 px-2 py-1 rounded text-xs font-mono text-blue-300;
+  }
+
+  .secret-info {
+    @apply bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-4 mb-4;
+  }
+
+  .secret-info p {
+    @apply text-sm text-yellow-200 m-0 mb-2;
+  }
+
+  .secret-display {
+    @apply bg-gray-800 rounded-lg p-3 mb-3;
+  }
+
+  .secret-code {
+    @apply font-mono text-lg text-green-400 font-bold;
+    word-break: break-all;
+  }
+
+  .secret-warning {
+    @apply text-xs text-yellow-300 font-medium;
+  }
+
+  .modal-actions {
+    @apply flex flex-col gap-2 mb-4;
+  }
+
+  .reveal-now-btn {
+    @apply w-full bg-gradient-to-r from-green-500 to-green-600;
+    @apply text-white font-bold py-3 px-4 rounded-lg;
+    @apply hover:from-green-400 hover:to-green-500 transition-all duration-200;
+    @apply border-none cursor-pointer;
+    @apply flex items-center justify-center gap-2;
+  }
+
+  .save-storage-btn {
+    @apply w-full bg-gradient-to-r from-purple-500 to-purple-600;
+    @apply text-white font-bold py-3 px-4 rounded-lg;
+    @apply hover:from-purple-400 hover:to-purple-500 transition-all duration-200;
+    @apply border-none cursor-pointer;
+  }
+
+  .save-clipboard-btn {
+    @apply w-full bg-gradient-to-r from-blue-500 to-blue-600;
+    @apply text-white font-bold py-3 px-4 rounded-lg;
+    @apply hover:from-blue-400 hover:to-blue-500 transition-all duration-200;
+    @apply border-none cursor-pointer;
+  }
+
+  .reveal-now-btn:disabled,
+  .save-storage-btn:disabled,
+  .save-clipboard-btn:disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
+  .spinner-small {
+    @apply w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin;
+  }
+
+  .modal-footer {
+    @apply border-t border-gray-700 pt-3;
+  }
+
+  .footer-text {
+    @apply text-xs text-gray-400 text-center m-0;
+  }
+
   /* Mobile Responsive */
   @media (max-width: 640px) {
     .btn-game {
@@ -805,6 +1139,20 @@
     
     .btn-sponsor span:first-child {
       @apply text-base;
+    }
+
+    .reveal-modal {
+      @apply mx-2 p-4;
+    }
+
+    .modal-actions {
+      @apply flex-col gap-2;
+    }
+    
+    .reveal-now-btn,
+    .save-storage-btn,
+    .save-clipboard-btn {
+      @apply text-sm py-2;
     }
   }
 </style>

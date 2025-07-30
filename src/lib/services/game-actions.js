@@ -126,9 +126,10 @@ export const takeShot = async ({
       throw new Error(`Insufficient ETH. Need ${shortfall} more ETH for gas fees.`);
     }
 
-    // Generate commitment
+    // Generate commitment - CRITICAL FIX: Must match contract's expectation
     const secret = Math.floor(Math.random() * 1000000);
-    const commitment = ethers.keccak256(ethers.solidityPacked(['uint256'], [secret]));
+    // Contract expects: keccak256(abi.encodePacked(secret, msg.sender))
+    const commitment = ethers.keccak256(ethers.solidityPacked(['uint256', 'address'], [secret, wallet.address]));
 
     const tx = await contractWithSigner.commitShot(commitment, {
       value: shotCost,

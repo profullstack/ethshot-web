@@ -153,3 +153,52 @@
     </a>
   </div>
 </div>
+
+<!-- Encryption Methods -->
+<div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-8 border border-gray-700">
+  <h2 class="text-3xl font-bold text-white mb-6 flex items-center space-x-3">
+    <span>🔐</span>
+    <span>Encryption Methods</span>
+  </h2>
+  <div class="space-y-4 text-gray-300">
+    <p>
+      All data transmitted and stored in ETH Shot is protected using industry-standard encryption protocols to ensure maximum security and privacy.
+    </p>
+    <ul class="space-y-2">
+      <li>• HTTPS with TLS 1.3 for secure data transmission</li>
+      <li>• AES-256 encryption for stored data</li>
+      <li>• Regular security updates to patch vulnerabilities</li>
+      <li>• Compliance with PCI-DSS standards for financial data</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Security & Audits -->
+<div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-8 border border-gray-700">
+  <h2 class="text-3xl font-bold text-white mb-6 flex items-center space-x-3">
+    <span>🔒</span>
+    <span>Security & Audits</span>
+  </h2>
+  <div class="grid md:grid-cols-2 gap-8">
+    <div class="space-y-4 text-gray-300">
+      <p>
+        ETH Shot prioritizes security through rigorous smart contract audits and blockchain transparency. Our code is open-source, allowing independent verification of all game mechanics.
+      </p>
+      <ul class="space-y-2">
+        <li>• Real-time blockchain verification of all transactions</li>
+        <li>• Regular security updates and vulnerability bounty program</li>
+      </ul>
+    </div>
+    <div class="space-y-4 text-gray-300">
+      <p>
+        All game operations are executed through transparent smart contracts on the Ethereum blockchain. This ensures:
+      </p>
+      <ul class="space-y-2">
+        <li>• Immutable record of all shots and wins</li>
+        <li>• Fair random number generation (RNG) verification</li>
+        <li>• Direct ETH transfers without intermediaries</li>
+        <li>• Public access to contract code and transaction history</li>
+      </ul>
+    </div>
+  </div>
+</div>
