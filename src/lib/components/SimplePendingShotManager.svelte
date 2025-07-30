@@ -230,11 +230,8 @@
         wallet: currentWallet,
         contract: gameStore.getContract(),
         ethers: gameStore.getEthers(),
-        db: gameStore.getDatabase(),
-        updateState: gameStore.updateState,
         loadGameState: gameStore.loadGameState,
-        loadPlayerData: gameStore.loadPlayerData,
-        walletStore: currentWalletStore
+        loadPlayerData: gameStore.loadPlayerData
       });
       
       console.log('✅ Pending shot revealed successfully!');

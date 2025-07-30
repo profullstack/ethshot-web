@@ -528,10 +528,10 @@
       toastStore.error('Failed to save secret to browser storage');
     }
     
-    // Close modal
-    showRevealModal = false;
-    pendingSecret = null;
-    pendingTxHash = null;
+    // Don't close modal - let user choose to reveal or close manually
+    // showRevealModal = false;
+    // pendingSecret = null;
+    // pendingTxHash = null;
   };
 
   // Handle saving secret for later (clipboard + localStorage)
@@ -545,10 +545,10 @@
       });
     }
     
-    // Close modal
-    showRevealModal = false;
-    pendingSecret = null;
-    pendingTxHash = null;
+    // Don't close modal - let user choose to reveal or close manually
+    // showRevealModal = false;
+    // pendingSecret = null;
+    // pendingTxHash = null;
   };
 
   // Clean up expired pending shot
