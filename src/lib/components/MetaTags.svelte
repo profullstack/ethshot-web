@@ -206,7 +206,9 @@
   <!-- <meta name="yandex-verification" content="your-yandex-verification-code" /> -->
   
   <!-- Rich Snippets / Structured Data -->
-  {@html `<script type="application/ld+json">${JSON.stringify(structuredData)}</script>`}
+  <script type="application/ld+json">
+    {JSON.stringify(structuredData)}
+  </script>
   
   <!-- Additional SEO Meta Tags -->
   <meta name="rating" content="general" />
