@@ -131,8 +131,8 @@ async function handleUpsertProfile(request, { profileData }) {
       debugMode
     } = profileData;
 
-    console.log('🔧 Calling upsert_user_profile_secure with parameters:', {
-      p_wallet_address: walletAddress,
+    console.log('🔧 Calling upsert_user_profile_secure with parameters (wallet address from JWT):', {
+      authenticated_wallet: walletAddress, // This is just for logging - not passed to function
       p_nickname: nickname || null,
       p_bio: bio || null,
       p_avatar_url: avatarUrl || null,
@@ -143,8 +143,9 @@ async function handleUpsertProfile(request, { profileData }) {
       p_debug_mode: debugMode !== undefined ? debugMode : null
     });
 
+    // SECURITY FIX: No longer pass wallet address as parameter
+    // The secure function gets wallet address from JWT authentication context
     const { data, error } = await supabase.rpc('upsert_user_profile_secure', {
-      p_wallet_address: walletAddress,
       p_nickname: nickname || null,
       p_bio: bio || null,
       p_avatar_url: avatarUrl || null,
