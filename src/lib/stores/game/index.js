@@ -68,10 +68,10 @@ export const nextDiscount = derived(gameStore, $game => {
 export const multiCryptoGameStore = gameStore;
 
 // Export service modules for business logic (moved from store)
-export * as GameActions from '../../services/game-actions.js';
-export * as SocialActions from '../../services/social-actions.js';
-export * as NotificationService from '../../services/notification-service.js';
-export * as ReferralService from '../../services/referral-service.js';
+export * as GameActions from '../services/game-actions.js';
+export * as SocialActions from '../services/social-actions.js';
+export * as NotificationService from '../services/notification-service.js';
+export * as ReferralService from '../services/referral-service.js';
 
 // Export core game functions for direct access (state management only)
 export const loadGameState = (...args) => gameStore.loadGameState(...args);
