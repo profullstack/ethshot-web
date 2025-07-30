@@ -13,6 +13,8 @@
 
   let cooldownTimer = null;
   let timeRemaining = 0;
+  let shotFlowState = 'idle'; // 'idle', 'committing', 'pending_reveal', 'revealing', 'completed'
+  let shotFlowMessage = '';
 
   // Format time remaining for display
   const formatTime = (seconds) => {

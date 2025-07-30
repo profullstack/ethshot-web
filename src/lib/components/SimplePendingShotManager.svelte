@@ -209,21 +209,14 @@
       if (pendingShot.hasSecret && state.pendingShot && state.pendingShot.secret) {
         console.log('🎯 Using stored secret from game state...');
         secret = state.pendingShot.secret;
-      } else if (pendingShot.isMultiCrypto) {
-        // Multi-crypto mode should always have a secret
-        toastStore.error('No secret available for multi-crypto reveal. Please take a new shot.');
-        return;
       } else {
-        // ETH-only mode fallback: ask for the secret manually
-        console.log('🔑 No stored secret found, asking user for manual entry...');
-        secret = prompt('Enter your secret from when you committed the shot:');
-        if (!secret) {
-          toastStore.error('Secret is required to reveal the shot');
-          return;
-        }
+        // No stored secret available - this should not happen in normal operation
+        console.error('❌ No stored secret available for reveal');
+        toastStore.error('No secret available for reveal. The shot may have been taken in a previous session. Please clear the pending shot and take a new one.');
+        return;
       }
 
-      console.log('🎯 Revealing pending shot...');
+      console.log('🎯 Revealing pending shot with stored secret...');
       toastStore.info('Revealing pending shot...');
       
       // Call the reveal function from the service
