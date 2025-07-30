@@ -140,6 +140,119 @@ async function validateJWTToken(token) {
   }
 }
 
+/**
+ * Comprehensive XSS sanitization function
+ * Removes potentially dangerous content while preserving safe text
+ * @param {string} input - The input string to sanitize
+ * @returns {string} - Sanitized string safe for display
+ */
+function sanitizeMessage(input) {
+  if (typeof input !== 'string') {
+    return '';
+  }
+
+  // Remove all HTML tags and entities
+  let sanitized = input
+    // Remove HTML tags
+    .replace(/<[^>]*>/g, '')
+    // Remove HTML entities
+    .replace(/&[#\w]+;/g, '')
+    // Remove javascript: URLs
+    .replace(/javascript:/gi, '')
+    // Remove data: URLs
+    .replace(/data:/gi, '')
+    // Remove vbscript: URLs
+    .replace(/vbscript:/gi, '')
+    // Remove on* event handlers
+    .replace(/on\w+\s*=/gi, '')
+    // Remove style attributes
+    .replace(/style\s*=/gi, '')
+    // Remove expression() CSS
+    .replace(/expression\s*\(/gi, '')
+    // Remove @import CSS
+    .replace(/@import/gi, '')
+    // Remove script tags content
+    .replace(/<script[^>]*>.*?<\/script>/gis, '')
+    // Remove style tags content
+    .replace(/<style[^>]*>.*?<\/style>/gis, '')
+    // Remove iframe tags
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gis, '')
+    // Remove object tags
+    .replace(/<object[^>]*>.*?<\/object>/gis, '')
+    // Remove embed tags
+    .replace(/<embed[^>]*>/gi, '')
+    // Remove form tags
+    .replace(/<form[^>]*>.*?<\/form>/gis, '')
+    // Remove input tags
+    .replace(/<input[^>]*>/gi, '')
+    // Remove meta tags
+    .replace(/<meta[^>]*>/gi, '')
+    // Remove link tags
+    .replace(/<link[^>]*>/gi, '')
+    // Remove base tags
+    .replace(/<base[^>]*>/gi, '');
+
+  // Additional security: Remove any remaining < or > characters
+  sanitized = sanitized.replace(/[<>]/g, '');
+
+  // Remove excessive whitespace
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
+
+  // Limit length as additional protection
+  if (sanitized.length > MAX_MESSAGE_LENGTH) {
+    sanitized = sanitized.substring(0, MAX_MESSAGE_LENGTH);
+  }
+
+  return sanitized;
+}
+
+/**
+ * Validate message content for additional security checks
+ * @param {string} content - The message content to validate
+ * @returns {{valid: boolean, error?: string}} - Validation result
+ */
+function validateMessageContent(content) {
+  if (!content || typeof content !== 'string') {
+    return { valid: false, error: 'Message content is required' };
+  }
+
+  // Check for suspicious patterns that might indicate XSS attempts
+  const suspiciousPatterns = [
+    /javascript:/i,
+    /vbscript:/i,
+    /data:/i,
+    /on\w+\s*=/i,
+    /<script/i,
+    /<iframe/i,
+    /<object/i,
+    /<embed/i,
+    /<form/i,
+    /<input/i,
+    /expression\s*\(/i,
+    /@import/i,
+    /document\./i,
+    /window\./i,
+    /eval\s*\(/i,
+    /setTimeout\s*\(/i,
+    /setInterval\s*\(/i,
+    /Function\s*\(/i,
+    /alert\s*\(/i,
+    /confirm\s*\(/i,
+    /prompt\s*\(/i
+  ];
+
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(content)) {
+      return {
+        valid: false,
+        error: 'Message contains potentially dangerous content and has been blocked for security reasons'
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
 // Chat server configuration
 const CHAT_SERVER_PORT = process.env.PORT || process.env.CHAT_SERVER_PORT || 8080;
 const MAX_MESSAGE_LENGTH = 500;
