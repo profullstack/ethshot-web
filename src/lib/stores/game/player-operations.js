@@ -289,7 +289,7 @@ export const takeShot = async ({
 
     // Execute the shot transaction
     if (state.isMultiCryptoMode) {
-      // Multi-crypto mode: use adapter with commit-reveal pattern
+      // Multi-crypto mode: use adapter with full commit-reveal cycle
       const adapter = getActiveAdapter();
       if (!adapter) {
         throw new Error('No active cryptocurrency adapter');
@@ -299,33 +299,26 @@ export const takeShot = async ({
       const secret = adapter.generateSecret();
       const commitment = adapter.generateCommitment(secret, wallet.address);
       
-      // Store the secret for later reveal (in a secure way)
-      // This should be handled by the game state management
-      updateState(state => ({
-        ...state,
-        pendingShot: {
-          secret,
-          commitment,
-          timestamp: new Date().toISOString(),
-          actualShotCost,
-          discountApplied,
-          discountPercentage
-        }
-      }));
+      console.log('🎯 Multi-crypto mode: Starting commit-reveal cycle...');
       
       // First commit the shot
       const commitResult = await adapter.commitShot(commitment, actualShotCost);
       console.log('✅ Shot committed:', commitResult.hash);
+      toastStore.info('Shot committed! Revealing result...');
       
-      // Show commit confirmation and wait for user to manually reveal
-      toastStore.info('Shot committed! Waiting for reveal window...');
+      // Wait a moment for the commit to be processed
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Return early - the reveal will be handled by a separate user action
+      // Now reveal the shot immediately
+      console.log('🔓 Auto-revealing shot...');
+      const revealResult = await adapter.revealShot(secret);
+      console.log('✅ Shot revealed:', revealResult.hash);
+      
       result = {
-        hash: commitResult.hash,
-        receipt: commitResult,
-        won: false, // Unknown until revealed
-        isCommitOnly: true
+        hash: revealResult.hash,
+        receipt: revealResult,
+        won: revealResult.won,
+        isCommitOnly: false
       };
     } else {
       // ETH-only mode: direct contract interaction
