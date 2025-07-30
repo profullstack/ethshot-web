@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
-  import { gameStore } from '$lib/stores/game/index.js';
+  import { gameStore, ReferralService } from '$lib/stores/game/index.js';
   import ReferralLeaderboard from '$lib/components/ReferralLeaderboard.svelte';
   import ReferralSystem from '$lib/components/ReferralSystem.svelte';
   import WalletConnect from '$lib/components/WalletConnect.svelte';
@@ -13,7 +13,7 @@
   onMount(() => {
     mounted = true;
     gameStore.init();
-    gameStore.processReferralOnLoad();
+    ReferralService.processReferralOnLoad();
   });
 
   function handleConnectWallet() {
