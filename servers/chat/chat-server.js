@@ -370,9 +370,17 @@ class ChatServer {
     try {
       // Join room in database (if available)
       if (supabase) {
-        const { data, error } = await supabase.rpc('join_chat_room', {
-          p_room_id: roomId,
-          p_user_wallet_address: client.walletAddress
+        // Create authenticated Supabase client with user's JWT
+        const authenticatedSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: {
+            headers: {
+              Authorization: `Bearer ${client.jwtToken}`
+            }
+          }
+        });
+
+        const { data, error } = await authenticatedSupabase.rpc('join_chat_room_secure', {
+          p_room_id: roomId
         });
 
         if (error) {
@@ -538,9 +546,17 @@ class ChatServer {
 
       // Save message to database (if available)
       if (supabase) {
-        const { data: dbMessageId, error } = await supabase.rpc('send_chat_message', {
+        // Create authenticated Supabase client with user's JWT
+        const authenticatedSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: {
+            headers: {
+              Authorization: `Bearer ${client.jwtToken}`
+            }
+          }
+        });
+
+        const { data: dbMessageId, error } = await authenticatedSupabase.rpc('send_chat_message_secure', {
           p_room_id: roomId,
-          p_user_wallet_address: client.walletAddress,
           p_message_content: content,
           p_message_type: messageType
         });
