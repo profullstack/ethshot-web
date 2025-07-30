@@ -16,6 +16,7 @@ import {
   notifyJackpotWon,
   scheduleCooldownNotification
 } from '../../utils/notifications.js';
+import { showWinMessage, showLossMessage } from '../shot-result-message.js';
 
 /**
  * Load player-specific data
@@ -369,6 +370,9 @@ export const takeShot = async ({
       const winAmount = ethers.formatEther(state.currentPot || '0');
       toastStore.success(`🎉 JACKPOT WON! You won ${winAmount} ETH! 🎊`);
       
+      // Show prominent page-wide win message
+      showWinMessage(winAmount, actualShotCost);
+      
       // Also show a more prominent success message
       setTimeout(() => {
         toastStore.success(`💰 Congratulations! ${winAmount} ETH has been sent to your wallet!`);
@@ -378,6 +382,9 @@ export const takeShot = async ({
         `Shot taken with ${(discountPercentage * 100).toFixed(0)}% discount! Better luck next time.` :
         'Shot taken! Better luck next time.';
       toastStore.info(message);
+      
+      // Show prominent page-wide loss message
+      showLossMessage(actualShotCost);
     }
     
     if (result.won) {
@@ -863,6 +870,12 @@ export const revealShot = async ({
     if (result.won) {
       // Multiple success messages for maximum visibility
       toastStore.success('🎉 JACKPOT! YOU WON! 🎊', { duration: 10000 });
+      
+      // Show prominent page-wide win message
+      const winAmount = state.currentPot || '0';
+      const shotCost = pendingShot?.actualShotCost || state.shotCost;
+      showWinMessage(winAmount, shotCost);
+      
       setTimeout(() => {
         toastStore.success('💰 CONGRATULATIONS! You hit the jackpot! 💰', { duration: 8000 });
       }, 1000);
@@ -872,6 +885,11 @@ export const revealShot = async ({
     } else {
       // Clear loss indication with enhanced messaging
       toastStore.info('🎲 Shot revealed - No win this time. Better luck next shot!', { duration: 6000 });
+      
+      // Show prominent page-wide loss message
+      const shotCost = pendingShot?.actualShotCost || state.shotCost;
+      showLossMessage(shotCost);
+      
       setTimeout(() => {
         toastStore.info('💪 Keep trying! The next shot could be the winner!', { duration: 4000 });
       }, 2000);

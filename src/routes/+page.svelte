@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { walletStore } from '$lib/stores/wallet.js';
   import { gameStore, winnerEventStore } from '$lib/stores/game/index.js';
+  import { shotResultMessageStore, hideShotResultMessage } from '$lib/stores/shot-result-message.js';
   import { debugMode } from '$lib/stores/debug.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatCooldownTime } from '$lib/config.js';
   import GameButton from '$lib/components/GameButton.svelte';
@@ -17,6 +18,7 @@
   import DiscountButton from '$lib/components/DiscountButton.svelte';
   import AdminPanel from '$lib/components/AdminPanel.svelte';
   import SimplePendingShotManager from '$lib/components/SimplePendingShotManager.svelte';
+  import ShotResultMessage from '$lib/components/ShotResultMessage.svelte';
   
   // Social Proof Components
   import LiveActivityFeed from '$lib/components/LiveActivityFeed.svelte';
@@ -338,6 +340,13 @@
   show={showWinnerAnimation}
   amount={winnerAmount}
   on:complete={handleAnimationComplete}
+/>
+
+<!-- Shot Result Message Overlay -->
+<ShotResultMessage
+  show={$shotResultMessageStore.show}
+  result={$shotResultMessageStore.result}
+  on:close={hideShotResultMessage}
 />
 
 <!-- Notification Permission Component -->
