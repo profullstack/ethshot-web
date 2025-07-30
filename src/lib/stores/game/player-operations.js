@@ -665,37 +665,37 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   
   toastStore.info('Commitment confirmed! Waiting for reveal window...');
   
-  // FIXED: Wait for proper block-based reveal delay instead of time-based
-  // The contract requires REVEAL_DELAY blocks to pass before revealing
-  console.log('⏳ Waiting for reveal delay (block-based)...');
+  // SIMPLIFIED: Wait for reveal delay with more reliable approach
+  console.log('⏳ Waiting for reveal delay...');
   
+  // Wait a reasonable time for the reveal delay (contract requires 1+ blocks)
+  // On testnets, blocks are fast (~2-5 seconds), on mainnet ~12 seconds
+  await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+  
+  // Check if we can reveal, with a few retries
   let canReveal = false;
-  let attempts = 0;
-  const maxAttempts = 30; // Maximum 30 attempts (about 6 minutes on Ethereum)
-  
-  while (!canReveal && attempts < maxAttempts) {
-    attempts++;
-    
+  for (let attempt = 1; attempt <= 5; attempt++) {
     try {
       canReveal = await contract.canRevealShot(wallet.address);
-      
       if (canReveal) {
-        console.log(`✅ Reveal window opened after ${attempts} attempts`);
+        console.log(`✅ Reveal window opened after ${attempt} attempt(s)`);
         break;
       }
       
-      // Wait for next block (approximately 12 seconds on Ethereum mainnet, faster on testnets)
-      console.log(`⏳ Attempt ${attempts}/${maxAttempts}: Waiting for reveal window...`);
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Check every 2 seconds
-      
+      if (attempt < 5) {
+        console.log(`⏳ Attempt ${attempt}/5: Waiting for reveal window...`);
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 more seconds
+      }
     } catch (revealCheckError) {
-      console.warn(`⚠️ Error checking reveal status (attempt ${attempts}):`, revealCheckError.message);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.warn(`⚠️ Error checking reveal status (attempt ${attempt}):`, revealCheckError.message);
+      if (attempt < 5) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
     }
   }
   
   if (!canReveal) {
-    throw new Error('Reveal window timeout. The reveal delay period may have expired. Please try taking a new shot.');
+    throw new Error('Reveal window not ready. This may be due to network delays. Please try again in a moment.');
   }
   
   console.log('🔓 Revealing shot with secret:', secret.slice(0, 10) + '...');
