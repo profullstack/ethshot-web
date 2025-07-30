@@ -21,6 +21,8 @@
   let pendingSecret = null;
   let pendingTxHash = null;
   let revealingShot = false;
+  let savingToLocalStorage = false;
+  let copyingToClipboard = false;
 
   // Format time remaining for display
   const formatTime = (seconds) => {
@@ -494,6 +496,8 @@
       return;
     }
 
+    savingToLocalStorage = true;
+    
     try {
       const wallet = get(walletStore);
       const secretData = {
@@ -526,6 +530,8 @@
     } catch (error) {
       console.error('❌ Failed to save secret to localStorage:', error);
       toastStore.error('Failed to save secret to browser storage');
+    } finally {
+      savingToLocalStorage = false;
     }
     
     // Don't close modal - let user choose to reveal or close manually
@@ -536,14 +542,21 @@
 
   // Handle saving secret for later (clipboard + localStorage)
   const handleSaveForLater = () => {
-    if (pendingSecret) {
-      // Copy secret to clipboard
-      navigator.clipboard.writeText(pendingSecret).then(() => {
-        toastStore.success(`Secret copied to clipboard: ${pendingSecret}`);
-      }).catch(() => {
-        toastStore.info(`Save this secret: ${pendingSecret}`);
-      });
+    if (!pendingSecret) {
+      toastStore.error('No secret available to copy');
+      return;
     }
+    
+    copyingToClipboard = true;
+    
+    // Copy secret to clipboard
+    navigator.clipboard.writeText(pendingSecret).then(() => {
+      toastStore.success(`Secret copied to clipboard: ${pendingSecret}`);
+    }).catch(() => {
+      toastStore.info(`Save this secret: ${pendingSecret}`);
+    }).finally(() => {
+      copyingToClipboard = false;
+    });
     
     // Don't close modal - let user choose to reveal or close manually
     // showRevealModal = false;
@@ -932,11 +945,38 @@
           </p>
         </div>
         
+        {#if revealingShot}
+          <div class="status-message">
+            <div class="flex items-center space-x-2">
+              <div class="spinner-small"></div>
+              <span>Communicating with blockchain...</span>
+            </div>
+          </div>
+        {/if}
+        
+        {#if savingToLocalStorage}
+          <div class="status-message">
+            <div class="flex items-center space-x-2">
+              <div class="spinner-small"></div>
+              <span>Saving to browser storage...</span>
+            </div>
+          </div>
+        {/if}
+        
+        {#if copyingToClipboard}
+          <div class="status-message">
+            <div class="flex items-center space-x-2">
+              <div class="spinner-small"></div>
+              <span>Copying to clipboard...</span>
+            </div>
+          </div>
+        {/if}
+        
         <div class="modal-actions">
           <button
             class="reveal-now-btn"
             on:click={handleRevealNow}
-            disabled={revealingShot}
+            disabled={revealingShot || savingToLocalStorage || copyingToClipboard}
           >
             {#if revealingShot}
               <div class="spinner-small"></div>
@@ -949,17 +989,27 @@
           <button
             class="save-storage-btn"
             on:click={handleSaveToLocalStorage}
-            disabled={revealingShot}
+            disabled={revealingShot || savingToLocalStorage || copyingToClipboard}
           >
-            💾 Save to Browser
+            {#if savingToLocalStorage}
+              <div class="spinner-small"></div>
+              Saving...
+            {:else}
+              💾 Save to Browser
+            {/if}
           </button>
           
           <button
             class="save-clipboard-btn"
             on:click={handleSaveForLater}
-            disabled={revealingShot}
+            disabled={revealingShot || savingToLocalStorage || copyingToClipboard}
           >
-            📋 Copy to Clipboard
+            {#if copyingToClipboard}
+              <div class="spinner-small"></div>
+              Copying...
+            {:else}
+              📋 Copy to Clipboard
+            {/if}
           </button>
         </div>
         
@@ -1213,6 +1263,14 @@
 
   .footer-text {
     @apply text-xs text-gray-400 text-center m-0;
+  }
+
+  .status-message {
+    @apply bg-gray-800 rounded-lg p-3 mb-4 text-center;
+  }
+
+  .status-message span {
+    @apply text-sm text-blue-300 font-medium;
   }
 
   /* Mobile Responsive */
