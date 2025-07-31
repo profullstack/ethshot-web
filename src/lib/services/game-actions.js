@@ -71,7 +71,9 @@ export const takeShot = async ({
     }
 
     const contractWithSigner = contract.connect(wallet.signer);
-    const shotCost = customShotCost ? ethers.parseEther(customShotCost) : await contract.SHOT_COST();
+    // CRITICAL FIX: Always use contract's SHOT_COST for transaction
+    // Custom shot costs are handled at UI/database level for display only
+    const shotCost = await contract.SHOT_COST();
 
     // Check user balance
     const balance = await wallet.provider.getBalance(wallet.address);
@@ -112,17 +114,24 @@ export const takeShot = async ({
     const estimatedGasCost = gasLimit * gasPrice;
     const totalCost = shotCost + estimatedGasCost;
     
+    // For balance check, use the higher of actual cost or custom cost
+    const balanceCheckCost = customShotCost ? 
+      Math.max(ethers.parseEther(customShotCost), shotCost) + estimatedGasCost : 
+      totalCost;
+    
     console.log('Gas estimation details:', {
       shotCost: ethers.formatEther(shotCost),
+      customShotCost: customShotCost || 'none',
       gasLimit: gasLimit.toString(),
       gasPrice: ethers.formatUnits(gasPrice, 'gwei') + ' gwei',
       estimatedGasCost: ethers.formatEther(estimatedGasCost),
       totalCost: ethers.formatEther(totalCost),
+      balanceCheckCost: ethers.formatEther(balanceCheckCost),
       balance: ethers.formatEther(balance)
     });
     
-    if (balance < totalCost) {
-      const shortfall = ethers.formatEther(totalCost - balance);
+    if (balance < balanceCheckCost) {
+      const shortfall = ethers.formatEther(balanceCheckCost - balance);
       throw new Error(`Insufficient ETH. Need ${shortfall} more ETH for gas fees.`);
     }
 
@@ -185,9 +194,12 @@ export const takeShot = async ({
 
   // Log shot to database
   try {
+    // Use custom shot cost for display purposes if provided
+    const displayAmount = customShotCost ? customShotCost : ethers.formatEther(shotCost);
+    
     await db.recordShot({
       playerAddress: wallet.address,
-      amount: gameState.shotCost,
+      amount: displayAmount,
       txHash: result.hash,
       blockNumber: result.receipt.blockNumber,
       timestamp: new Date().toISOString(),
