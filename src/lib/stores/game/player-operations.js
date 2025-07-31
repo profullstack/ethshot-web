@@ -374,7 +374,7 @@ export const takeShot = async ({
     
     console.log('✅ Shot transaction completed:', result.hash);
     
-    // Handle commit-only transactions (multi-crypto mode)
+    // Handle commit-only transactions (both multi-crypto and ETH-only modes)
     if (result.isCommitOnly) {
       const message = discountApplied ?
         `Shot committed with ${(discountPercentage * 100).toFixed(0)}% discount! Waiting for reveal window...` :
@@ -695,82 +695,56 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
   
   toastStore.info('Commitment confirmed! Waiting for reveal window...');
   
-  // SIMPLIFIED: Wait for reveal delay with more reliable approach
-  console.log('⏳ Waiting for reveal delay...');
-  
-  // Wait a reasonable time for the reveal delay (contract requires 1+ blocks)
-  // On testnets, blocks are fast (~2-5 seconds), on mainnet ~12 seconds
-  await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-  
-  // Check if we can reveal, with a few retries
-  let canReveal = false;
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    try {
-      canReveal = await contract.canRevealShot(wallet.address);
-      if (canReveal) {
-        console.log(`✅ Reveal window opened after ${attempt} attempt(s)`);
-        break;
-      }
-      
-      if (attempt < 5) {
-        console.log(`⏳ Attempt ${attempt}/5: Waiting for reveal window...`);
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 more seconds
-      }
-    } catch (revealCheckError) {
-      console.warn(`⚠️ Error checking reveal status (attempt ${attempt}):`, revealCheckError.message);
-      if (attempt < 5) {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      }
-    }
-  }
-  
-  if (!canReveal) {
-    throw new Error('Reveal window not ready. This may be due to network delays. Please try again in a moment.');
-  }
-  
-  console.log('🔓 Revealing shot with secret:', secret.slice(0, 10) + '...');
-  
-  // Now reveal the shot
-  const revealTx = await contractWithSigner.revealShot(secret);
-  toastStore.info('🎲 Revealing shot result...');
-
-  const receipt = await revealTx.wait();
-  
-  console.log('✅ Reveal transaction confirmed:', receipt.hash);
-  
-  // Check if user won by looking at ShotRevealed events
-  const shotRevealedEvent = receipt.logs.find(log => {
-    try {
-      const parsed = contract.interface.parseLog(log);
-      return parsed.name === 'ShotRevealed';
-    } catch {
-      return false;
-    }
-  });
-
-  let won = false;
-  if (shotRevealedEvent) {
-    const parsed = contract.interface.parseLog(shotRevealedEvent);
-    won = parsed.args.won;
-    console.log('🎲 Shot result:', won ? 'WON!' : 'Lost');
-    
-    // Immediate, prominent result feedback
-    if (won) {
-      toastStore.success('🎉 JACKPOT! YOU WON! 🎊', { duration: 8000 });
-    } else {
-      toastStore.info('🎲 Shot complete - Better luck next time!', { duration: 4000 });
-    }
-  } else {
-    // Fallback if we can't parse the event
-    toastStore.info('🎲 Shot complete - Check the leaderboard for results!', { duration: 4000 });
-  }
-
-  return {
-    hash: receipt.hash,
-    receipt,
-    won,
-    isDiscountShot: discountApplied
+  // Store the pending shot information for later reveal
+  const pendingShotData = {
+    secret,
+    commitment,
+    commitHash: commitReceipt.hash,
+    commitBlock: commitReceipt.blockNumber,
+    amount: transactionValue.toString(),
+    timestamp: Date.now()
   };
+  
+  // Update state to show pending shot
+  updateState(state => ({
+    ...state,
+    pendingShot: pendingShotData,
+    takingShot: false
+  }));
+  
+  // Store secret in localStorage for persistence
+  try {
+    const secretKey = `ethshot_secret_${wallet.address}_${commitReceipt.hash.slice(0, 10)}`;
+    const secretData = {
+      secret,
+      txHash: commitReceipt.hash,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(secretKey, JSON.stringify(secretData));
+    
+    // Also maintain a list of saved secrets for this wallet
+    const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+    const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+    existingSecrets.push(secretKey);
+    localStorage.setItem(savedSecretsKey, JSON.stringify(existingSecrets));
+  } catch (storageError) {
+    console.warn('Failed to save secret to localStorage:', storageError);
+  }
+  
+  console.log('✅ Shot committed successfully! Pending reveal...');
+  toastStore.success('Shot committed! Waiting for reveal window...');
+  
+  // Return early - let the user reveal manually or use the pending shot manager
+  return {
+    hash: commitReceipt.hash,
+    receipt: commitReceipt,
+    won: false,
+    isCommitOnly: true,
+    pendingShot: pendingShotData
+  };
+  
+  // This code is no longer reached since we return early after commit
+  // The reveal will be handled by the pending shot manager or manual reveal
 };
 
 /**

@@ -38,6 +38,12 @@
         };
         
         console.log('✅ Multi-crypto pending shot detected:', pendingShot);
+        
+        // Auto-reveal for multi-crypto mode
+        if (pendingShot.canReveal && pendingShot.hasSecret && !loading) {
+          console.log('🎯 Auto-revealing multi-crypto shot...');
+          await handleRevealShot();
+        }
         return;
       }
       
@@ -119,6 +125,17 @@
           revealExpired: pendingShot.revealExpired,
           canReveal: pendingShot.canReveal
         });
+        
+        // Auto-reveal for ETH-only mode when ready
+        if (pendingShot.canReveal && pendingShot.hasSecret && !loading) {
+          console.log('🎯 Auto-revealing ETH-only shot...');
+          // Add a small delay to ensure the reveal window is fully open
+          setTimeout(async () => {
+            if (pendingShot && pendingShot.canReveal && !loading) {
+              await handleRevealShot();
+            }
+          }, 2000);
+        }
       } else {
         console.log('✅ No pending shot found');
         pendingShot = null;
@@ -201,6 +218,11 @@
   };
 
   const handleRevealShot = async () => {
+    if (loading) {
+      console.log('⏳ Reveal already in progress, skipping...');
+      return;
+    }
+    
     loading = true;
     try {
       let secret = null;
@@ -210,10 +232,30 @@
         console.log('🎯 Using stored secret from game state...');
         secret = state.pendingShot.secret;
       } else {
-        // No stored secret available - this should not happen in normal operation
-        console.error('❌ No stored secret available for reveal');
-        toastStore.error('No secret available for reveal. The shot may have been taken in a previous session. Please clear the pending shot and take a new one.');
-        return;
+        // Try to get secret from localStorage as fallback
+        try {
+          const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+          const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+          
+          if (existingSecrets.length > 0) {
+            // Get the most recent secret
+            const latestSecretKey = existingSecrets[existingSecrets.length - 1];
+            const secretDataStr = localStorage.getItem(latestSecretKey);
+            if (secretDataStr) {
+              const secretData = JSON.parse(secretDataStr);
+              secret = secretData.secret;
+              console.log('🎯 Using secret from localStorage fallback...');
+            }
+          }
+        } catch (localStorageError) {
+          console.warn('Failed to get secret from localStorage:', localStorageError);
+        }
+        
+        if (!secret) {
+          console.error('❌ No stored secret available for reveal');
+          toastStore.error('No secret available for reveal. The shot may have been taken in a previous session. Please clear the pending shot and take a new one.');
+          return;
+        }
       }
 
       console.log('🎯 Revealing pending shot with stored secret...');
@@ -224,7 +266,7 @@
       const currentWalletStore = gameStore.getWalletStore();
       const currentWallet = get(currentWalletStore);
       
-      await GameActions.revealShot({
+      const result = await GameActions.revealShot({
         secret,
         gameState: currentGameState,
         wallet: currentWallet,
@@ -234,8 +276,41 @@
         loadPlayerData: gameStore.loadPlayerData
       });
       
-      console.log('✅ Pending shot revealed successfully!');
-      toastStore.success('Shot revealed successfully!');
+      console.log('✅ Pending shot revealed successfully!', result);
+      
+      // Show appropriate message based on win/loss
+      if (result.won) {
+        toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
+        console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
+      } else {
+        toastStore.info('🎲 Shot revealed - No win this time. Better luck next shot!');
+        console.log('🎲 Shot revealed - No win this time');
+      }
+      
+      // Clean up localStorage
+      try {
+        const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+        const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+        
+        // Remove the revealed secret
+        const updatedSecrets = existingSecrets.filter(key => {
+          const secretDataStr = localStorage.getItem(key);
+          if (secretDataStr) {
+            const secretData = JSON.parse(secretDataStr);
+            return secretData.txHash !== result.receipt.hash;
+          }
+          return true;
+        });
+        
+        localStorage.setItem(savedSecretsKey, JSON.stringify(updatedSecrets));
+        
+        // Also remove the individual secret entry
+        const secretKey = `ethshot_secret_${wallet.address}_${result.receipt.hash.slice(0, 10)}`;
+        localStorage.removeItem(secretKey);
+      } catch (cleanupError) {
+        console.warn('Failed to cleanup localStorage:', cleanupError);
+      }
+      
       await checkPendingShot();
     } catch (error) {
       console.error('❌ Failed to reveal pending shot:', error);
@@ -248,10 +323,13 @@
   onMount(() => {
     // Only run automated checking if debug mode is disabled
     if (!$debugMode) {
-      checkPendingShot();
+      // Initial check with a small delay to ensure everything is loaded
+      setTimeout(() => {
+        checkPendingShot();
+      }, 1000);
       
-      // Check every 15 seconds
-      const interval = setInterval(checkPendingShot, 15000);
+      // Check every 5 seconds for better responsiveness
+      const interval = setInterval(checkPendingShot, 5000);
       return () => clearInterval(interval);
     } else {
       console.log('🔧 Debug mode enabled - automated pending shot checking disabled');

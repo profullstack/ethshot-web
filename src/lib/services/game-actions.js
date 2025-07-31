@@ -127,7 +127,7 @@ export const takeShot = async ({
     }
 
     // Generate commitment - CRITICAL FIX: Must match contract's expectation
-    const secret = Math.floor(Math.random() * 1000000);
+    const secret = ethers.hexlify(ethers.randomBytes(32));
     // Contract expects: keccak256(abi.encodePacked(secret, msg.sender))
     const commitment = ethers.keccak256(ethers.solidityPacked(['uint256', 'address'], [secret, wallet.address]));
 
@@ -138,10 +138,48 @@ export const takeShot = async ({
 
     const receipt = await tx.wait();
     
+    // Store the pending shot information for later reveal
+    const pendingShotData = {
+      secret,
+      commitment,
+      commitHash: receipt.hash,
+      commitBlock: receipt.blockNumber,
+      amount: shotCost.toString(),
+      timestamp: Date.now()
+    };
+    
+    // Update game state to show pending shot
+    updateGameState(state => ({
+      ...state,
+      pendingShot: pendingShotData,
+      takingShot: false
+    }));
+    
+    // Store secret in localStorage for persistence
+    try {
+      const secretKey = `ethshot_secret_${wallet.address}_${receipt.hash.slice(0, 10)}`;
+      const secretData = {
+        secret,
+        txHash: receipt.hash,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(secretKey, JSON.stringify(secretData));
+      
+      // Also maintain a list of saved secrets for this wallet
+      const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+      const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+      existingSecrets.push(secretKey);
+      localStorage.setItem(savedSecretsKey, JSON.stringify(existingSecrets));
+    } catch (storageError) {
+      console.warn('Failed to save secret to localStorage:', storageError);
+    }
+    
     result = {
       hash: receipt.hash,
       receipt,
-      secret
+      secret,
+      isCommitOnly: true,
+      pendingShot: pendingShotData
     };
   }
 

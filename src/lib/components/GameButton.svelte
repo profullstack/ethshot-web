@@ -123,8 +123,13 @@
       });
       console.log('✅ GameActions.takeShot() completed:', result);
       
-      // CRITICAL FIX: Show reveal confirmation modal with the secret
-      if (result && result.secret) {
+      // Handle commit-only result (new approach)
+      if (result && result.isCommitOnly) {
+        console.log('🎯 Shot committed successfully, waiting for reveal window...');
+        toastStore.success('Shot committed! Waiting for reveal window to open...');
+        // The SimplePendingShotManager will handle the reveal automatically
+      } else if (result && result.secret) {
+        // Fallback for old approach
         console.log('🎯 Shot committed successfully, showing reveal modal');
         pendingSecret = result.secret;
         pendingTxHash = result.hash;
@@ -197,8 +202,13 @@
       });
       console.log('✅ GameActions.takeShot() (first shot) completed:', result);
       
-      // CRITICAL FIX: Show reveal confirmation modal with the secret
-      if (result && result.secret) {
+      // Handle commit-only result (new approach)
+      if (result && result.isCommitOnly) {
+        console.log('🎯 First shot committed successfully, waiting for reveal window...');
+        toastStore.success('First shot committed! Waiting for reveal window to open...');
+        // The SimplePendingShotManager will handle the reveal automatically
+      } else if (result && result.secret) {
+        // Fallback for old approach
         console.log('🎯 First shot committed successfully, showing reveal modal');
         pendingSecret = result.secret;
         pendingTxHash = result.hash;
