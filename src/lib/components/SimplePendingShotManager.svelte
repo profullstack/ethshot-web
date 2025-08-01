@@ -6,6 +6,7 @@
   import { toastStore } from '../stores/toast.js';
   import { debugMode } from '../stores/debug.js';
   import { GameActions } from '../stores/game/index.js';
+  import { safeBigIntToNumber } from '../stores/game/utils.js';
 
   let pendingShot = null;
   let loading = false;
@@ -90,7 +91,7 @@
       if (hasPending || !canCommit) {
         const shotInfo = await contract.getPendingShot(wallet.address);
         const currentBlock = await provider.getBlockNumber();
-        const commitBlock = Number(shotInfo.blockNumber);
+        const commitBlock = safeBigIntToNumber(shotInfo.blockNumber);
         const revealDelay = 1; // REVEAL_DELAY from contract
         const maxRevealDelay = 256; // MAX_REVEAL_DELAY from contract
         

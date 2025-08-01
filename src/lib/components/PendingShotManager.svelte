@@ -4,6 +4,7 @@
   import { walletStore } from '../stores/wallet.js';
   import { revealShot } from '../stores/game/player-operations.js';
   import { toastStore } from '../stores/toast.js';
+  import { safeBigIntToNumber } from '../stores/game/utils.js';
 
   export let contract;
   export let ethers;
@@ -28,7 +29,7 @@
       if (hasPending) {
         const shotInfo = await contract.getPendingShot(wallet.address);
         const currentBlock = await wallet.provider.getBlockNumber();
-        const commitBlock = shotInfo.blockNumber;
+        const commitBlock = safeBigIntToNumber(shotInfo.blockNumber);
         const revealDelay = 1; // REVEAL_DELAY from contract
         const maxRevealDelay = 256; // MAX_REVEAL_DELAY from contract
         

@@ -153,7 +153,7 @@ export const takeShot = async ({
       secret,
       commitment,
       commitHash: receipt.hash,
-      commitBlock: receipt.blockNumber,
+      commitBlock: safeBigIntToNumber(receipt.blockNumber),
       amount: shotCost.toString(),
       timestamp: Date.now()
     };
@@ -202,7 +202,7 @@ export const takeShot = async ({
       playerAddress: wallet.address,
       amount: displayAmount,
       txHash: result.hash,
-      blockNumber: result.receipt.blockNumber,
+      blockNumber: safeBigIntToNumber(result.receipt.blockNumber),
       timestamp: new Date().toISOString(),
       won: false, // Will be updated when revealed
       cryptoType: gameState.activeCrypto
@@ -345,7 +345,7 @@ export const sponsorRound = async ({
       sponsorUrl,
       amount: gameState.sponsorCost,
       txHash: result.hash,
-      blockNumber: result.receipt.blockNumber,
+      blockNumber: safeBigIntToNumber(result.receipt.blockNumber),
       timestamp: new Date().toISOString(),
       active: true,
       cryptoType: gameState.activeCrypto

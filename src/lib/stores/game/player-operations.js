@@ -562,7 +562,7 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
       try {
         const pendingShot = await contract.getPendingShot(wallet.address);
         const currentBlock = await wallet.provider.getBlockNumber();
-        const commitBlock = pendingShot.blockNumber;
+        const commitBlock = safeBigIntToNumber(pendingShot.blockNumber);
         const maxRevealDelay = 256; // MAX_REVEAL_DELAY from contract
         
         const revealExpired = currentBlock > commitBlock + maxRevealDelay;
@@ -701,7 +701,7 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
     secret,
     commitment,
     commitHash: commitReceipt.hash,
-    commitBlock: commitReceipt.blockNumber,
+    commitBlock: safeBigIntToNumber(commitReceipt.blockNumber),
     amount: transactionValue.toString(),
     timestamp: Date.now()
   };

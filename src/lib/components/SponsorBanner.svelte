@@ -1,6 +1,7 @@
 <script>
   import { currentSponsor } from '../stores/game/index.js';
   import { GAME_CONFIG, formatEth } from '../config.js';
+  import { safeBigIntToNumber } from '../stores/game/utils.js';
 
   // Use real sponsor data from store
   $: sponsor = $currentSponsor;
@@ -21,7 +22,7 @@
   const timeAgo = (timestamp) => {
     const now = new Date();
     // Convert BigInt to number if needed
-    const timestampValue = typeof timestamp === 'bigint' ? Number(timestamp) : timestamp;
+    const timestampValue = safeBigIntToNumber(timestamp);
     const time = new Date(timestampValue);
     const diffInSeconds = Math.floor((now - time) / 1000);
 
