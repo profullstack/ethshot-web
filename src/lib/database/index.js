@@ -60,7 +60,7 @@ export const db = {
   // Shot operations
   async recordShot(shotData) {
     try {
-      console.log('🎯 Recording shot to Supabase with JWT authentication:', {
+      console.log('🎯 Recording shot to Supabase:', {
         player_address: shotData.playerAddress.toLowerCase(),
         amount: shotData.amount,
         won: shotData.won || false,
@@ -71,44 +71,75 @@ export const db = {
         contract_address: shotData.contractAddress
       });
 
-      // Validate JWT token before attempting database operation
+      // Try JWT authentication first
       const jwtToken = localStorage.getItem('ethshot_jwt_token');
       const storedWalletAddress = localStorage.getItem('ethshot_wallet_address');
       
-      if (!jwtToken || !storedWalletAddress) {
-        throw new Error('JWT authentication required to record shot. Please reconnect your wallet.');
-      }
+      if (jwtToken && storedWalletAddress && storedWalletAddress.toLowerCase() === shotData.playerAddress.toLowerCase()) {
+        try {
+          console.log('🔐 Attempting JWT authenticated shot recording...');
+          return await withAuthenticatedClient(async (client) => {
+            const { data, error } = await client
+              .from(TABLES.SHOTS)
+              .insert({
+                player_address: shotData.playerAddress.toLowerCase(),
+                amount: shotData.amount,
+                won: shotData.won || false,
+                tx_hash: shotData.txHash,
+                block_number: shotData.blockNumber,
+                timestamp: shotData.timestamp || new Date().toISOString(),
+                crypto_type: shotData.cryptoType || 'ETH',
+                contract_address: shotData.contractAddress
+              })
+              .select()
+              .single();
 
-      if (storedWalletAddress.toLowerCase() !== shotData.playerAddress.toLowerCase()) {
-        throw new Error('JWT token wallet address does not match shot player address.');
-      }
-
-      return await withAuthenticatedClient(async (client) => {
-        const { data, error } = await client
-          .from(TABLES.SHOTS)
-          .insert({
-            player_address: shotData.playerAddress.toLowerCase(),
-            amount: shotData.amount,
-            won: shotData.won || false,
-            tx_hash: shotData.txHash,
-            block_number: shotData.blockNumber,
-            timestamp: shotData.timestamp || new Date().toISOString(),
-            crypto_type: shotData.cryptoType || 'ETH',
-            contract_address: shotData.contractAddress
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error('❌ Authenticated recordShot error:', error);
-          throw error;
+            if (error) {
+              console.error('❌ Authenticated recordShot error:', error);
+              throw error;
+            }
+            
+            console.log('✅ Shot recorded successfully with JWT authentication:', data);
+            return data;
+          });
+        } catch (jwtError) {
+          console.warn('⚠️ JWT authentication failed, falling back to public insert:', jwtError.message);
         }
-        
-        console.log('✅ Shot recorded successfully with JWT authentication:', data);
-        return data;
-      });
+      } else {
+        console.log('ℹ️ No valid JWT token found, using public insert for shot recording');
+      }
+
+      // Fallback: Use public client for users without profiles
+      // This ensures shots are recorded and triggers fire to update player statistics
+      if (!supabase) {
+        throw new Error('Supabase not configured');
+      }
+
+      console.log('📝 Recording shot with public client (fallback)...');
+      const { data, error } = await supabase
+        .from(TABLES.SHOTS)
+        .insert({
+          player_address: shotData.playerAddress.toLowerCase(),
+          amount: shotData.amount,
+          won: shotData.won || false,
+          tx_hash: shotData.txHash,
+          block_number: shotData.blockNumber,
+          timestamp: shotData.timestamp || new Date().toISOString(),
+          crypto_type: shotData.cryptoType || 'ETH',
+          contract_address: shotData.contractAddress
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Public recordShot error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Shot recorded successfully with public client:', data);
+      return data;
     } catch (error) {
-      console.error('❌ Error recording shot with JWT authentication:', error);
+      console.error('❌ Error recording shot:', error);
       throw error;
     }
   },
