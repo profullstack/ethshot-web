@@ -16,6 +16,11 @@
   let shotFlowState = 'idle'; // 'idle', 'committing', 'pending_reveal', 'revealing', 'completed'
   let shotFlowMessage = '';
   
+  // Enhanced status tracking
+  let transactionStatus = 'idle'; // 'idle', 'preparing', 'checking_balance', 'estimating_gas', 'generating_commitment', 'sending_transaction', 'waiting_confirmation', 'processing', 'logging_database', 'refreshing_state', 'completed'
+  let statusMessage = '';
+  let progressPercentage = 0;
+  
   // Reveal confirmation modal state
   let showRevealModal = false;
   let pendingSecret = null;
@@ -23,6 +28,30 @@
   let revealingShot = false;
   let savingToLocalStorage = false;
   let copyingToClipboard = false;
+
+  // Status update handler
+  const handleStatusUpdate = (status, message) => {
+    transactionStatus = status;
+    statusMessage = message;
+    
+    // Update progress percentage based on status
+    const statusProgress = {
+      'idle': 0,
+      'preparing': 10,
+      'checking_balance': 20,
+      'estimating_gas': 30,
+      'generating_commitment': 40,
+      'sending_transaction': 50,
+      'waiting_confirmation': 70,
+      'processing': 80,
+      'logging_database': 90,
+      'refreshing_state': 95,
+      'completed': 100
+    };
+    
+    progressPercentage = statusProgress[status] || 0;
+    console.log(`🎯 Transaction Status: ${status} - ${message} (${progressPercentage}%)`);
+  };
 
   // Format time remaining for display
   const formatTime = (seconds) => {
@@ -104,6 +133,11 @@
     console.log('✅ All checks passed, calling gameStore.takeShot()');
     console.log('🚀 About to call gameStore.takeShot()...');
     
+    // Reset status
+    transactionStatus = 'idle';
+    statusMessage = '';
+    progressPercentage = 0;
+    
     try {
       const gameState = gameStore.getGameState();
       const walletStore = gameStore.getWalletStore();
@@ -119,7 +153,8 @@
         ethers: gameStore.getEthers(),
         updateGameState: gameStore.updateState,
         loadGameState: gameStore.loadGameState,
-        loadPlayerData: gameStore.loadPlayerData
+        loadPlayerData: gameStore.loadPlayerData,
+        onStatusUpdate: handleStatusUpdate
       });
       console.log('✅ GameActions.takeShot() completed:', result);
       
@@ -128,6 +163,13 @@
         console.log('🎯 Shot committed successfully, waiting for reveal window...');
         toastStore.success('Shot committed! Waiting for reveal window to open...');
         // The SimplePendingShotManager will handle the reveal automatically
+        
+        // Reset transaction status after successful completion
+        setTimeout(() => {
+          transactionStatus = 'idle';
+          statusMessage = '';
+          progressPercentage = 0;
+        }, 2000);
       } else if (result && result.secret) {
         // Fallback for old approach
         console.log('🎯 Shot committed successfully, showing reveal modal');
@@ -135,6 +177,13 @@
         pendingTxHash = result.hash;
         showRevealModal = true;
         toastStore.success('Shot committed! Click "Reveal Now" to complete your shot.');
+        
+        // Reset transaction status after successful completion
+        setTimeout(() => {
+          transactionStatus = 'idle';
+          statusMessage = '';
+          progressPercentage = 0;
+        }, 2000);
       }
     } catch (error) {
       console.error('❌ Failed to take shot:', error);
@@ -144,6 +193,11 @@
         stack: error.stack
       });
       toastStore.error('Failed to take shot: ' + error.message);
+      
+      // Reset status on error
+      transactionStatus = 'idle';
+      statusMessage = '';
+      progressPercentage = 0;
     }
   };
 
@@ -183,6 +237,11 @@
     console.log('✅ All checks passed, calling gameStore.takeShot() with first shot cost');
     console.log('🚀 About to call gameStore.takeShot() for first shot...');
     
+    // Reset status
+    transactionStatus = 'idle';
+    statusMessage = '';
+    progressPercentage = 0;
+    
     try {
       const gameState = gameStore.getGameState();
       const walletStore = gameStore.getWalletStore();
@@ -198,7 +257,8 @@
         ethers: gameStore.getEthers(),
         updateGameState: gameStore.updateState,
         loadGameState: gameStore.loadGameState,
-        loadPlayerData: gameStore.loadPlayerData
+        loadPlayerData: gameStore.loadPlayerData,
+        onStatusUpdate: handleStatusUpdate
       });
       console.log('✅ GameActions.takeShot() (first shot) completed:', result);
       
@@ -207,6 +267,13 @@
         console.log('🎯 First shot committed successfully, waiting for reveal window...');
         toastStore.success('First shot committed! Waiting for reveal window to open...');
         // The SimplePendingShotManager will handle the reveal automatically
+        
+        // Reset transaction status after successful completion
+        setTimeout(() => {
+          transactionStatus = 'idle';
+          statusMessage = '';
+          progressPercentage = 0;
+        }, 2000);
       } else if (result && result.secret) {
         // Fallback for old approach
         console.log('🎯 First shot committed successfully, showing reveal modal');
@@ -214,6 +281,20 @@
         pendingTxHash = result.hash;
         showRevealModal = true;
         toastStore.success('First shot committed! Click "Reveal Now" to complete your shot.');
+        
+        // Reset transaction status after successful completion, but keep some info during cooldown
+        setTimeout(() => {
+          if (timeRemaining > 0) {
+            // If cooldown is active, show cooldown status instead of idle
+            transactionStatus = 'cooldown';
+            statusMessage = 'Shot committed successfully! Cooldown active.';
+            progressPercentage = 100;
+          } else {
+            transactionStatus = 'idle';
+            statusMessage = '';
+            progressPercentage = 0;
+          }
+        }, 2000);
       }
     } catch (error) {
       console.error('❌ Failed to take first shot:', error);
@@ -223,6 +304,11 @@
         stack: error.stack
       });
       toastStore.error('Failed to take first shot: ' + error.message);
+      
+      // Reset status on error
+      transactionStatus = 'idle';
+      statusMessage = '';
+      progressPercentage = 0;
     }
   };
 
@@ -642,15 +728,39 @@
   $: isTakingShot = gameState.takingShot;
   
   // Enhanced loading state detection with specific messages
-  $: isLoadingState = $isLoading;
-  $: loadingMessage = isTakingShot ? 'Processing your shot...' : 'Loading game data...';
+  $: isLoadingState = $isLoading || (transactionStatus !== 'idle' && transactionStatus !== 'cooldown');
+  $: loadingMessage = (transactionStatus !== 'idle' && transactionStatus !== 'cooldown') ? statusMessage : (isTakingShot ? 'Processing your shot...' : 'Loading game data...');
+  
+  // Cooldown state detection
+  $: isCooldownState = transactionStatus === 'cooldown' || timeRemaining > 0;
+  $: cooldownMessage = transactionStatus === 'cooldown' ? statusMessage : `Cooldown: ${formatTime(timeRemaining)}`;
   
   // Check if pot is empty (first shot scenario) - simplified to handle both string and numeric values
   $: isPotEmpty = parseFloat($currentPot || '0') === 0;
-  $: isFirstShotReady = isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0;
+  $: isFirstShotReady = isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0 && transactionStatus === 'idle';
   
   // CRITICAL FIX: Regular shot should be available when canTakeShot is true AND pot is NOT empty
-  $: isRegularShotReady = !isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0;
+  $: isRegularShotReady = !isPotEmpty && $canTakeShot && !$isLoading && timeRemaining <= 0 && transactionStatus === 'idle';
+  
+  // Transaction in progress
+  $: isTransactionInProgress = transactionStatus !== 'idle' && transactionStatus !== 'completed' && transactionStatus !== 'cooldown';
+
+  // Update status message during cooldown
+  $: if (timeRemaining > 0 && transactionStatus === 'idle') {
+    transactionStatus = 'cooldown';
+    statusMessage = `Shot committed successfully! Cooldown: ${Math.ceil(timeRemaining / 1000)}s remaining`;
+    progressPercentage = Math.max(0, 100 - (timeRemaining / (GAME_CONFIG.COOLDOWN_SECONDS * 1000)) * 100);
+  } else if (timeRemaining <= 0 && transactionStatus === 'cooldown') {
+    transactionStatus = 'idle';
+    statusMessage = '';
+    progressPercentage = 0;
+  }
+
+  // Update cooldown message dynamically
+  $: if (transactionStatus === 'cooldown' && timeRemaining > 0) {
+    statusMessage = `Shot committed successfully! Cooldown: ${Math.ceil(timeRemaining / 1000)}s remaining`;
+    progressPercentage = Math.max(0, 100 - (timeRemaining / (GAME_CONFIG.COOLDOWN_SECONDS * 1000)) * 100);
+  }
 
   // Check for saved secrets in localStorage on component mount
   const checkForSavedSecrets = () => {
@@ -768,7 +878,7 @@
         <span class="text-sm opacity-80">Next shot in {formatTime(timeRemaining)}</span>
       </button>
     {:else if isLoadingState}
-      <!-- Loading State with Spinner -->
+      <!-- Enhanced Loading State with Detailed Status -->
       <button
         class="btn-game btn-loading"
         disabled
@@ -777,7 +887,15 @@
           <div class="spinner w-6 h-6"></div>
           <div class="flex flex-col">
             <span class="text-2xl font-bold">{loadingMessage}</span>
-            <span class="text-sm opacity-80">{isTakingShot ? 'Confirm in wallet' : 'Please wait...'}</span>
+            <span class="text-sm opacity-80">
+              {#if isTransactionInProgress}
+                {progressPercentage}% complete
+              {:else if isTakingShot}
+                Confirm in wallet
+              {:else}
+                Please wait...
+              {/if}
+            </span>
           </div>
         </div>
       </button>
@@ -870,26 +988,40 @@
       <div class="absolute inset-0 rounded-2xl bg-red-500/20 animate-ping pointer-events-none"></div>
     {/if}
 
-    <!-- Status Bar for Loading States -->
+    <!-- Enhanced Status Bar for Loading States -->
     {#if isLoadingState}
       <div class="status-bar-container w-80">
         <div class="status-bar">
-          <div class="status-bar-fill" style="width: 75%;"></div>
+          <div class="status-bar-fill transaction-progress" style="width: {progressPercentage}%;"></div>
         </div>
         <div class="status-text">
           <span class="status-message">{loadingMessage}</span>
-          <span class="status-detail">{isTakingShot ? 'Waiting for wallet confirmation...' : 'Initializing...'}</span>
+          <span class="status-detail">
+            {#if isTransactionInProgress}
+              Step {Math.ceil(progressPercentage / 10)} of 10 • {progressPercentage}% complete
+            {:else if isTakingShot}
+              Waiting for wallet confirmation...
+            {:else}
+              Initializing...
+            {/if}
+          </span>
         </div>
       </div>
-    {:else if timeRemaining > 0}
+    {:else if isCooldownState}
       <!-- Cooldown Status Bar -->
       <div class="status-bar-container w-80">
         <div class="status-bar cooldown-bar">
-          <div class="status-bar-fill cooldown-fill" style="width: {Math.max(0, 100 - (timeRemaining / GAME_CONFIG.COOLDOWN_SECONDS * 100))}%;"></div>
+          <div class="status-bar-fill cooldown-fill" style="width: {Math.max(0, 100 - (timeRemaining / (GAME_CONFIG.COOLDOWN_SECONDS * 1000)) * 100)}%;"></div>
         </div>
         <div class="status-text">
-          <span class="status-message">Cooldown Active</span>
-          <span class="status-detail">Next shot in {formatTime(timeRemaining)}</span>
+          <span class="status-message">{transactionStatus === 'cooldown' ? 'Shot Committed!' : 'Cooldown Active'}</span>
+          <span class="status-detail">
+            {#if transactionStatus === 'cooldown'}
+              {cooldownMessage}
+            {:else}
+              Next shot in {formatTime(timeRemaining)}
+            {/if}
+          </span>
         </div>
       </div>
     {/if}
@@ -1150,6 +1282,15 @@
     bottom: 0;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
     animation: shimmer 2s infinite;
+  }
+
+  .transaction-progress {
+    @apply bg-gradient-to-r from-green-500 to-blue-500;
+  }
+
+  .transaction-progress::after {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 1.5s infinite;
   }
 
   .cooldown-bar {

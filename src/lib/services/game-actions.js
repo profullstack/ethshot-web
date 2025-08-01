@@ -37,8 +37,15 @@ export const takeShot = async ({
   ethers,
   updateGameState,
   loadGameState,
-  loadPlayerData
+  loadPlayerData,
+  onStatusUpdate = null // New callback for status updates
 }) => {
+  const updateStatus = (status, message) => {
+    if (onStatusUpdate) {
+      onStatusUpdate(status, message);
+    }
+  };
+
   if (!wallet.connected || !wallet.address) {
     throw new Error('Please connect your wallet first');
   }
@@ -71,13 +78,19 @@ export const takeShot = async ({
       throw new Error('Contract or signer not available');
     }
 
+    updateStatus('preparing', 'Preparing transaction...');
+    
     const contractWithSigner = contract.connect(wallet.signer);
     // CRITICAL FIX: Always use contract's SHOT_COST for transaction
     // Custom shot costs are handled at UI/database level for display only
     const shotCost = await contract.SHOT_COST();
 
+    updateStatus('checking_balance', 'Checking wallet balance...');
+    
     // Check user balance
     const balance = await wallet.provider.getBalance(wallet.address);
+    
+    updateStatus('estimating_gas', 'Estimating gas costs...');
     
     // Estimate gas with proper commitment hash
     let gasEstimate;
@@ -112,13 +125,13 @@ export const takeShot = async ({
       gasPrice = ethers.parseUnits('20', 'gwei');
     }
     
-    const estimatedGasCost = gasLimit * gasPrice;
-    const totalCost = shotCost + estimatedGasCost;
-    
+    const estimatedGasCost = Number(gasLimit) * Number(gasPrice);
+    const totalCost = Number(shotCost) + Number(estimatedGasCost);
+
     // For balance check, use the higher of actual cost or custom cost
-    const balanceCheckCost = customShotCost ? 
-      Math.max(ethers.parseEther(customShotCost), shotCost) + estimatedGasCost : 
-      totalCost;
+    const balanceCheckCost = customShotCost ?
+      Math.max(Number(ethers.parseEther(customShotCost)), Number(shotCost)) + Number(estimatedGasCost) :
+      Number(totalCost);
     
     console.log('Gas estimation details:', {
       shotCost: ethers.formatEther(shotCost),
@@ -136,17 +149,25 @@ export const takeShot = async ({
       throw new Error(`Insufficient ETH. Need ${shortfall} more ETH for gas fees.`);
     }
 
+    updateStatus('generating_commitment', 'Generating secure commitment...');
+
     // Generate commitment - CRITICAL FIX: Must match contract's expectation
     const secret = ethers.hexlify(ethers.randomBytes(32));
     // Contract expects: keccak256(abi.encodePacked(secret, msg.sender))
     const commitment = ethers.keccak256(ethers.solidityPacked(['uint256', 'address'], [secret, wallet.address]));
+
+    updateStatus('sending_transaction', 'Sending transaction to blockchain...');
 
     const tx = await contractWithSigner.commitShot(commitment, {
       value: shotCost,
       gasLimit: gasLimit
     });
 
+    updateStatus('waiting_confirmation', 'Waiting for blockchain confirmation...');
+
     const receipt = await tx.wait();
+    
+    updateStatus('processing', 'Processing transaction result...');
     
     // Store the pending shot information for later reveal
     const pendingShotData = {
@@ -193,10 +214,12 @@ export const takeShot = async ({
     };
   }
 
+  updateStatus('logging_database', 'Recording shot to database...');
+
   // Log shot to database
   try {
     // Use custom shot cost for display purposes if provided
-    const displayAmount = customShotCost ? customShotCost : ethers.formatEther(shotCost);
+    const displayAmount = customShotCost ? customShotCost : ethers.formatEther(Number(shotCost));
     
     await db.recordShot({
       playerAddress: wallet.address,
@@ -209,13 +232,18 @@ export const takeShot = async ({
     });
   } catch (dbError) {
     console.error('Failed to log shot to database:', dbError);
+    // Don't throw here - the shot was successful even if logging failed
   }
+
+  updateStatus('refreshing_state', 'Refreshing game state...');
 
   // Clear cache and refresh state
   rpcCache.clear();
   await new Promise(resolve => setTimeout(resolve, 1000));
   await loadGameState();
   await loadPlayerData(wallet.address);
+
+  updateStatus('completed', 'Shot committed successfully!');
 
   return result;
 };
@@ -306,8 +334,8 @@ export const sponsorRound = async ({
       gasPrice = ethers.parseUnits('20', 'gwei');
     }
     
-    const estimatedGasCost = gasLimit * gasPrice;
-    const totalCost = sponsorCost + estimatedGasCost;
+    const estimatedGasCost = Number(gasLimit) * Number(gasPrice);
+    const totalCost = Number(sponsorCost) + Number(estimatedGasCost);
     
     console.log('Sponsor gas estimation details:', {
       sponsorCost: ethers.formatEther(sponsorCost),
@@ -343,7 +371,7 @@ export const sponsorRound = async ({
       name,
       logoUrl,
       sponsorUrl,
-      amount: gameState.sponsorCost,
+      amount: ethers.formatEther(Number(sponsorCost)),
       txHash: result.hash,
       blockNumber: result.receipt.blockNumber,
       timestamp: new Date().toISOString(),
@@ -512,12 +540,12 @@ export const cleanupExpiredPendingShot = async ({
     }
 
     const pendingShot = await contract.getPendingShot(targetPlayer);
-    const currentBlock = await wallet.provider.getBlockNumber();
+    const currentBlock = Number(await wallet.provider.getBlockNumber());
     const commitBlock = safeBigIntToNumber(pendingShot.blockNumber);
     const maxRevealDelay = 256; // MAX_REVEAL_DELAY from contract
-    
+
     const revealExpired = currentBlock > commitBlock + maxRevealDelay;
-    
+
     if (!revealExpired) {
       const blocksRemaining = (commitBlock + maxRevealDelay) - currentBlock;
       throw new Error(`Pending shot is not expired yet. Please wait ${blocksRemaining} more blocks or refresh the page to start over.`);
