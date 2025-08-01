@@ -701,7 +701,11 @@ const executeShotTransaction = async ({ contract, ethers, wallet, actualShotCost
     secret,
     commitment,
     commitHash: commitReceipt.hash,
+
     commitBlock: safeBigIntToNumber(commitReceipt.blockNumber),
+
+    
+
     amount: transactionValue.toString(),
     timestamp: Date.now()
   };

@@ -153,7 +153,10 @@ export const takeShot = async ({
       secret,
       commitment,
       commitHash: receipt.hash,
+
       commitBlock: safeBigIntToNumber(receipt.blockNumber),
+      
+
       amount: shotCost.toString(),
       timestamp: Date.now()
     };
