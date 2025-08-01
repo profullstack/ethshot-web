@@ -10,6 +10,7 @@ import { getActiveAdapter } from '../crypto/adapters/index.js';
 import { toastStore } from '../stores/toast.js';
 import { db } from '../database/index.js';
 import { rpcCache } from '../stores/game/cache.js';
+import { safeBigIntToNumber } from '../stores/game/utils.js';
 
 /**
  * Take a shot in the game
@@ -512,7 +513,7 @@ export const cleanupExpiredPendingShot = async ({
 
     const pendingShot = await contract.getPendingShot(targetPlayer);
     const currentBlock = await wallet.provider.getBlockNumber();
-    const commitBlock = Number(pendingShot.blockNumber);
+    const commitBlock = safeBigIntToNumber(pendingShot.blockNumber);
     const maxRevealDelay = 256; // MAX_REVEAL_DELAY from contract
     
     const revealExpired = currentBlock > commitBlock + maxRevealDelay;

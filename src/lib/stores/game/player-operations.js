@@ -17,6 +17,7 @@ import {
   scheduleCooldownNotification
 } from '../../utils/notifications.js';
 import { showWinMessage, showLossMessage } from '../shot-result-message.js';
+import { safeBigIntToNumber } from './utils.js';
 
 /**
  * Load player-specific data
@@ -50,13 +51,13 @@ export const loadPlayerData = async ({ address, state, contract, ethers, db, upd
         const [playerStatsResult, canShootResult, cooldownResult] = await adapter.batchContractCalls(batchCalls);
         
         playerStats = {
-          totalShots: Number(playerStatsResult[0].totalShots),
+          totalShots: safeBigIntToNumber(playerStatsResult[0].totalShots),
           totalSpent: adapter.ethers.formatEther(playerStatsResult[0].totalSpent),
           totalWon: adapter.ethers.formatEther(playerStatsResult[0].totalWon),
-          lastShotTime: new Date(Number(playerStatsResult[0].lastShotTime) * 1000).toISOString(),
+          lastShotTime: new Date(safeBigIntToNumber(playerStatsResult[0].lastShotTime) * 1000).toISOString(),
         };
         canShoot = canShootResult[0];
-        cooldownRemaining = Number(cooldownResult[0]);
+        cooldownRemaining = safeBigIntToNumber(cooldownResult[0]);
       } catch (batchError) {
         console.warn('Batch call failed, falling back to individual calls:', batchError.message);
         
@@ -98,13 +99,13 @@ export const loadPlayerData = async ({ address, state, contract, ethers, db, upd
 
         // Format ETH-specific data
         playerStats = {
-          totalShots: Number(playerStats.totalShots),
+          totalShots: safeBigIntToNumber(playerStats.totalShots),
           totalSpent: ethers.formatEther(playerStats.totalSpent),
           totalWon: ethers.formatEther(playerStats.totalWon),
-          lastShotTime: new Date(Number(playerStats.lastShotTime) * 1000).toISOString(),
+          lastShotTime: new Date(safeBigIntToNumber(playerStats.lastShotTime) * 1000).toISOString(),
         };
 
-        cooldownRemaining = Number(cooldownRemaining);
+        cooldownRemaining = safeBigIntToNumber(cooldownRemaining);
       } catch (error) {
         console.warn('Failed to load player data from contract:', error.message);
         
@@ -987,7 +988,7 @@ const logShotToDatabase = async ({
       amount: actualShotCost,
       won: result.won,
       txHash: result.hash,
-      blockNumber: result.receipt.blockNumber,
+      blockNumber: safeBigIntToNumber(result.receipt.blockNumber),
       timestamp: new Date().toISOString(),
       cryptoType: state.activeCrypto,
       contractAddress: contractAddress
@@ -1001,7 +1002,7 @@ const logShotToDatabase = async ({
         winnerAddress: wallet.address,
         amount: state.currentPot,
         txHash: result.hash,
-        blockNumber: result.receipt.blockNumber,
+        blockNumber: safeBigIntToNumber(result.receipt.blockNumber),
         timestamp: new Date().toISOString(),
         cryptoType: state.activeCrypto,
         contractAddress: contractAddress

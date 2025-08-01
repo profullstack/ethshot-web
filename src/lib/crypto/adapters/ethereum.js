@@ -5,6 +5,7 @@ import { BaseCryptoAdapter } from './base.js';
 import { WALLET_PROVIDERS } from '../config.js';
 import { defaultProviderManager, setupProvidersFromEnv } from '../rpc-provider-manager.js';
 import { WALLET_CONFIG } from '../../config.js';
+import { safeBigIntToNumber } from '../../stores/game/utils.js';
 
 /**
  * Ethereum adapter for handling ETH transactions and wallet interactions
@@ -336,7 +337,7 @@ export class EthereumAdapter extends BaseCryptoAdapter {
       hash: tx.hash,
       receipt,
       committed: true,
-      commitBlock: Number(commitBlock)
+              commitBlock: safeBigIntToNumber(commitBlock)
     };
   }
 
@@ -587,10 +588,10 @@ export class EthereumAdapter extends BaseCryptoAdapter {
       const [stats] = await this.makeContractCall('getPlayerStats', [address]);
       
       return {
-        totalShots: Number(stats.totalShots),
+        totalShots: safeBigIntToNumber(stats.totalShots),
         totalSpent: this.ethers.formatEther(stats.totalSpent),
         totalWon: this.ethers.formatEther(stats.totalWon),
-        lastShotTime: new Date(Number(stats.lastShotTime) * 1000).toISOString()
+        lastShotTime: new Date(safeBigIntToNumber(stats.lastShotTime) * 1000).toISOString()
       };
     } catch (error) {
       console.warn('Failed to fetch player stats:', error.message);
@@ -651,7 +652,7 @@ export class EthereumAdapter extends BaseCryptoAdapter {
       
       return {
         exists: result.exists,
-        blockNumber: Number(result.blockNumber),
+        blockNumber: safeBigIntToNumber(result.blockNumber),
         amount: this.ethers.formatEther(result.amount)
       };
     } catch (error) {
@@ -683,7 +684,7 @@ export class EthereumAdapter extends BaseCryptoAdapter {
   async getCooldownRemaining(address) {
     try {
       const [remaining] = await this.makeContractCall('getCooldownRemaining', [address]);
-      return Number(remaining);
+      return safeBigIntToNumber(remaining);
     } catch (error) {
       console.warn('Failed to fetch cooldown remaining:', error.message);
       return 0;
@@ -701,7 +702,7 @@ export class EthereumAdapter extends BaseCryptoAdapter {
         sponsor: sponsor.sponsor,
         name: sponsor.name,
         logoUrl: sponsor.logoUrl,
-        timestamp: new Date(Number(sponsor.timestamp) * 1000).toISOString(),
+        timestamp: new Date(safeBigIntToNumber(sponsor.timestamp) * 1000).toISOString(),
         active: sponsor.active
       };
     } catch (error) {
@@ -726,8 +727,8 @@ export class EthereumAdapter extends BaseCryptoAdapter {
       return winners.map(winner => ({
         winner: winner.winner,
         amount: this.ethers.formatEther(winner.amount),
-        timestamp: new Date(Number(winner.timestamp) * 1000).toISOString(),
-        blockNumber: Number(winner.blockNumber)
+        timestamp: new Date(safeBigIntToNumber(winner.timestamp) * 1000).toISOString(),
+        blockNumber: safeBigIntToNumber(winner.blockNumber)
       }));
     } catch (error) {
       console.warn('Failed to fetch recent winners:', error.message);
@@ -761,14 +762,14 @@ export class EthereumAdapter extends BaseCryptoAdapter {
         recentWinners: results[5][0].map(winner => ({
           winner: winner.winner,
           amount: this.ethers.formatEther(winner.amount),
-          timestamp: new Date(Number(winner.timestamp) * 1000).toISOString(),
-          blockNumber: Number(winner.blockNumber)
+          timestamp: new Date(safeBigIntToNumber(winner.timestamp) * 1000).toISOString(),
+          blockNumber: safeBigIntToNumber(winner.blockNumber)
         })),
         currentSponsor: {
           sponsor: results[6].sponsor,
           name: results[6].name,
           logoUrl: results[6].logoUrl,
-          timestamp: new Date(Number(results[6].timestamp) * 1000).toISOString(),
+          timestamp: new Date(safeBigIntToNumber(results[6].timestamp) * 1000).toISOString(),
           active: results[6].active
         }
       };
@@ -864,9 +865,9 @@ export class EthereumAdapter extends BaseCryptoAdapter {
     const config = await contract.getGameConfig();
     
     return {
-      winPercentageBP: Number(config.winPercentageBP),
-      housePercentageBP: Number(config.housePercentageBP),
-      winChanceBP: Number(config.winChanceBP)
+              winPercentageBP: safeBigIntToNumber(config.winPercentageBP),
+        housePercentageBP: safeBigIntToNumber(config.housePercentageBP),
+        winChanceBP: safeBigIntToNumber(config.winChanceBP)
     };
   }
 
@@ -876,7 +877,7 @@ export class EthereumAdapter extends BaseCryptoAdapter {
   async getCooldownPeriod() {
     const contract = this.getContract();
     const period = await contract.COOLDOWN_PERIOD();
-    return Number(period);
+    return safeBigIntToNumber(period);
   }
 
   /**
@@ -885,7 +886,7 @@ export class EthereumAdapter extends BaseCryptoAdapter {
   async getWinPercentageBP() {
     const contract = this.getContract();
     const percentage = await contract.WIN_PERCENTAGE_BP();
-    return Number(percentage);
+    return safeBigIntToNumber(percentage);
   }
 
   /**
@@ -894,7 +895,7 @@ export class EthereumAdapter extends BaseCryptoAdapter {
   async getHousePercentageBP() {
     const contract = this.getContract();
     const percentage = await contract.HOUSE_PERCENTAGE_BP();
-    return Number(percentage);
+    return safeBigIntToNumber(percentage);
   }
 
   /**
@@ -903,7 +904,7 @@ export class EthereumAdapter extends BaseCryptoAdapter {
   async getWinChanceBP() {
     const contract = this.getContract();
     const chance = await contract.WIN_CHANCE_BP();
-    return Number(chance);
+    return safeBigIntToNumber(chance);
   }
 
   /**
@@ -912,7 +913,7 @@ export class EthereumAdapter extends BaseCryptoAdapter {
   async getMaxRecentWinners() {
     const contract = this.getContract();
     const max = await contract.MAX_RECENT_WINNERS();
-    return Number(max);
+    return safeBigIntToNumber(max);
   }
 
   /**

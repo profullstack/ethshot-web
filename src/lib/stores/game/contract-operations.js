@@ -15,7 +15,8 @@ import {
   updateUSDValues,
   checkPotMilestones,
   validateContractDeployment,
-  handleContractError
+  handleContractError,
+  safeBigIntToNumber
 } from './utils.js';
 import { notifyPotMilestone } from '../../utils/notifications.js';
 
@@ -243,7 +244,7 @@ export const loadGameState = async ({ state, contract, ethers, db, updateState }
     const winners = dbWinners.length > 0 ? dbWinners : (recentWinners || []).map(winner => ({
       ...winner,
       amount: state.isMultiCryptoMode ? winner.amount : ethers.formatEther(winner.amount),
-      timestamp: new Date(Number(winner.timestamp) * 1000).toISOString()
+      timestamp: new Date(safeBigIntToNumber(winner.timestamp) * 1000).toISOString()
     }));
 
     const sponsor = dbSponsors || (currentSponsor?.active ? currentSponsor : null);

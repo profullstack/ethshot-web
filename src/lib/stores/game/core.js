@@ -12,7 +12,7 @@ import { getCryptoGameConfig, getCurrentCrypto } from '../../crypto/config.js';
 import { GAME_CONFIG } from '../../config.js';
 import { db } from '../../database/index.js';
 import { rpcCache } from './cache.js';
-import { createInitialGameState, updateUSDValues, formatTimeRemaining } from './utils.js';
+import { createInitialGameState, updateUSDValues, formatTimeRemaining, safeBigIntToNumber } from './utils.js';
 import { loadGameState, initializeEthContract, initializeMultiCryptoAdapter } from './contract-operations.js';
 import { loadPlayerData } from './player-operations.js';
 import { startRealTimeUpdates, stopRealTimeUpdates } from './real-time.js';
@@ -255,8 +255,8 @@ const createUnifiedGameStore = () => {
 
         console.log('🧹 GameStore: Getting pending shot details...');
         const pendingShot = await contract.getPendingShot(targetPlayer);
-        const currentBlock = await wallet.provider.getBlockNumber();
-        const commitBlock = Number(pendingShot.blockNumber);
+            const currentBlock = await wallet.provider.getBlockNumber();
+    const commitBlock = safeBigIntToNumber(pendingShot.blockNumber);
         const maxRevealDelay = 256; // MAX_REVEAL_DELAY from contract
         
         const revealExpired = currentBlock > commitBlock + maxRevealDelay;
