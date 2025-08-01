@@ -169,49 +169,64 @@ export const takeShot = async ({
     
     updateStatus('processing', 'Processing transaction result...');
     
-    // Store the pending shot information for later reveal
-    const pendingShotData = {
-      secret,
-      commitment,
-      commitHash: receipt.hash,
-      commitBlock: receipt.blockNumber,
-      amount: shotCost.toString(),
-      timestamp: Date.now()
-    };
+    // Check if this is a first shot (pot is empty) by checking the custom shot cost
+    const isFirstShot = customShotCost && parseFloat(customShotCost) !== parseFloat(ethers.formatEther(shotCost));
     
-    // Update game state to show pending shot
-    updateGameState(state => ({
-      ...state,
-      pendingShot: pendingShotData,
-      takingShot: false
-    }));
-    
-    // Store secret in localStorage for persistence
-    try {
-      const secretKey = `ethshot_secret_${wallet.address}_${receipt.hash.slice(0, 10)}`;
-      const secretData = {
+    if (isFirstShot) {
+      // First shot: no secret storage, no reveal needed - just adds to pot
+      console.log('🚀 First shot detected - no secret storage or reveal needed');
+      result = {
+        hash: receipt.hash,
+        receipt,
+        isCommitOnly: true,
+        isFirstShot: true
+        // No secret returned for first shots
+      };
+    } else {
+      // Regular shot: store secret for later reveal
+      const pendingShotData = {
         secret,
-        txHash: receipt.hash,
+        commitment,
+        commitHash: receipt.hash,
+        commitBlock: receipt.blockNumber,
+        amount: shotCost.toString(),
         timestamp: Date.now()
       };
-      localStorage.setItem(secretKey, JSON.stringify(secretData));
       
-      // Also maintain a list of saved secrets for this wallet
-      const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
-      const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
-      existingSecrets.push(secretKey);
-      localStorage.setItem(savedSecretsKey, JSON.stringify(existingSecrets));
-    } catch (storageError) {
-      console.warn('Failed to save secret to localStorage:', storageError);
+      // Update game state to show pending shot
+      updateGameState(state => ({
+        ...state,
+        pendingShot: pendingShotData,
+        takingShot: false
+      }));
+      
+      // Store secret in localStorage for persistence
+      try {
+        const secretKey = `ethshot_secret_${wallet.address}_${receipt.hash.slice(0, 10)}`;
+        const secretData = {
+          secret,
+          txHash: receipt.hash,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(secretKey, JSON.stringify(secretData));
+        
+        // Also maintain a list of saved secrets for this wallet
+        const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+        const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+        existingSecrets.push(secretKey);
+        localStorage.setItem(savedSecretsKey, JSON.stringify(existingSecrets));
+      } catch (storageError) {
+        console.warn('Failed to save secret to localStorage:', storageError);
+      }
+      
+      result = {
+        hash: receipt.hash,
+        receipt,
+        secret,
+        isCommitOnly: true,
+        pendingShot: pendingShotData
+      };
     }
-    
-    result = {
-      hash: receipt.hash,
-      receipt,
-      secret,
-      isCommitOnly: true,
-      pendingShot: pendingShotData
-    };
   }
 
   updateStatus('logging_database', 'Recording shot to database...');
@@ -444,10 +459,42 @@ export const revealShot = async ({
 
     updateStatus('checking_pending', 'Checking for pending shot...');
 
-    // Check if user has a pending shot
-    const hasPending = await contract.hasPendingShot(wallet.address);
+    // Check if user has a pending shot with retry logic
+    let hasPending = false;
+    let retryCount = 0;
+    const maxRetries = 5;
+    
+    while (!hasPending && retryCount < maxRetries) {
+      try {
+        hasPending = await contract.hasPendingShot(wallet.address);
+        if (!hasPending) {
+          console.log(`Retry ${retryCount + 1}/${maxRetries}: No pending shot found, waiting 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          retryCount++;
+        }
+      } catch (error) {
+        console.error(`Error checking pending shot (retry ${retryCount + 1}):`, error);
+        retryCount++;
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+    }
+    
     if (!hasPending) {
-      throw new Error('No pending shot found to reveal');
+      // Try to get more detailed information for debugging
+      try {
+        const currentBlock = await wallet.provider.getBlockNumber();
+        console.error('Debug info for missing pending shot:', {
+          walletAddress: wallet.address,
+          currentBlock,
+          retriesAttempted: retryCount
+        });
+      } catch (debugError) {
+        console.error('Failed to get debug info:', debugError);
+      }
+      
+      throw new Error('No pending shot found to reveal. The commit transaction may still be processing, or the reveal window may have expired. Please wait a moment and try again.');
     }
 
     updateStatus('estimating_reveal_gas', 'Estimating gas for reveal...');

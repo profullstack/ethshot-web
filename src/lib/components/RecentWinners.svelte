@@ -23,7 +23,8 @@
       
       if (dbWinners && dbWinners.length > 0) {
         // Transform database format to component format
-        winners = dbWinners.map(winner => ({
+        winners = dbWinners.map((winner, index) => ({
+          id: winner.tx_hash || winner.block_number || `winner-${index}-${Date.now()}`,
           winner: winner.winner_address,
           amount: winner.amount,
           timestamp: winner.timestamp,
@@ -32,7 +33,10 @@
         }));
       } else {
         // Fall back to store data if database is empty
-        winners = $recentWinners || [];
+        winners = ($recentWinners || []).map((winner, index) => ({
+          id: winner.txHash || winner.blockNumber || `winner-${index}-${Date.now()}`,
+          ...winner
+        }));
       }
     } catch (err) {
       console.error('Error loading winners:', err);
@@ -56,7 +60,10 @@
 
   // React to store changes for real-time updates
   $: if ($recentWinners && $recentWinners.length > 0) {
-    winners = $recentWinners;
+    winners = $recentWinners.map((winner, index) => ({
+      id: winner.txHash || winner.blockNumber || `winner-${index}-${Date.now()}`,
+      ...winner
+    }));
   }
 </script>
 
@@ -89,7 +96,7 @@
         </div>
       </div>
     {:else if winners.length > 0}
-      {#each winners as winner (winner.blockNumber || winner.txHash)}
+      {#each winners as winner (winner.id)}
         <div class="winner-row">
           <!-- Winner Icon -->
           <div class="winner-icon">

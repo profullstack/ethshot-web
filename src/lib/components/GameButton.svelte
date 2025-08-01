@@ -46,6 +46,7 @@
       'processing': 40,
       'logging_database': 45,
       'refreshing_state': 50,
+      'waiting_reveal_window': 52,
       'preparing_reveal': 55,
       'checking_pending': 60,
       'estimating_reveal_gas': 65,
@@ -167,11 +168,16 @@
       console.log('✅ GameActions.takeShot() completed:', result);
       
       // Handle commit-only result (new approach with automatic reveal)
-      if (result && result.isCommitOnly && result.secret) {
-        console.log('🎯 Shot committed successfully, automatically revealing...');
+      if (result && result.isCommitOnly && result.secret && !result.isFirstShot) {
+        console.log('🎯 Regular shot committed successfully, waiting before automatic reveal...');
+        
+        // Wait a bit for blockchain state to update before attempting reveal
+        handleStatusUpdate('waiting_reveal_window', 'Waiting for reveal window to open...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
         // Automatically reveal the shot
         try {
+          console.log('🎯 Starting automatic reveal...');
           const revealResult = await GameActions.revealShot({
             secret: result.secret,
             gameState,
@@ -225,6 +231,24 @@
             progressPercentage = 0;
           }, 2000);
         }
+      } else if (result && result.isCommitOnly && result.isFirstShot) {
+        // First shot: no reveal needed, just adds to pot
+        console.log('🚀 First shot committed successfully - no reveal needed!');
+        toastStore.success('🚀 First shot committed! The pot has been started. Other players can now take shots to try to win it!');
+        
+        // Reset transaction status after successful completion, but keep some info during cooldown
+        setTimeout(() => {
+          if (timeRemaining > 0) {
+            // If cooldown is active, show cooldown status instead of idle
+            transactionStatus = 'cooldown';
+            statusMessage = 'First shot completed successfully! Cooldown active.';
+            progressPercentage = 100;
+          } else {
+            transactionStatus = 'idle';
+            statusMessage = '';
+            progressPercentage = 0;
+          }
+        }, 2000);
       } else if (result && result.secret) {
         // Fallback for old approach
         console.log('🎯 Shot committed successfully, showing reveal modal');
@@ -317,87 +341,10 @@
       });
       console.log('✅ GameActions.takeShot() (first shot) completed:', result);
       
-      // Handle commit-only result (new approach with automatic reveal)
-      if (result && result.isCommitOnly && result.secret) {
-        console.log('🎯 First shot committed successfully, automatically revealing...');
-        
-        // Automatically reveal the shot
-        try {
-          const revealResult = await GameActions.revealShot({
-            secret: result.secret,
-            gameState,
-            wallet,
-            contract: gameStore.getContract(),
-            ethers: gameStore.getEthers(),
-            loadGameState: gameStore.loadGameState,
-            loadPlayerData: gameStore.loadPlayerData,
-            onStatusUpdate: handleStatusUpdate
-          });
-          
-          console.log('✅ First shot revealed automatically:', revealResult);
-          
-          // Show appropriate message based on win/loss
-          if (revealResult.won) {
-            toastStore.success('🎉 JACKPOT! YOU WON THE FIRST SHOT! 🎊');
-            console.log('🎉 First shot revealed - YOU WON THE JACKPOT!');
-          } else {
-            toastStore.info('🎲 First shot completed - No win this time. Better luck next shot!');
-            console.log('🎲 First shot revealed - No win this time');
-          }
-          
-          // Reset transaction status after successful completion, but keep some info during cooldown
-          setTimeout(() => {
-            if (timeRemaining > 0) {
-              // If cooldown is active, show cooldown status instead of idle
-              transactionStatus = 'cooldown';
-              statusMessage = 'First shot completed successfully! Cooldown active.';
-              progressPercentage = 100;
-            } else {
-              transactionStatus = 'idle';
-              statusMessage = '';
-              progressPercentage = 0;
-            }
-          }, 2000);
-          
-        } catch (revealError) {
-          console.error('❌ Failed to automatically reveal first shot:', revealError);
-          
-          // Fallback to manual reveal modal
-          console.log('🎯 Falling back to manual reveal modal for first shot');
-          pendingSecret = result.secret;
-          pendingTxHash = result.hash;
-          showRevealModal = true;
-          toastStore.error('First shot committed but auto-reveal failed. Please reveal manually.');
-          
-          // Reset transaction status
-          setTimeout(() => {
-            transactionStatus = 'idle';
-            statusMessage = '';
-            progressPercentage = 0;
-          }, 2000);
-        }
-      } else if (result && result.secret) {
-        // Fallback for old approach
-        console.log('🎯 First shot committed successfully, showing reveal modal');
-        pendingSecret = result.secret;
-        pendingTxHash = result.hash;
-        showRevealModal = true;
-        toastStore.success('First shot committed! Click "Reveal Now" to complete your shot.');
-        
-        // Reset transaction status after successful completion, but keep some info during cooldown
-        setTimeout(() => {
-          if (timeRemaining > 0) {
-            // If cooldown is active, show cooldown status instead of idle
-            transactionStatus = 'cooldown';
-            statusMessage = 'Shot committed successfully! Cooldown active.';
-            progressPercentage = 100;
-          } else {
-            transactionStatus = 'idle';
-            statusMessage = '';
-            progressPercentage = 0;
-          }
-        }, 2000);
-      }
+      // First shots are now handled by the main takeShot logic above
+      // This function should only be called for first shots, but the result handling
+      // is now unified in the main handleTakeShot function
+      console.log('✅ First shot handled by main takeShot logic');
     } catch (error) {
       console.error('❌ Failed to take first shot:', error);
       console.error('Error details:', {
@@ -1092,7 +1039,7 @@
 
     <!-- Enhanced Status Bar for Loading States -->
     {#if isLoadingState}
-      <div class="status-bar-container w-80">
+      <div class="status-bar-container">
         <div class="status-bar">
           <div class="status-bar-fill transaction-progress" style="width: {progressPercentage}%;"></div>
         </div>
@@ -1117,7 +1064,7 @@
       </div>
     {:else if isCooldownState}
       <!-- Cooldown Status Bar -->
-      <div class="status-bar-container w-80">
+      <div class="status-bar-container">
         <div class="status-bar cooldown-bar">
           <div class="status-bar-fill cooldown-fill" style="width: {Math.max(0, 100 - (timeRemaining / (GAME_CONFIG.COOLDOWN_SECONDS * 1000)) * 100)}%;"></div>
         </div>
@@ -1368,7 +1315,7 @@
 
   /* Status Bar Styles */
   .status-bar-container {
-    @apply w-full mt-4;
+    @apply w-80 mt-4 mx-auto;
   }
 
   .status-bar {
@@ -1648,7 +1595,7 @@
 
     /* Mobile Status Bar Styles */
     .status-bar-container {
-      @apply w-72;
+      @apply w-72 mx-auto;
     }
     
     .status-message {
