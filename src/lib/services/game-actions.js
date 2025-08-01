@@ -501,6 +501,9 @@ export const revealShot = async ({
 
     const contractWithSigner = contract.connect(wallet.signer);
     
+    // Check wallet balance first
+    const balance = await wallet.provider.getBalance(wallet.address);
+    
     // Estimate gas
     let gasEstimate;
     try {
@@ -512,10 +515,43 @@ export const revealShot = async ({
     
     const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
     
+    // Get gas price and calculate total cost
+    const feeData = await wallet.provider.getFeeData();
+    let gasPrice;
+    
+    // Handle different fee structures (EIP-1559 vs legacy)
+    if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+      // EIP-1559 transaction
+      gasPrice = feeData.maxFeePerGas;
+    } else if (feeData.gasPrice) {
+      // Legacy transaction
+      gasPrice = feeData.gasPrice;
+    } else {
+      // Fallback to a reasonable gas price (20 gwei)
+      gasPrice = ethers.parseUnits('20', 'gwei');
+    }
+    
+    const estimatedGasCost = Number(gasLimit) * Number(gasPrice);
+    
+    console.log('Reveal gas estimation details:', {
+      gasLimit: gasLimit.toString(),
+      gasPrice: ethers.formatUnits(gasPrice, 'gwei') + ' gwei',
+      estimatedGasCost: ethers.formatEther(estimatedGasCost),
+      balance: ethers.formatEther(balance)
+    });
+    
+    // Check if user has enough ETH for gas fees
+    if (balance < estimatedGasCost) {
+      const shortfall = ethers.formatEther(estimatedGasCost - balance);
+      throw new Error(`Insufficient ETH for gas fees. Need ${shortfall} more ETH to reveal your shot. Your current balance: ${ethers.formatEther(balance)} ETH`);
+    }
+    
     updateStatus('sending_reveal', 'Sending reveal transaction...');
 
     const tx = await contractWithSigner.revealShot(secret, {
-      gasLimit: gasLimit
+      gasLimit: gasLimit,
+      maxFeePerGas: feeData.maxFeePerGas || gasPrice,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || gasPrice
     });
 
     updateStatus('waiting_reveal_confirmation', 'Waiting for reveal confirmation...');

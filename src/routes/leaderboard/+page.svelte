@@ -7,25 +7,29 @@
 
   let topPlayers = [];
   let recentShots = [];
+  let recentWinners = [];
   let userProfiles = new Map();
   let loading = true;
   let error = null;
 
   onMount(async () => {
     try {
-      // Fetch top players and recent shots in parallel
-      const [playersData, shotsData] = await Promise.all([
+      // Fetch top players, recent shots, and recent winners in parallel
+      const [playersData, shotsData, winnersData] = await Promise.all([
         db.getTopPlayers(50, 'total_shots'),
-        db.getRecentShots(10)
+        db.getRecentShots(10),
+        db.getRecentWinners(10)
       ]);
       
       topPlayers = playersData;
       recentShots = shotsData;
+      recentWinners = winnersData;
       
-      // Collect all unique addresses from both players and shots
+      // Collect all unique addresses from players, shots, and winners
       const allAddresses = new Set();
       topPlayers.forEach(player => allAddresses.add(player.address));
       recentShots.forEach(shot => allAddresses.add(shot.player_address));
+      recentWinners.forEach(winner => allAddresses.add(winner.player_address));
       
       // Fetch user profiles for all addresses
       if (allAddresses.size > 0) {
@@ -168,6 +172,69 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- Recent Winners Section -->
+    <div class="space-y-6">
+      <div class="text-center space-y-2">
+        <h2 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 bg-clip-text text-transparent">
+          🏆 Recent Winners
+        </h2>
+        <p class="text-lg text-gray-300">
+          The latest jackpot winners who struck it lucky
+        </p>
+      </div>
+
+      {#if recentWinners.length === 0}
+        <div class="text-center py-8">
+          <div class="text-gray-400 text-lg">No winners yet</div>
+          <p class="text-gray-500 mt-2">Be the first to win the jackpot!</p>
+        </div>
+      {:else}
+        <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-900/50">
+                <tr>
+                  <th class="px-6 py-4 text-left text-sm font-semibold text-gray-300">Winner</th>
+                  <th class="px-6 py-4 text-right text-sm font-semibold text-gray-300">Shot Cost</th>
+                  <th class="px-6 py-4 text-right text-sm font-semibold text-gray-300">Jackpot Won</th>
+                  <th class="px-6 py-4 text-right text-sm font-semibold text-gray-300">Time</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-700">
+                {#each recentWinners as winner}
+                  <tr class="hover:bg-gray-700/30 transition-colors">
+                    <td class="px-6 py-4">
+                      <UserDisplay
+                        walletAddress={winner.player_address}
+                        profile={getPlayerProfile(winner.player_address)}
+                        size="sm"
+                        showAddress={true}
+                      />
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                      <div class="font-mono text-white">
+                        {formatEther(winner.amount)} ETH
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                      <div class="font-mono text-green-400 font-bold">
+                        🎉 {formatEther(winner.jackpot_amount || winner.amount)} ETH
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                      <div class="text-sm text-gray-400">
+                        {formatTimeAgo(winner.timestamp)}
+                      </div>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {/if}
     </div>
 
     <!-- Recent Shots Section -->
