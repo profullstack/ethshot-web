@@ -7,6 +7,7 @@
 import { get } from 'svelte/store';
 import { walletStore } from '../stores/wallet.js';
 import { gameStore } from '../stores/game/core.js';
+import { safeBigIntToNumber } from '../stores/game/utils.js';
 
 /**
  * Clean up expired pending shot for the current user
@@ -60,8 +61,8 @@ export const cleanupExpiredPendingShot = async () => {
 
   console.log('🧹 PendingShotCleanup: Getting pending shot details...');
   const pendingShot = await contract.getPendingShot(wallet.address);
-  const currentBlock = await wallet.provider.getBlockNumber();
-  const commitBlock = Number(pendingShot.blockNumber);
+      const currentBlock = await wallet.provider.getBlockNumber();
+    const commitBlock = safeBigIntToNumber(pendingShot.blockNumber);
   const maxRevealDelay = 256; // MAX_REVEAL_DELAY from contract
   
   const revealExpired = currentBlock > commitBlock + maxRevealDelay;

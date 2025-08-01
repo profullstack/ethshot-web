@@ -7,6 +7,45 @@
 import { GAME_CONFIG, calculateUSDValue } from '../../config.js';
 
 /**
+ * Safely convert BigInt to number, handling edge cases
+ * @param {BigInt|number|string} value - Value to convert
+ * @returns {number} Converted number
+ */
+export const safeBigIntToNumber = (value) => {
+  if (value === null || value === undefined) {
+    return 0;
+  }
+  
+  if (typeof value === 'number') {
+    return value;
+  }
+  
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  
+  if (typeof value === 'bigint') {
+    // Check if BigInt is within safe integer range
+    if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER) {
+      console.warn('BigInt value exceeds safe integer range, converting to string:', value.toString());
+      return parseFloat(value.toString());
+    }
+    return Number(value);
+  }
+  
+  // For other types, try to convert to string first
+  try {
+    const stringValue = String(value);
+    const parsed = parseFloat(stringValue);
+    return isNaN(parsed) ? 0 : parsed;
+  } catch (error) {
+    console.warn('Failed to convert value to number:', value, error);
+    return 0;
+  }
+};
+
+/**
  * ETH Shot contract ABI (for backward compatibility with ETH-only mode)
  */
 export const ETH_SHOT_ABI = [
