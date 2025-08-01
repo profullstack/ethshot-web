@@ -37,15 +37,23 @@
     // Update progress percentage based on status
     const statusProgress = {
       'idle': 0,
-      'preparing': 10,
-      'checking_balance': 20,
-      'estimating_gas': 30,
-      'generating_commitment': 40,
-      'sending_transaction': 50,
-      'waiting_confirmation': 70,
-      'processing': 80,
-      'logging_database': 90,
-      'refreshing_state': 95,
+      'preparing': 5,
+      'checking_balance': 10,
+      'estimating_gas': 15,
+      'generating_commitment': 20,
+      'sending_transaction': 25,
+      'waiting_confirmation': 35,
+      'processing': 40,
+      'logging_database': 45,
+      'refreshing_state': 50,
+      'preparing_reveal': 55,
+      'checking_pending': 60,
+      'estimating_reveal_gas': 65,
+      'sending_reveal': 70,
+      'waiting_reveal_confirmation': 80,
+      'processing_reveal': 85,
+      'refreshing_reveal_state': 90,
+      'reveal_completed': 95,
       'completed': 100
     };
     
@@ -158,18 +166,65 @@
       });
       console.log('✅ GameActions.takeShot() completed:', result);
       
-      // Handle commit-only result (new approach)
-      if (result && result.isCommitOnly) {
-        console.log('🎯 Shot committed successfully, waiting for reveal window...');
-        toastStore.success('Shot committed! Waiting for reveal window to open...');
-        // The SimplePendingShotManager will handle the reveal automatically
+      // Handle commit-only result (new approach with automatic reveal)
+      if (result && result.isCommitOnly && result.secret) {
+        console.log('🎯 Shot committed successfully, automatically revealing...');
         
-        // Reset transaction status after successful completion
-        setTimeout(() => {
-          transactionStatus = 'idle';
-          statusMessage = '';
-          progressPercentage = 0;
-        }, 2000);
+        // Automatically reveal the shot
+        try {
+          const revealResult = await GameActions.revealShot({
+            secret: result.secret,
+            gameState,
+            wallet,
+            contract: gameStore.getContract(),
+            ethers: gameStore.getEthers(),
+            loadGameState: gameStore.loadGameState,
+            loadPlayerData: gameStore.loadPlayerData,
+            onStatusUpdate: handleStatusUpdate
+          });
+          
+          console.log('✅ Shot revealed automatically:', revealResult);
+          
+          // Show appropriate message based on win/loss
+          if (revealResult.won) {
+            toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
+            console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
+          } else {
+            toastStore.info('🎲 Shot completed - No win this time. Better luck next shot!');
+            console.log('🎲 Shot revealed - No win this time');
+          }
+          
+          // Reset transaction status after successful completion, but keep some info during cooldown
+          setTimeout(() => {
+            if (timeRemaining > 0) {
+              // If cooldown is active, show cooldown status instead of idle
+              transactionStatus = 'cooldown';
+              statusMessage = 'Shot completed successfully! Cooldown active.';
+              progressPercentage = 100;
+            } else {
+              transactionStatus = 'idle';
+              statusMessage = '';
+              progressPercentage = 0;
+            }
+          }, 2000);
+          
+        } catch (revealError) {
+          console.error('❌ Failed to automatically reveal shot:', revealError);
+          
+          // Fallback to manual reveal modal
+          console.log('🎯 Falling back to manual reveal modal');
+          pendingSecret = result.secret;
+          pendingTxHash = result.hash;
+          showRevealModal = true;
+          toastStore.error('Shot committed but auto-reveal failed. Please reveal manually.');
+          
+          // Reset transaction status
+          setTimeout(() => {
+            transactionStatus = 'idle';
+            statusMessage = '';
+            progressPercentage = 0;
+          }, 2000);
+        }
       } else if (result && result.secret) {
         // Fallback for old approach
         console.log('🎯 Shot committed successfully, showing reveal modal');
@@ -262,18 +317,65 @@
       });
       console.log('✅ GameActions.takeShot() (first shot) completed:', result);
       
-      // Handle commit-only result (new approach)
-      if (result && result.isCommitOnly) {
-        console.log('🎯 First shot committed successfully, waiting for reveal window...');
-        toastStore.success('First shot committed! Waiting for reveal window to open...');
-        // The SimplePendingShotManager will handle the reveal automatically
+      // Handle commit-only result (new approach with automatic reveal)
+      if (result && result.isCommitOnly && result.secret) {
+        console.log('🎯 First shot committed successfully, automatically revealing...');
         
-        // Reset transaction status after successful completion
-        setTimeout(() => {
-          transactionStatus = 'idle';
-          statusMessage = '';
-          progressPercentage = 0;
-        }, 2000);
+        // Automatically reveal the shot
+        try {
+          const revealResult = await GameActions.revealShot({
+            secret: result.secret,
+            gameState,
+            wallet,
+            contract: gameStore.getContract(),
+            ethers: gameStore.getEthers(),
+            loadGameState: gameStore.loadGameState,
+            loadPlayerData: gameStore.loadPlayerData,
+            onStatusUpdate: handleStatusUpdate
+          });
+          
+          console.log('✅ First shot revealed automatically:', revealResult);
+          
+          // Show appropriate message based on win/loss
+          if (revealResult.won) {
+            toastStore.success('🎉 JACKPOT! YOU WON THE FIRST SHOT! 🎊');
+            console.log('🎉 First shot revealed - YOU WON THE JACKPOT!');
+          } else {
+            toastStore.info('🎲 First shot completed - No win this time. Better luck next shot!');
+            console.log('🎲 First shot revealed - No win this time');
+          }
+          
+          // Reset transaction status after successful completion, but keep some info during cooldown
+          setTimeout(() => {
+            if (timeRemaining > 0) {
+              // If cooldown is active, show cooldown status instead of idle
+              transactionStatus = 'cooldown';
+              statusMessage = 'First shot completed successfully! Cooldown active.';
+              progressPercentage = 100;
+            } else {
+              transactionStatus = 'idle';
+              statusMessage = '';
+              progressPercentage = 0;
+            }
+          }, 2000);
+          
+        } catch (revealError) {
+          console.error('❌ Failed to automatically reveal first shot:', revealError);
+          
+          // Fallback to manual reveal modal
+          console.log('🎯 Falling back to manual reveal modal for first shot');
+          pendingSecret = result.secret;
+          pendingTxHash = result.hash;
+          showRevealModal = true;
+          toastStore.error('First shot committed but auto-reveal failed. Please reveal manually.');
+          
+          // Reset transaction status
+          setTimeout(() => {
+            transactionStatus = 'idle';
+            statusMessage = '';
+            progressPercentage = 0;
+          }, 2000);
+        }
       } else if (result && result.secret) {
         // Fallback for old approach
         console.log('🎯 First shot committed successfully, showing reveal modal');
@@ -998,7 +1100,13 @@
           <span class="status-message">{loadingMessage}</span>
           <span class="status-detail">
             {#if isTransactionInProgress}
-              Step {Math.ceil(progressPercentage / 10)} of 10 • {progressPercentage}% complete
+              {#if progressPercentage <= 50}
+                Commit Phase: Step {Math.ceil(progressPercentage / 10)} of 10 • {progressPercentage}% complete
+              {:else if progressPercentage <= 95}
+                Reveal Phase: Step {Math.ceil((progressPercentage - 50) / 9)} of 5 • {progressPercentage}% complete
+              {:else}
+                Finalizing: {progressPercentage}% complete
+              {/if}
             {:else if isTakingShot}
               Waiting for wallet confirmation...
             {:else}

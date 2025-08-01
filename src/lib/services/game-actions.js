@@ -409,8 +409,16 @@ export const revealShot = async ({
   contract,
   ethers,
   loadGameState,
-  loadPlayerData
+  loadPlayerData,
+  onStatusUpdate = null // New callback for status updates
 }) => {
+  const updateStatus = (status, message) => {
+    if (onStatusUpdate) {
+      onStatusUpdate(status, message);
+    }
+  };
+  updateStatus('preparing_reveal', 'Preparing to reveal shot...');
+
   if (!wallet.connected || !wallet.address) {
     throw new Error('Please connect your wallet first');
   }
@@ -434,11 +442,15 @@ export const revealShot = async ({
       throw new Error('Contract or signer not available');
     }
 
+    updateStatus('checking_pending', 'Checking for pending shot...');
+
     // Check if user has a pending shot
     const hasPending = await contract.hasPendingShot(wallet.address);
     if (!hasPending) {
       throw new Error('No pending shot found to reveal');
     }
+
+    updateStatus('estimating_reveal_gas', 'Estimating gas for reveal...');
 
     const contractWithSigner = contract.connect(wallet.signer);
     
@@ -453,12 +465,18 @@ export const revealShot = async ({
     
     const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
     
+    updateStatus('sending_reveal', 'Sending reveal transaction...');
+
     const tx = await contractWithSigner.revealShot(secret, {
       gasLimit: gasLimit
     });
 
+    updateStatus('waiting_reveal_confirmation', 'Waiting for reveal confirmation...');
+
     const receipt = await tx.wait();
     
+    updateStatus('processing_reveal', 'Processing reveal result...');
+
     // Check if user won by looking at ShotRevealed events
     const shotRevealedEvent = receipt.logs.find(log => {
       try {
@@ -482,11 +500,15 @@ export const revealShot = async ({
     };
   }
 
+  updateStatus('refreshing_reveal_state', 'Refreshing game state...');
+
   // Clear cache and refresh state
   rpcCache.clear();
   await new Promise(resolve => setTimeout(resolve, 1000));
   await loadGameState();
   await loadPlayerData(wallet.address);
+
+  updateStatus('reveal_completed', won ? 'Congratulations! You won!' : 'Shot revealed - Better luck next time!');
 
   return result;
 };
