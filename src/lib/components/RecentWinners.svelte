@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { recentWinners } from '../stores/game/index.js';
   import { db, formatAddress, formatTimeAgo } from '../database/index.js';
-  import { NETWORK_CONFIG, calculateUSDValue } from '../config.js';
+  import { NETWORK_CONFIG, calculateUSDValueSync } from '../config.js';
 
   let winners = [];
   let loading = true;
@@ -128,7 +128,7 @@
               +{parseFloat(winner.amount).toFixed(3)} ETH
             </div>
             <div class="amount-usd">
-              ${calculateUSDValue(winner.amount)}
+              ${calculateUSDValueSync(winner.amount)}
             </div>
           </div>
 
