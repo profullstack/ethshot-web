@@ -202,6 +202,29 @@ export const takeShot = async ({
         pendingShot: pendingShotData
       };
       
+      // Store secret in localStorage for persistence and recovery
+      try {
+        const secretKey = `ethshot_secret_${wallet.address}_${receipt.hash.slice(0, 10)}`;
+        const secretData = {
+          secret,
+          txHash: receipt.hash,
+          timestamp: Date.now(),
+          isFirstShot: false // Mark as regular shot
+        };
+        localStorage.setItem(secretKey, JSON.stringify(secretData));
+        
+        // Also maintain a list of saved secrets for this wallet
+        const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+        const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+        existingSecrets.push(secretKey);
+        localStorage.setItem(savedSecretsKey, JSON.stringify(existingSecrets));
+        
+        console.log('✅ Secret stored in localStorage for recovery:', secretKey);
+      } catch (storageError) {
+        console.warn('Failed to save secret to localStorage:', storageError);
+        // Don't throw here - the shot was successful even if storage failed
+      }
+      
       // Automatically reveal the shot after a short delay
       updateStatus('auto_revealing', 'Automatically revealing shot...');
       
@@ -225,8 +248,20 @@ export const takeShot = async ({
         result.won = revealResult.won;
       } catch (revealError) {
         console.error('❌ Auto-reveal failed:', revealError);
-        toastStore.error('Shot committed but auto-reveal failed. Please try again.');
-        throw revealError;
+        
+        // Don't throw the error - instead provide a helpful message
+        // The secret is already stored in localStorage for manual recovery
+        toastStore.info('Shot committed but auto-reveal failed. Your secret is saved for manual reveal if needed.');
+        
+        // Return the result without reveal information for the UI to handle
+        result.revealResult = {
+          hash: null,
+          receipt: null,
+          won: false,
+          autoRevealFailed: true,
+          error: revealError.message
+        };
+        result.won = false;
       }
     }
 
@@ -417,6 +452,110 @@ export const sponsorRound = async ({
   await loadGameState();
 
   return result;
+};
+
+/**
+ * Clear a pending shot using the stored secret (for recovery from failed auto-reveal)
+ * @param {Object} params - Parameters object
+ * @param {string} params.playerAddress - Player address
+ * @param {string} params.commitTxHash - Commit transaction hash
+ * @param {Object} params.gameState - Current game state
+ * @param {Object} params.wallet - Wallet instance
+ * @param {Object} params.contract - Contract instance (ETH mode)
+ * @param {Object} params.ethers - Ethers library (ETH mode)
+ * @param {Function} params.loadGameState - Function to reload game state
+ * @returns {Promise<Object>} Transaction result
+ */
+export const clearPendingShot = async ({
+  playerAddress,
+  commitTxHash,
+  gameState,
+  wallet,
+  contract,
+  ethers,
+  loadGameState
+}) => {
+  if (!wallet.connected || !wallet.address) {
+    throw new Error('Please connect your wallet first');
+  }
+
+  if (gameState.contractDeployed === false) {
+    throw new Error(`${gameState.activeCrypto} contract not deployed yet.`);
+  }
+
+  if (playerAddress !== wallet.address) {
+    throw new Error('You can only clear your own pending shots');
+  }
+
+  // Find the secret from localStorage
+  let secret = null;
+  const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+  const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+  
+  for (const secretKey of existingSecrets) {
+    try {
+      const secretData = JSON.parse(localStorage.getItem(secretKey) || '{}');
+      if (secretData.txHash === commitTxHash) {
+        secret = secretData.secret;
+        break;
+      }
+    } catch (e) {
+      console.warn('Failed to parse secret data:', e);
+    }
+  }
+
+  if (!secret) {
+    throw new Error('No secret found for the specified transaction. The shot may have already been revealed or the data may be corrupted.');
+  }
+
+  console.log('🔧 Found secret for clearing pending shot:', commitTxHash);
+
+  if (gameState.isMultiCryptoMode) {
+    // Multi-crypto mode: not implemented yet
+    throw new Error('Clear pending shot functionality not yet implemented for multi-crypto mode.');
+  } else {
+    // ETH-only mode: call the reveal function to clear the pending shot
+    if (!contract || !ethers || !wallet.signer) {
+      throw new Error('Contract or signer not available');
+    }
+
+    // Check if user actually has a pending shot
+    const hasPending = await contract.hasPendingShot(wallet.address);
+    if (!hasPending) {
+      console.log('No pending shot found - may have already been cleared');
+      return {
+        hash: null,
+        receipt: null,
+        cleared: true,
+        message: 'No pending shot found - may have already been cleared'
+      };
+    }
+
+    const contractWithSigner = contract.connect(wallet.signer);
+    
+    // Estimate gas
+    let gasEstimate;
+    try {
+      gasEstimate = await contractWithSigner.revealShot.estimateGas(secret);
+    } catch (estimateError) {
+      console.warn('Failed to estimate gas for clear, using default:', estimateError.message);
+      gasEstimate = 100000n;
+    }
+    
+    const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
+    
+    const tx = await contractWithSigner.revealShot(secret, {
+      gasLimit: gasLimit
+    });
+
+    const receipt = await tx.wait();
+    
+    return {
+      hash: receipt.hash,
+      receipt,
+      cleared: true
+    };
+  }
 };
 
 /**
