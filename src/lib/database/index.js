@@ -306,7 +306,7 @@ export const db = {
   // Winner operations
   async recordWinner(winnerData) {
     try {
-      console.log('🏆 Recording winner to Supabase with JWT authentication:', {
+      console.log('🏆 Recording winner to Supabase:', {
         winner_address: winnerData.winnerAddress.toLowerCase(),
         amount: winnerData.amount,
         tx_hash: winnerData.txHash,
@@ -316,43 +316,73 @@ export const db = {
         contract_address: winnerData.contractAddress
       });
 
-      // Validate JWT token before attempting database operation
+      // Try JWT authentication first
       const jwtToken = localStorage.getItem('ethshot_jwt_token');
       const storedWalletAddress = localStorage.getItem('ethshot_wallet_address');
       
-      if (!jwtToken || !storedWalletAddress) {
-        throw new Error('JWT authentication required to record winner. Please reconnect your wallet.');
-      }
+      if (jwtToken && storedWalletAddress && storedWalletAddress.toLowerCase() === winnerData.winnerAddress.toLowerCase()) {
+        try {
+          console.log('🔐 Attempting JWT authenticated winner recording...');
+          return await withAuthenticatedClient(async (client) => {
+            const { data, error } = await client
+              .from(TABLES.WINNERS)
+              .insert({
+                winner_address: winnerData.winnerAddress.toLowerCase(),
+                amount: winnerData.amount,
+                tx_hash: winnerData.txHash,
+                block_number: winnerData.blockNumber,
+                timestamp: winnerData.timestamp || new Date().toISOString(),
+                crypto_type: winnerData.cryptoType || 'ETH',
+                contract_address: winnerData.contractAddress
+              })
+              .select()
+              .single();
 
-      if (storedWalletAddress.toLowerCase() !== winnerData.winnerAddress.toLowerCase()) {
-        throw new Error('JWT token wallet address does not match winner address.');
-      }
-
-      return await withAuthenticatedClient(async (client) => {
-        const { data, error } = await client
-          .from(TABLES.WINNERS)
-          .insert({
-            winner_address: winnerData.winnerAddress.toLowerCase(),
-            amount: winnerData.amount,
-            tx_hash: winnerData.txHash,
-            block_number: winnerData.blockNumber,
-            timestamp: winnerData.timestamp || new Date().toISOString(),
-            crypto_type: winnerData.cryptoType || 'ETH',
-            contract_address: winnerData.contractAddress
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error('❌ Authenticated recordWinner error:', error);
-          throw error;
+            if (error) {
+              console.error('❌ Authenticated recordWinner error:', error);
+              throw error;
+            }
+            
+            console.log('✅ Winner recorded successfully with JWT authentication:', data);
+            return data;
+          });
+        } catch (jwtError) {
+          console.warn('⚠️ JWT authentication failed for winner recording, falling back to public insert:', jwtError.message);
         }
-        
-        console.log('✅ Winner recorded successfully with JWT authentication:', data);
-        return data;
-      });
+      } else {
+        console.log('ℹ️ No valid JWT token found, using public insert for winner recording');
+      }
+
+      // Fallback: Use public client for winner recording
+      // This ensures winners are recorded even without profiles
+      if (!supabase) {
+        throw new Error('Supabase not configured');
+      }
+
+      console.log('📝 Recording winner with public client (fallback)...');
+      const { data, error } = await supabase
+        .from(TABLES.WINNERS)
+        .insert({
+          winner_address: winnerData.winnerAddress.toLowerCase(),
+          amount: winnerData.amount,
+          tx_hash: winnerData.txHash,
+          block_number: winnerData.blockNumber,
+          timestamp: winnerData.timestamp || new Date().toISOString(),
+          crypto_type: winnerData.cryptoType || 'ETH',
+          contract_address: winnerData.contractAddress
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Public recordWinner error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Winner recorded successfully with public client:', data);
+      return data;
     } catch (error) {
-      console.error('❌ Error recording winner with JWT authentication:', error);
+      console.error('❌ Error recording winner:', error);
       throw error;
     }
   },

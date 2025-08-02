@@ -635,7 +635,7 @@ export const revealShot = async ({
       try {
         const { data, error } = await supabase.rpc('update_shot_on_reveal', {
           p_tx_hash: commitTxHash,
-          p_won: result.won,
+          p_won: result && result.won ? result.won : false,
           p_reveal_tx_hash: result.hash,
           p_reveal_block_number: result.receipt.blockNumber
         });
@@ -649,7 +649,7 @@ export const revealShot = async ({
               const { error: fallbackError } = await supabase
                 .from('shots')
                 .update({
-                  won: result.won,
+                  won: result && result.won ? result.won : false,
                   reveal_tx_hash: result.hash,
                   reveal_block_number: result.receipt.blockNumber,
                   reveal_timestamp: new Date().toISOString(),
@@ -678,7 +678,7 @@ export const revealShot = async ({
             const { error: fallbackError } = await supabase
               .from('shots')
               .update({
-                won: result.won,
+                won: result && result.won ? result.won : false,
                 reveal_tx_hash: result.hash,
                 reveal_block_number: result.receipt.blockNumber,
                 reveal_timestamp: new Date().toISOString(),
@@ -700,19 +700,28 @@ export const revealShot = async ({
       console.warn('Could not find commit transaction hash to update shot record');
     }
     
-    if (result.won) {
+    if (result && result.won) {
       // Record the winner in the winners table
-      await db.recordWinner({
-        winnerAddress: wallet.address,
-        amount: gameState.shotCost || '0.0005', // Use the shot cost
-        txHash: result.hash,
-        blockNumber: result.receipt.blockNumber,
-        timestamp: new Date().toISOString(),
-        cryptoType: gameState.activeCrypto,
-        contractAddress: gameState.contractAddress
-      });
+      // Get the actual pot amount from the game state, not just the shot cost
+      const winAmount = gameState.currentPot || gameState.shotCost || '0.0005';
       
-      console.log('✅ Winner recorded successfully');
+      try {
+        await db.recordWinner({
+          winnerAddress: wallet.address,
+          amount: winAmount,
+          txHash: result.hash,
+          blockNumber: result.receipt.blockNumber,
+          timestamp: new Date().toISOString(),
+          cryptoType: gameState.activeCrypto,
+          contractAddress: gameState.contractAddress
+        });
+        
+        console.log('✅ Winner recorded successfully with amount:', winAmount);
+      } catch (winnerRecordError) {
+        console.error('❌ Failed to record winner, but shot reveal was successful:', winnerRecordError);
+        // Don't throw here - the reveal was successful even if winner recording failed
+        // This ensures the shot is still marked as won in the database
+      }
     }
     
     console.log('✅ Database updated with reveal results');
