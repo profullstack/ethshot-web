@@ -837,6 +837,95 @@ export const revealShot = async ({
         });
         
         console.log('✅ Winner recorded successfully with amount:', winAmount);
+        
+        // Automatically trigger deposit reveal/withdrawal for winnings
+        updateStatus('withdrawing_winnings', 'Withdrawing your winnings...');
+        
+        try {
+          if (gameState.isMultiCryptoMode) {
+            // Multi-crypto mode: use adapter pattern
+            const adapter = getActiveAdapter();
+            if (adapter && adapter.withdrawWinnings) {
+              const withdrawResult = await adapter.withdrawWinnings(winAmount);
+              console.log('✅ Winnings withdrawn successfully via adapter:', withdrawResult);
+              result.withdrawResult = withdrawResult;
+            } else {
+              console.warn('No adapter available for automatic withdrawal');
+            }
+          } else {
+            // ETH-only mode: direct contract interaction for withdrawal
+            if (!contract || !ethers || !wallet.signer) {
+              console.warn('Contract or signer not available for automatic withdrawal');
+            } else {
+              const contractWithSigner = contract.connect(wallet.signer);
+              
+              // Estimate gas for withdrawal
+              let gasEstimate;
+              try {
+                gasEstimate = await contractWithSigner.withdraw.estimateGas();
+              } catch (estimateError) {
+                console.warn('Failed to estimate gas for withdrawal, using default:', estimateError.message);
+                gasEstimate = 100000n;
+              }
+              
+              const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
+              
+              // Get gas price
+              const feeData = await wallet.provider.getFeeData();
+              let gasPrice;
+              
+              if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+                gasPrice = feeData.maxFeePerGas;
+              } else if (feeData.gasPrice) {
+                gasPrice = feeData.gasPrice;
+              } else {
+                gasPrice = ethers.parseUnits('20', 'gwei');
+              }
+              
+              // Check balance for gas fees
+              const balance = await wallet.provider.getBalance(wallet.address);
+              const estimatedGasCost = Number(gasLimit) * Number(gasPrice);
+              const minRequiredBalance = BigInt(Math.floor(Number(estimatedGasCost) * 0.5));
+              
+              if (balance < minRequiredBalance) {
+                console.warn('Insufficient ETH for withdrawal gas fees');
+              } else {
+                const withdrawTx = await contractWithSigner.withdraw({
+                  gasLimit: gasLimit,
+                  maxFeePerGas: feeData.maxFeePerGas || gasPrice,
+                  maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || gasPrice
+                });
+                
+                const withdrawReceipt = await withdrawTx.wait();
+                
+                // Check if withdrawal was successful
+                if (withdrawReceipt.status === 1) {
+                  console.log('✅ Winnings withdrawn successfully:', withdrawReceipt.hash);
+                  result.withdrawResult = {
+                    hash: withdrawReceipt.hash,
+                    receipt: withdrawReceipt,
+                    success: true
+                  };
+                } else {
+                  console.error('❌ Withdrawal transaction failed');
+                  result.withdrawResult = {
+                    hash: withdrawReceipt.hash,
+                    receipt: withdrawReceipt,
+                    success: false,
+                    error: 'Withdrawal transaction failed'
+                  };
+                }
+              }
+            }
+          }
+        } catch (withdrawError) {
+          console.error('❌ Automatic withdrawal failed:', withdrawError);
+          result.withdrawResult = {
+            success: false,
+            error: withdrawError.message
+          };
+          // Don't throw here - the reveal was successful even if withdrawal failed
+        }
       } catch (winnerRecordError) {
         console.error('❌ Failed to record winner, but shot reveal was successful:', winnerRecordError);
         // Don't throw here - the reveal was successful even if winner recording failed
