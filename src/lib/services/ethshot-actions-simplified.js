@@ -865,7 +865,7 @@ export const revealShot = async ({
           winnerAddress: wallet.address,
           amount: winAmount,
           txHash: result.hash,
-          blockNumber: result.receipt.blockNumber,
+          blockNumber: result?.receipt?.blockNumber || null,
           timestamp: new Date().toISOString(),
           cryptoType: gameState.activeCrypto,
           contractAddress: gameState.contractAddress
