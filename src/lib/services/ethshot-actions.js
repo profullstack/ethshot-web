@@ -170,7 +170,8 @@ export const takeShot = async ({
     
     updateStatus('processing', 'Processing transaction result...');
     
-    // Check if this is a first shot (pot is empty) by checking the custom shot cost
+    // Check if this is a first shot (pot is empty) by checking if custom shot cost indicates a first shot
+    // First shot cost is typically different from regular shot cost, or we can check if pot is empty
     const isFirstShot = customShotCost && parseFloat(customShotCost) !== parseFloat(ethers.formatEther(shotCost));
     
     if (isFirstShot) {
@@ -652,8 +653,7 @@ export const revealShot = async ({
                   won: result && result.won ? result.won : false,
                   reveal_tx_hash: result.hash,
                   reveal_block_number: result.receipt.blockNumber,
-                  reveal_timestamp: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
+                  reveal_timestamp: new Date().toISOString()
                 })
                 .eq('tx_hash', commitTxHash);
               
@@ -681,8 +681,7 @@ export const revealShot = async ({
                 won: result && result.won ? result.won : false,
                 reveal_tx_hash: result.hash,
                 reveal_block_number: result.receipt.blockNumber,
-                reveal_timestamp: new Date().toISOString(),
-                updated_at: new Date().toISOString()
+                reveal_timestamp: new Date().toISOString()
               })
               .eq('tx_hash', commitTxHash);
             

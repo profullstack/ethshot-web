@@ -110,75 +110,108 @@ export const createGameActionHandlers = (dependencies) => {
       
       // Handle commit-only result (new approach with automatic reveal)
       if (result && result.isCommitOnly && result.secret && !result.isFirstShot) {
-        console.log('🎯 Regular shot committed successfully, waiting before automatic reveal...');
+        console.log('🎯 Regular shot committed successfully, attempting automatic reveal...');
         
-        // Wait a bit for blockchain state to update before attempting reveal
+        // Store the secret and hash for potential manual reveal
+        setPendingSecret(result.secret);
+        setPendingTxHash(result.hash);
+        
+        // Wait for blockchain state to update and attempt auto-reveal with retries
         handleStatusUpdate('waiting_reveal_window', 'Waiting for reveal window to open...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // Automatically reveal the shot
-        try {
-          console.log('🎯 Starting automatic reveal...');
-          const revealResult = await revealShot({
-            secret: result.secret,
-            gameState,
-            wallet,
-            contract: gameStore.getContract(),
-            ethers: gameStore.getEthers(),
-            loadGameState: gameStore.loadGameState,
-            loadPlayerData: gameStore.loadPlayerData,
-            onStatusUpdate: handleStatusUpdate
-          });
-          
-          console.log('✅ Shot revealed automatically:', revealResult);
-          
-          // Show appropriate message based on win/loss
-          if (revealResult && revealResult.won) {
-            toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
-            console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
-          } else {
-            toastStore.info('🎲 Shot completed - No win this time. Better luck next shot!');
-            console.log('🎲 Shot revealed - No win this time');
-          }
-          
-          // Reset transaction status after successful completion, but keep some info during cooldown
-          setTimeout(() => {
-            if (timeRemaining > 0) {
-              // If cooldown is active, show cooldown status instead of idle
-              setCooldownStatus(setTransactionStatus, setStatusMessage, setProgressPercentage, 
-                'Shot completed successfully! Cooldown active.', 100);
-            } else {
-              resetTransactionStatus(setTransactionStatus, setStatusMessage, setProgressPercentage, 0);
-            }
-          }, 2000);
-          
-        } catch (revealError) {
-          console.error('❌ Failed to automatically reveal shot:', revealError);
-          
-          // Fallback to manual reveal modal - with validation
-          console.log('🎯 Falling back to manual reveal modal');
-          console.log('🔍 Debug - result object:', result);
-          console.log('🔍 Debug - result.secret:', result.secret);
-          console.log('🔍 Debug - result.hash:', result.hash);
-          
-          // Validate that we have the necessary data for manual reveal
-          if (result.secret && result.hash) {
-            setPendingSecret(result.secret);
-            setPendingTxHash(result.hash);
-            setShowRevealModal(true);
-            toastStore.error('Shot committed but auto-reveal failed. Please reveal manually.');
-            console.log('✅ Manual reveal modal set up with secret and hash');
-          } else {
-            console.error('❌ Missing secret or hash for manual reveal:', {
-              hasSecret: !!result.secret,
-              hasHash: !!result.hash,
-              result
+        let autoRevealSuccess = false;
+        let retryCount = 0;
+        const maxRetries = 3;
+        const baseDelay = 5000; // Start with 5 seconds
+        
+        while (!autoRevealSuccess && retryCount < maxRetries) {
+          try {
+            // Progressive delay: 5s, 10s, 15s
+            const delay = baseDelay * (retryCount + 1);
+            console.log(`🎯 Auto-reveal attempt ${retryCount + 1}/${maxRetries}, waiting ${delay/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            
+            console.log('🎯 Starting automatic reveal...');
+            const revealResult = await revealShot({
+              secret: result.secret,
+              gameState,
+              wallet,
+              contract: gameStore.getContract(),
+              ethers: gameStore.getEthers(),
+              loadGameState: gameStore.loadGameState,
+              loadPlayerData: gameStore.loadPlayerData,
+              onStatusUpdate: handleStatusUpdate
             });
-            toastStore.error('Shot committed but auto-reveal failed and no secret available for manual reveal. Check debug panel for saved secrets.');
+            
+            console.log('✅ Shot revealed automatically:', revealResult);
+            autoRevealSuccess = true;
+            
+            // Clear the pending secret since reveal was successful
+            setPendingSecret(null);
+            setPendingTxHash(null);
+            
+            // Show appropriate message based on win/loss
+            if (revealResult && revealResult.won) {
+              toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
+              console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
+            } else {
+              toastStore.info('🎲 Shot completed - No win this time. Better luck next shot!');
+              console.log('🎲 Shot revealed - No win this time');
+            }
+            
+            // Reset transaction status after successful completion, but keep some info during cooldown
+            setTimeout(() => {
+              if (timeRemaining > 0) {
+                // If cooldown is active, show cooldown status instead of idle
+                setCooldownStatus(setTransactionStatus, setStatusMessage, setProgressPercentage,
+                  'Shot completed successfully! Cooldown active.', 100);
+              } else {
+                resetTransactionStatus(setTransactionStatus, setStatusMessage, setProgressPercentage, 0);
+              }
+            }, 2000);
+            
+          } catch (revealError) {
+            retryCount++;
+            console.error(`❌ Auto-reveal attempt ${retryCount} failed:`, revealError);
+            
+            if (retryCount >= maxRetries) {
+              console.error('❌ All auto-reveal attempts failed, falling back to manual reveal');
+              
+              // Fallback to manual reveal modal - with validation
+              console.log('🎯 Falling back to manual reveal modal');
+              console.log('🔍 Debug - result object:', result);
+              console.log('🔍 Debug - result.secret:', result.secret);
+              console.log('🔍 Debug - result.hash:', result.hash);
+              
+              // Validate that we have the necessary data for manual reveal
+              if (result.secret && result.hash) {
+                setShowRevealModal(true);
+                toastStore.error('❌\n\nShot committed but auto-reveal failed. Please reveal manually.');
+                console.log('✅ Manual reveal modal set up with secret and hash');
+              } else {
+                console.error('❌ Missing secret or hash for manual reveal:', {
+                  hasSecret: !!result.secret,
+                  hasHash: !!result.hash,
+                  result
+                });
+                toastStore.error('Shot committed but auto-reveal failed and no secret available for manual reveal. Check debug panel for saved secrets.');
+              }
+              
+              // Reset transaction status
+              setTimeout(() => {
+                if (timeRemaining > 0) {
+                  // If cooldown is active, show cooldown status instead of idle
+                  setCooldownStatus(setTransactionStatus, setStatusMessage, setProgressPercentage,
+                    'Shot committed but auto-reveal failed. Manual reveal required.', 52);
+                } else {
+                  resetTransactionStatus(setTransactionStatus, setStatusMessage, setProgressPercentage, 0);
+                }
+              }, 2000);
+            } else {
+              console.log(`🔄 Retrying auto-reveal in ${baseDelay * (retryCount + 1)/1000}s...`);
+              handleStatusUpdate('waiting_reveal_window', `Auto-reveal failed, retrying in ${baseDelay * (retryCount + 1)/1000}s... (${retryCount}/${maxRetries})`);
+            }
           }
-          
-          // Reset transaction status
-          resetTransactionStatus(setTransactionStatus, setStatusMessage, setProgressPercentage);
         }
       } else if (result && result.isCommitOnly && result.isFirstShot) {
         // First shot: no reveal needed, just adds to pot
@@ -232,7 +265,8 @@ export const createGameActionHandlers = (dependencies) => {
     const canTakeShot = getCanTakeShot();
     const contractDeployed = getContractDeployed();
     const isLoading = getIsLoading();
-    const currentPot = get(gameStore).currentPot;
+    const gameState = gameStore.getGameState();
+    const currentPot = gameState.currentPot;
     const gameError = getGameError();
 
     console.log('Debug info:', {
@@ -367,49 +401,88 @@ export const createGameActionHandlers = (dependencies) => {
   const handleRevealNow = async (pendingSecret) => {
     if (!pendingSecret) {
       toastStore.error('No secret available to reveal');
-      return;
+      return { success: false, error: 'No secret available' };
     }
 
-    console.log('🎯 Revealing shot with secret:', pendingSecret);
+    console.log('🎯 Manual reveal requested with secret:', pendingSecret);
     setRevealingShot(true);
     
     try {
-      const gameState = gameStore.getGameState();
-      const walletStoreInstance = gameStore.getWalletStore();
-      const wallet = get(walletStoreInstance);
+      // Retry logic for manual reveals too
+      let retryCount = 0;
+      const maxRetries = 2;
+      const retryDelay = 3000; // 3 seconds between retries
       
-      const result = await revealShot({
-        secret: pendingSecret,
-        gameState,
-        wallet,
-        contract: gameStore.getContract(),
-        ethers: gameStore.getEthers(),
-        loadGameState: gameStore.loadGameState,
-        loadPlayerData: gameStore.loadPlayerData
-      });
-      
-      console.log('✅ Shot revealed successfully:', result);
-      
-      // Show appropriate message based on win/loss
-      if (result && result.won) {
-        toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
-        console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
-      } else {
-        toastStore.info('🎲 Shot revealed - No win this time. Better luck next shot!');
-        console.log('🎲 Shot revealed - No win this time');
+      while (retryCount <= maxRetries) {
+        try {
+          if (retryCount > 0) {
+            console.log(`🔄 Manual reveal retry ${retryCount}/${maxRetries}, waiting ${retryDelay/1000}s...`);
+            toastStore.info(`Retrying reveal... (${retryCount}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
+          
+          const gameState = gameStore.getGameState();
+          const walletStoreInstance = gameStore.getWalletStore();
+          const wallet = get(walletStoreInstance);
+          
+          console.log('🎯 Attempting manual reveal...');
+          const result = await revealShot({
+            secret: pendingSecret,
+            gameState,
+            wallet,
+            contract: gameStore.getContract(),
+            ethers: gameStore.getEthers(),
+            loadGameState: gameStore.loadGameState,
+            loadPlayerData: gameStore.loadPlayerData,
+            onStatusUpdate: handleStatusUpdate
+          });
+          
+          console.log('✅ Shot revealed successfully via manual reveal:', result);
+          
+          // Show appropriate message based on win/loss
+          if (result && result.won) {
+            toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
+            console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
+          } else {
+            toastStore.info('🎲 Shot revealed - No win this time. Better luck next shot!');
+            console.log('🎲 Shot revealed - No win this time');
+          }
+          
+          // Remove the revealed secret from localStorage
+          const currentWallet = get(walletStore);
+          if (currentWallet.connected && currentWallet.address && result.receipt?.hash) {
+            removeRevealedSecret(currentWallet.address, result.receipt.hash);
+          }
+          
+          return { success: true, result };
+          
+        } catch (error) {
+          retryCount++;
+          console.error(`❌ Manual reveal attempt ${retryCount} failed:`, error);
+          
+          // Check if it's a "no pending shot" error and we should retry
+          const isPendingShotError = error.message?.includes('No pending shot') ||
+                                    error.message?.includes('pending shot') ||
+                                    error.message?.includes('reveal window');
+          
+          if (isPendingShotError && retryCount <= maxRetries) {
+            console.log('🔄 Pending shot error detected, will retry...');
+            continue; // Try again
+          } else if (retryCount > maxRetries) {
+            console.error('❌ All manual reveal attempts failed');
+            toastStore.error(`Failed to reveal shot after ${maxRetries + 1} attempts: ${error.message}`);
+            return { success: false, error };
+          } else {
+            // Non-retryable error
+            console.error('❌ Non-retryable error in manual reveal:', error);
+            toastStore.error('Failed to reveal shot: ' + error.message);
+            return { success: false, error };
+          }
+        }
       }
       
-      // Remove the revealed secret from localStorage
-      const currentWallet = get(walletStore);
-      if (currentWallet.connected && currentWallet.address && result.receipt?.hash) {
-        removeRevealedSecret(currentWallet.address, result.receipt.hash);
-      }
-      
-      return { success: true, result };
-    } catch (error) {
-      console.error('❌ Failed to reveal shot:', error);
-      toastStore.error('Failed to reveal shot: ' + error.message);
-      return { success: false, error };
+      // This should never be reached, but just in case
+      return { success: false, error: 'Unexpected error in reveal process' };
     } finally {
       setRevealingShot(false);
     }

@@ -521,10 +521,12 @@ export const db = {
     }
 
     try {
+      const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS || 'default';
+      
       const { data, error } = await supabase
         .from(TABLES.GAME_STATS)
         .upsert({
-          id: 1, // Single row for global stats
+          contract_address: contractAddress,
           total_shots: stats.totalShots,
           total_players: stats.totalPlayers,
           total_pot_won: stats.totalPotWon,
@@ -533,7 +535,7 @@ export const db = {
           last_win_amount: stats.lastWinAmount,
           updated_at: new Date().toISOString(),
         }, {
-          onConflict: 'id',
+          onConflict: 'contract_address',
         })
         .select()
         .single();
@@ -553,10 +555,12 @@ export const db = {
     }
 
     try {
+      const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS || 'default';
+      
       const { data, error } = await supabase
         .from(TABLES.GAME_STATS)
         .select('*')
-        .eq('id', 1)
+        .eq('contract_address', contractAddress)
         .limit(1);
 
       if (error) {

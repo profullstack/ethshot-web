@@ -103,11 +103,11 @@ export const getTopPlayers = async (limit = 10, orderBy = 'total_shots') => {
   try {
     const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS;
     
-    // Use the new flexible function that handles contract address filtering better
-    const { data, error } = await supabase.rpc('get_top_players_flexible', {
+    // Use the new contract-aware function
+    const { data, error } = await supabase.rpc('get_top_players_by_contract', {
+      p_contract_address: contractAddress || 'default',
       player_limit: limit,
-      order_by_field: orderBy,
-      filter_contract_address: contractAddress || null
+      order_by_field: orderBy
     });
 
     if (error) {
@@ -121,9 +121,11 @@ export const getTopPlayers = async (limit = 10, orderBy = 'total_shots') => {
         .order(orderBy, { ascending: false })
         .limit(limit);
 
-      // More flexible contract address filtering
+      // Contract address filtering
       if (contractAddress) {
-        query = query.or(`contract_address.eq.${contractAddress},contract_address.is.null`);
+        query = query.eq('contract_address', contractAddress);
+      } else {
+        query = query.or('contract_address.is.null,contract_address.eq.default');
       }
 
       const { data: fallbackData, error: fallbackError } = await query;
