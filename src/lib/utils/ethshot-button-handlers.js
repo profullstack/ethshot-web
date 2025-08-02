@@ -4,10 +4,10 @@
  */
 
 import { get } from 'svelte/store';
-import { takeShot, sponsorRound, revealShot, cleanupExpiredPendingShot } from '../services/game-actions.js';
+import { takeShot, sponsorRound, revealShot, cleanupExpiredPendingShot } from '../services/ethshot-actions.js';
 import { GAME_CONFIG, NETWORK_CONFIG } from '../config.js';
-import { saveSecretToStorage, removeRevealedSecret, copySecretToClipboard } from './game-button-storage.js';
-import { resetTransactionStatus, setCooldownStatus } from './game-button-utils.js';
+import { saveSecretToStorage, removeRevealedSecret, copySecretToClipboard } from './ethshot-button-storage.js';
+import { resetTransactionStatus, setCooldownStatus } from './ethshot-button-utils.js';
 
 /**
  * Create game action handlers

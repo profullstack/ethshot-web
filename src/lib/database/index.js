@@ -288,9 +288,9 @@ export const db = {
         .order('timestamp', { ascending: false })
         .limit(limit);
 
-      // Filter by contract address if available
+      // More flexible contract address filtering - include NULL addresses for backward compatibility
       if (contractAddress) {
-        query = query.eq('contract_address', contractAddress);
+        query = query.or(`contract_address.eq.${contractAddress},contract_address.is.null`);
       }
 
       const { data, error } = await query;
@@ -372,9 +372,9 @@ export const db = {
         .order('timestamp', { ascending: false })
         .limit(limit);
 
-      // Filter by contract address if available
+      // More flexible contract address filtering - include NULL addresses for backward compatibility
       if (contractAddress) {
-        query = query.eq('contract_address', contractAddress);
+        query = query.or(`contract_address.eq.${contractAddress},contract_address.is.null`);
       }
 
       const { data, error } = await query;

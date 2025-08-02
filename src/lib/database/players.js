@@ -103,26 +103,42 @@ export const getTopPlayers = async (limit = 10, orderBy = 'total_shots') => {
   try {
     const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS;
     
-    let query = supabase
-      .from(TABLES.PLAYERS)
-      .select('*')
-      .order(orderBy, { ascending: false })
-      .limit(limit);
-
-    // Filter by contract address if available
-    if (contractAddress) {
-      query = query.eq('contract_address', contractAddress);
-    }
-
-    const { data, error } = await query;
+    // Use the new flexible function that handles contract address filtering better
+    const { data, error } = await supabase.rpc('get_top_players_flexible', {
+      player_limit: limit,
+      order_by_field: orderBy,
+      filter_contract_address: contractAddress || null
+    });
 
     if (error) {
-      console.warn('Supabase getTopPlayers query error (expected if no data yet):', error);
-      return [];
+      console.warn('Supabase getTopPlayers RPC error, falling back to direct query:', error);
+      
+      // Fallback to direct query if RPC fails
+      let query = supabase
+        .from(TABLES.PLAYERS)
+        .select('*')
+        .gt('total_shots', 0)  // Only include players with shots
+        .order(orderBy, { ascending: false })
+        .limit(limit);
+
+      // More flexible contract address filtering
+      if (contractAddress) {
+        query = query.or(`contract_address.eq.${contractAddress},contract_address.is.null`);
+      }
+
+      const { data: fallbackData, error: fallbackError } = await query;
+      
+      if (fallbackError) {
+        console.warn('Fallback getTopPlayers query also failed:', fallbackError);
+        return [];
+      }
+      
+      return fallbackData || [];
     }
+    
     return data || [];
   } catch (error) {
-    console.warn('Error fetching top players (expected if no data yet):', error);
+    console.warn('Error fetching top players:', error);
     return [];
   }
 };

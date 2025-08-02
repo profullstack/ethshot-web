@@ -5,7 +5,7 @@
   import { shotResultMessageStore, hideShotResultMessage } from '$lib/stores/shot-result-message.js';
   import { debugMode } from '$lib/stores/debug.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatCooldownTime } from '$lib/config.js';
-  import GameButton from '$lib/components/GameButton.svelte';
+  import EthShotGameButton from '$lib/components/EthShotGameButton.svelte';
   import PotDisplay from '$lib/components/PotDisplay.svelte';
   import Leaderboard from '$lib/components/Leaderboard.svelte';
   import SponsorBanner from '$lib/components/SponsorBanner.svelte';
@@ -152,7 +152,7 @@
         <!-- Game Button -->
         <div class="flex justify-center space-x-4">
           {#if $walletStore.connected}
-            <GameButton />
+            <EthShotGameButton />
             {#if $gameStore.availableDiscounts?.length > 0}
               <DiscountButton />
             {/if}

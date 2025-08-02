@@ -1,6 +1,6 @@
 <script>
   import { GAME_CONFIG, formatEth } from '../config.js';
-  import { formatTime } from '../utils/game-button-utils.js';
+  import { formatTime } from '../utils/ethshot-button-utils.js';
 
   // Props
   export let contractDeployed;

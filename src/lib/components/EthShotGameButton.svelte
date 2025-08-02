@@ -17,18 +17,18 @@
     resetTransactionStatus,
     setCooldownStatus,
     formatTime
-  } from '../utils/game-button-utils.js';
-  import { createGameActionHandlers } from '../utils/game-button-handlers.js';
-  import { checkForSavedSecrets } from '../utils/game-button-storage.js';
-  import { cleanupExpiredPendingShot } from '../services/game-actions.js';
+  } from '../utils/ethshot-button-utils.js';
+  import { createGameActionHandlers } from '../utils/ethshot-button-handlers.js';
+  import { checkForSavedSecrets } from '../utils/ethshot-button-storage.js';
+  import { cleanupExpiredPendingShot } from '../services/ethshot-actions.js';
 
   // Import sub-components
-  import MainGameButton from './MainGameButton.svelte';
-  import StatusBar from './StatusBar.svelte';
-  import GameStats from './GameStats.svelte';
-  import ErrorMessage from './ErrorMessage.svelte';
-  import RevealModal from './RevealModal.svelte';
-  import DebugPanel from './DebugPanel.svelte';
+  import EthShotMainButton from './EthShotMainButton.svelte';
+  import EthShotStatusBar from './EthShotStatusBar.svelte';
+  import EthShotGameStats from './EthShotGameStats.svelte';
+  import EthShotErrorMessage from './EthShotErrorMessage.svelte';
+  import EthShotRevealModal from './EthShotRevealModal.svelte';
+  import EthShotDebugPanel from './EthShotDebugPanel.svelte';
 
   console.log('✅ GameButton imports loaded successfully');
 
@@ -423,7 +423,7 @@
 
 <div class="flex flex-col items-center space-y-6">
   <!-- Main Game Button -->
-  <MainGameButton
+  <EthShotMainButton
     {contractDeployed}
     isConnected={$isConnected}
     isCorrectNetwork={$isCorrectNetwork}
@@ -445,7 +445,7 @@
   />
 
   <!-- Status Bar -->
-  <StatusBar
+  <EthShotStatusBar
     {isLoadingState}
     {isCooldownState}
     {progressPercentage}
@@ -458,13 +458,13 @@
   />
 
   <!-- Game Stats -->
-  <GameStats />
+  <EthShotGameStats />
 
   <!-- Error Message -->
-  <ErrorMessage gameError={$gameError} {contractDeployed} />
+  <EthShotErrorMessage gameError={$gameError} {contractDeployed} />
 
   <!-- Debug Panel -->
-  <DebugPanel
+  <EthShotDebugPanel
     isConnected={$isConnected}
     debugMode={$debugMode}
     canTakeShot={$canTakeShot}
@@ -487,7 +487,7 @@
 </div>
 
 <!-- Reveal Confirmation Modal -->
-<RevealModal
+<EthShotRevealModal
   {showRevealModal}
   {pendingSecret}
   {pendingTxHash}

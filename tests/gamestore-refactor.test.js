@@ -45,7 +45,7 @@ describe('Game Store Refactor Architecture', () => {
   describe('Service Layer Separation', () => {
     it('should have separate service modules for different concerns', async () => {
       // Test that service modules exist and export expected functions
-      const gameActions = await import('../src/lib/services/game-actions.js');
+      const gameActions = await import('../src/lib/services/ethshot-actions.js');
       const socialActions = await import('../src/lib/services/social-actions.js');
       const notificationService = await import('../src/lib/services/notification-service.js');
       const referralService = await import('../src/lib/services/referral-service.js');
@@ -119,7 +119,7 @@ describe('Game Store Refactor Architecture', () => {
 
   describe('Service Function Parameters', () => {
     it('should require explicit parameters instead of accessing store directly', async () => {
-      const gameActions = await import('../src/lib/services/game-actions.js');
+      const gameActions = await import('../src/lib/services/ethshot-actions.js');
       
       // Test that takeShot requires explicit parameters
       const mockParams = {

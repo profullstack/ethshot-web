@@ -27,9 +27,18 @@
       
       // Collect all unique addresses from players, shots, and winners
       const allAddresses = new Set();
-      topPlayers.forEach(player => allAddresses.add(player.address));
-      recentShots.forEach(shot => allAddresses.add(shot.player_address));
-      recentWinners.forEach(winner => allAddresses.add(winner.player_address));
+      topPlayers.forEach(player => {
+        const address = player.address || player.wallet_address;
+        if (address) allAddresses.add(address);
+      });
+      recentShots.forEach(shot => {
+        if (shot.player_address) allAddresses.add(shot.player_address);
+      });
+      recentWinners.forEach(winner => {
+        if (winner.player_address || winner.winner_address) {
+          allAddresses.add(winner.player_address || winner.winner_address);
+        }
+      });
       
       // Fetch user profiles for all addresses
       if (allAddresses.size > 0) {
@@ -51,6 +60,7 @@
 
   // Get profile for a player
   function getPlayerProfile(address) {
+    if (!address) return null;
     return userProfiles.get(address.toLowerCase()) || null;
   }
 
@@ -141,8 +151,8 @@
                 </td>
                 <td class="px-6 py-4">
                   <UserDisplay
-                    walletAddress={player.address}
-                    profile={getPlayerProfile(player.address)}
+                    walletAddress={player.address || player.wallet_address}
+                    profile={getPlayerProfile(player.address || player.wallet_address)}
                     size="sm"
                     showAddress={true}
                   />
@@ -207,8 +217,8 @@
                   <tr class="hover:bg-gray-700/30 transition-colors">
                     <td class="px-6 py-4">
                       <UserDisplay
-                        walletAddress={winner.player_address}
-                        profile={getPlayerProfile(winner.player_address)}
+                        walletAddress={winner.player_address || winner.winner_address}
+                        profile={getPlayerProfile(winner.player_address || winner.winner_address)}
                         size="sm"
                         showAddress={true}
                       />
