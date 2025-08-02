@@ -208,7 +208,7 @@ export const takeShot = async ({
         totalShots: gameState.totalShots + 1,
         lastShotTime: new Date().toISOString(),
         canShoot: false,
-        cooldownUntil: new Date(Date.now() + parseInt(GAME_CONFIG.COOLDOWN_PERIOD)).toISOString()
+        cooldownUntil: new Date(Date.now() + (parseInt(GAME_CONFIG.COOLDOWN_PERIOD) || 60000)).toISOString()
       });
       
       // Load updated player data
@@ -319,7 +319,7 @@ export const takeShot = async ({
       totalShots: gameState.totalShots + 1,
       lastShotTime: new Date().toISOString(),
       canShoot: false,
-      cooldownUntil: new Date(Date.now() + parseInt(GAME_CONFIG.COOLDOWN_PERIOD)).toISOString()
+      cooldownUntil: new Date(Date.now() + (parseInt(GAME_CONFIG.COOLDOWN_PERIOD) || 60000)).toISOString()
     });
 
     updateStatus('refreshing_state', 'Refreshing game state...');
