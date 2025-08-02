@@ -1,0 +1,34 @@
+flowchart TD
+  A([Idle]) --> B{Wallet Connected?}
+  B -- No --> C[Prompt to Connect Wallet] --> END
+  B -- Yes --> D[Show 'Play' Button]
+  D --> E[Check for Pending Shot]
+  E -- Yes --> F[Show Pending Shot State]
+  F --> G{Reveal Window Open?}
+  G -- Yes --> H[Prompt for Secret to Reveal]
+  H --> I[User Enters Secret & Clicks Reveal]
+  I --> J[Reveal in Progress (Loading UI)]
+  J --> K{Reveal Success?}
+  K -- No --> L[Show Error Message (Toast/UI)] --> M[Allow Retry or Reset] --> END
+  K -- Yes --> N{User Wins?}
+  N -- Yes --> O[Show Win Message (Toasts/Banners)] --> P[Show Win Amount & Allow New Shot] --> Q[Reset State] --> END
+  N -- No --> R[Show Loss Message (Toast/Feedback)] --> S[Allow New Shot] --> Q
+  G -- No --> T[Show Countdown to Reveal Window]
+  T --> U{Reveal Window Expires?}
+  U -- No --> V[Wait for Reveal Window] --> G
+  U -- Yes --> W[Show Expired Shot State]
+  W --> X[Prompt for Cleanup]
+  X --> Y[Cleanup in Progress (Loading UI)]
+  Y --> AA{Cleanup Success?}
+  AA -- Yes --> AB[Allow New Shot] --> Q
+  AA -- No --> AC[Show Cleanup Error (UI/Toast)] --> END
+  E -- No --> AD[Ready to Play]
+  AD --> AE[User Clicks 'Take Shot']
+  AE --> AF[Prompt for Commitment (Secret Input)]
+  AF --> AG[Send Commit Transaction (Loading UI)]
+  AG --> AH{Commit Success?}
+  AH -- Yes --> F
+  AH -- No --> AI[Show Commit Error (Toast/UI)] --> AJ[Allow Retry] --> END
+
+  classDef endStyle fill:#f99,stroke:#333,stroke-width:2px;
+  class END endStyle;

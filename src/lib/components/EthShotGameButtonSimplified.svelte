@@ -1,5 +1,5 @@
 <script>
-  console.log('🔧 GameButton component loading...');
+  console.log('🔧 Simplified GameButton component loading...');
   
   import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError, currentPot } from '../stores/game/index.js';
   import { walletStore, isConnected, isCorrectNetwork } from '../stores/wallet.js';
@@ -18,7 +18,7 @@
     setCooldownStatus,
     formatTime
   } from '../utils/ethshot-button-utils.js';
-  import { createGameActionHandlers } from '../utils/ethshot-button-handlers.js';
+  import { createGameActionHandlers } from '../utils/ethshot-button-handlers-simplified.js';
 
   // Import sub-components
   import EthShotMainButton from './EthShotMainButton.svelte';
@@ -27,7 +27,7 @@
   import EthShotErrorMessage from './EthShotErrorMessage.svelte';
   import EthShotDebugPanel from './EthShotDebugPanel.svelte';
 
-  console.log('✅ GameButton imports loaded successfully');
+  console.log('✅ Simplified GameButton imports loaded successfully');
 
   // State variables
   let timeRemaining = 0;
@@ -107,29 +107,6 @@
     }
   };
 
-  const handleDeepDebug = async () => {
-    console.log('🔍 Deep contract debugging...');
-    const wallet = get(walletStore);
-    if (!wallet.connected || !wallet.address) {
-      toastStore.error('Wallet not connected');
-      return;
-    }
-
-    try {
-      // Access the contract directly for debugging
-      const gameState = get(gameStore);
-      console.log('🔍 Current game state:', {
-        contractDeployed: $contractDeployed,
-        isLoading: $isLoading,
-        gameError: $gameError
-      });
-
-    } catch (error) {
-      console.error('❌ Deep debug failed:', error);
-      toastStore.error('Debug failed: ' + error.message);
-    }
-  };
-
   // Reactive statements
   $: timeRemaining = $cooldownRemaining;
   $: if (timeRemaining > 0 && !cooldownTimer) {
@@ -165,7 +142,7 @@
       (status) => transactionStatus = status,
       (message) => statusMessage = message,
       (percentage) => progressPercentage = percentage,
-      `Shot committed successfully! Cooldown: ${Math.ceil(timeRemaining / 1000)}s remaining`,
+      `Shot completed successfully! Cooldown: ${Math.ceil(timeRemaining / 1000)}s remaining`,
       calculateCooldownProgress(timeRemaining)
     );
   } else if (timeRemaining <= 0 && transactionStatus === 'cooldown') {
@@ -179,19 +156,19 @@
 
   // Update cooldown message dynamically
   $: if (transactionStatus === 'cooldown' && timeRemaining > 0) {
-    statusMessage = `Shot committed successfully! Cooldown: ${Math.ceil(timeRemaining / 1000)}s remaining`;
+    statusMessage = `Shot completed successfully! Cooldown: ${Math.ceil(timeRemaining / 1000)}s remaining`;
     progressPercentage = calculateCooldownProgress(timeRemaining);
   }
 
   onMount(() => {
-    console.log('🔧 GameButton onMount called');
+    console.log('🔧 Simplified GameButton onMount called');
     console.log('🔧 Cooldown remaining:', $cooldownRemaining);
     
     if ($cooldownRemaining > 0) {
       cooldownTimer.start();
     }
     
-    console.log('✅ GameButton component mounted successfully');
+    console.log('✅ Simplified GameButton component mounted successfully');
   });
 
   onDestroy(() => {
@@ -250,7 +227,6 @@
     currentPot={$currentPot}
     isLoading={$isLoading}
     onManualRefresh={handleManualRefresh}
-    onDeepDebug={handleDeepDebug}
   />
 
   <!-- Risk Warning -->

@@ -1,0 +1,63 @@
+@startuml
+start
+
+:Idle;
+:Prompt user to connect wallet;
+if (Wallet Connected?) then (yes)
+  :Show 'Play' button;
+  :Check for pending shot;
+  if (Has Pending Shot?) then (yes)
+    :Show pending shot state;
+    if (Reveal Window Open?) then (yes)
+      :Prompt for secret to reveal;
+      :User enters secret and clicks 'Reveal';
+      :Reveal in progress (loading UI);
+      if (Reveal Success) then (yes)
+        if (User Wins?) then (yes)
+          :Show win message (toasts, banners, etc);
+          :Show win amount and allow new shot;
+          :Reset state;
+        else (no)
+          :Show loss message (toasts, feedback);
+          :Allow new shot;
+          :Reset state;
+        endif
+      else (no)
+        :Show error message (toast, UI);
+        :Allow retry or reset;
+      endif
+    else (no)
+      :Show countdown to reveal window;
+      if (Reveal Window Expires) then (yes)
+        :Show expired shot state;
+        :Prompt for cleanup;
+        :Cleanup in progress (loading UI);
+        if (Cleanup Success) then (yes)
+          :Allow new shot;
+          :Reset state;
+        else (no)
+          :Show cleanup error (UI, toast);
+        endif
+      else (no)
+        :Wait for reveal window;
+      endif
+    endif
+  else (no)
+    :Ready to play;
+    :User clicks 'Take Shot';
+    :Prompt for commitment (secret input);
+    :Send commit transaction (loading UI);
+    if (Commit Success) then (yes)
+      :Show pending shot state;
+      :Wait for reveal window;
+    else (no)
+      :Show commit error (toast, UI);
+      :Allow retry;
+    endif
+  endif
+else (no)
+  :Prompt to connect wallet (UI, toast);
+endif
+
+stop
+@enduml

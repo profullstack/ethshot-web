@@ -6,6 +6,7 @@
   import { debugMode } from '$lib/stores/debug.js';
   import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatCooldownTime } from '$lib/config.js';
   import EthShotGameButton from '$lib/components/EthShotGameButton.svelte';
+  import EthShotGameButtonSimplified from '$lib/components/EthShotGameButtonSimplified.svelte';
   import PotDisplay from '$lib/components/PotDisplay.svelte';
   import Leaderboard from '$lib/components/Leaderboard.svelte';
   import SponsorBanner from '$lib/components/SponsorBanner.svelte';
@@ -152,7 +153,7 @@
         <!-- Game Button -->
         <div class="flex justify-center space-x-4">
           {#if $walletStore.connected}
-            <EthShotGameButton />
+            <EthShotGameButtonSimplified />
             {#if $gameStore.availableDiscounts?.length > 0}
               <DiscountButton />
             {/if}

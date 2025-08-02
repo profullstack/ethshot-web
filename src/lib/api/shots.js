@@ -101,9 +101,3 @@ export class ShotsAPI extends BaseApiClient {
 
 // Create and export default instance
 export const shotsAPI = new ShotsAPI();
-
-// Export convenience functions
-export const {
-  recordShot,
-  recordWinner
-} = shotsAPI;

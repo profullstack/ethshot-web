@@ -171,11 +171,3 @@ export class ProfileAPI extends BaseApiClient {
 
 // Create and export default instance
 export const profileAPI = new ProfileAPI();
-
-// Export convenience functions
-export const {
-  upsertProfile,
-  getProfile,
-  checkNicknameAvailability,
-  getProfiles
-} = profileAPI;

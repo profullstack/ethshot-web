@@ -238,8 +238,5 @@ export class BaseApiClient {
 // Create default API client instance
 export const apiClient = new BaseApiClient();
 
-// Export convenience methods
-export const { get: apiGet, post: apiPost, put: apiPut, delete: apiDelete } = apiClient;
-
 // Export the base class for extension
 export { BaseApiClient as APIClient };

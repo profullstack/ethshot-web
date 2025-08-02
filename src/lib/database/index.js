@@ -72,10 +72,10 @@ export const db = {
       });
 
       // Import the API client for making authenticated requests
-      const { apiPost } = await import('../api/base.js');
+      const { apiClient } = await import('../api/base.js');
 
       // Make authenticated API call to record the shot
-      const response = await apiPost('/api/shots', {
+      const response = await apiClient.post('/api/shots', {
         action: 'record_shot',
         playerAddress: shotData.playerAddress,
         amount: shotData.amount,
