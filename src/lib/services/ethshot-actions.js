@@ -738,7 +738,7 @@ export const revealShot = async ({
   await loadGameState();
   await loadPlayerData(wallet.address);
 
-  updateStatus('reveal_completed', won ? 'Congratulations! You won!' : 'Shot revealed - Better luck next time!');
+  updateStatus('reveal_completed', result && result.won ? 'Congratulations! You won!' : 'Shot revealed - Better luck next time!');
 
   return result;
 };
