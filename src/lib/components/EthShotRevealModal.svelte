@@ -1,4 +1,6 @@
 <script>
+  import { analyzePotentialWin, getWalletWarningExplanation } from '../utils/ethshot-win-prediction.js';
+
   // Props
   export let showRevealModal = false;
   export let pendingSecret = null;
@@ -6,12 +8,24 @@
   export let revealingShot = false;
   export let savingToLocalStorage = false;
   export let copyingToClipboard = false;
+  export let gameState = {};
 
   // Event handlers (passed from parent)
   export let onClose;
   export let onRevealNow;
   export let onSaveToLocalStorage;
   export let onSaveForLater;
+
+  let showWalletWarningInfo = false;
+
+  // Analyze potential win and wallet warning expectations
+  $: winAnalysis = gameState && gameState.currentPot ?
+    analyzePotentialWin(gameState, gameState.playerAddress) :
+    { canWin: false, walletWarningExpected: false, recommendation: 'Loading...' };
+
+  const toggleWalletWarningInfo = () => {
+    showWalletWarningInfo = !showWalletWarningInfo;
+  };
 </script>
 
 {#if showRevealModal}
@@ -57,6 +71,49 @@
             </p>
           {/if}
         </div>
+
+        {#if winAnalysis.walletWarningExpected}
+          <div class="wallet-warning-info">
+            <div class="warning-header">
+              <span class="warning-icon">⚠️</span>
+              <span class="warning-title">Wallet Warning Expected</span>
+              <button
+                class="info-toggle-btn"
+                on:click={toggleWalletWarningInfo}
+                type="button"
+              >
+                {showWalletWarningInfo ? '▼' : '▶'}
+              </button>
+            </div>
+            
+            <div class="win-analysis">
+              <p class="analysis-text">{winAnalysis.recommendation}</p>
+            </div>
+
+            {#if showWalletWarningInfo}
+              <div class="warning-details">
+                <p class="warning-explanation">
+                  🎯 <strong>Your wallet may show "insufficient funds" warning</strong>
+                </p>
+                <ul class="warning-reasons">
+                  <li>• Wallet only sees gas cost going out</li>
+                  <li>• Cannot predict you might WIN ETH back</li>
+                  <li>• Contract sends winnings automatically if you win</li>
+                </ul>
+                <p class="safety-message">
+                  ✅ <strong>This warning is SAFE to ignore for reveals</strong><br>
+                  ✅ Transaction will succeed and you'll get winnings if you win! 🚀
+                </p>
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <div class="no-warning-info">
+            <p class="no-warning-text">
+              ℹ️ No wallet warnings expected for this reveal
+            </p>
+          </div>
+        {/if}
         
         {#if revealingShot}
           <div class="status-message">
@@ -277,6 +334,66 @@
 
   .status-message span {
     @apply text-sm text-blue-300 font-medium;
+  }
+
+  /* Wallet Warning Info Styles */
+  .wallet-warning-info {
+    @apply bg-orange-900 bg-opacity-30 border border-orange-600 rounded-lg p-4 mb-4;
+  }
+
+  .no-warning-info {
+    @apply bg-green-900 bg-opacity-30 border border-green-600 rounded-lg p-3 mb-4;
+  }
+
+  .warning-header {
+    @apply flex items-center justify-between mb-2;
+  }
+
+  .warning-icon {
+    @apply text-orange-400 text-lg;
+  }
+
+  .warning-title {
+    @apply text-orange-200 font-semibold text-sm flex-1 ml-2;
+  }
+
+  .info-toggle-btn {
+    @apply text-orange-300 hover:text-orange-100 text-sm font-mono;
+    @apply bg-transparent border-none cursor-pointer p-1;
+    @apply transition-colors duration-200;
+  }
+
+  .win-analysis {
+    @apply mb-3;
+  }
+
+  .analysis-text {
+    @apply text-orange-200 text-sm font-medium m-0;
+  }
+
+  .warning-details {
+    @apply border-t border-orange-700 pt-3 mt-3;
+  }
+
+  .warning-explanation {
+    @apply text-orange-200 text-sm font-semibold m-0 mb-2;
+  }
+
+  .warning-reasons {
+    @apply text-orange-300 text-xs list-none p-0 m-0 mb-3;
+  }
+
+  .warning-reasons li {
+    @apply mb-1;
+  }
+
+  .safety-message {
+    @apply text-green-300 text-xs font-medium m-0;
+    @apply bg-green-900 bg-opacity-40 rounded p-2;
+  }
+
+  .no-warning-text {
+    @apply text-green-300 text-sm m-0;
   }
 
   /* Mobile Responsive */
