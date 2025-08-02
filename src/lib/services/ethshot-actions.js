@@ -242,8 +242,8 @@ export const takeShot = async ({
       await db.recordShot({
         playerAddress: wallet.address,
         amount: displayAmount,
-        txHash: result.hash,
-        blockNumber: result.receipt.blockNumber,
+        txHash: result?.hash || null,
+        blockNumber: result?.receipt?.blockNumber || null,
         timestamp: new Date().toISOString(),
         won: false, // Will be updated when revealed
         cryptoType: gameState.activeCrypto,
@@ -405,8 +405,8 @@ export const sponsorRound = async ({
       logoUrl,
       sponsorUrl,
       amount: ethers.formatEther(Number(sponsorCost)),
-      txHash: result.hash,
-      blockNumber: result.receipt.blockNumber,
+      txHash: result?.hash || null,
+      blockNumber: result?.receipt?.blockNumber || null,
       timestamp: new Date().toISOString(),
       active: true,
       cryptoType: gameState.activeCrypto
@@ -658,8 +658,8 @@ export const revealShot = async ({
         const { data, error } = await supabase.rpc('update_shot_on_reveal', {
           p_tx_hash: commitTxHash,
           p_won: result && result.won ? result.won : false,
-          p_reveal_tx_hash: result.hash,
-          p_reveal_block_number: result.receipt.blockNumber
+          p_reveal_tx_hash: result?.hash || null,
+          p_reveal_block_number: result?.receipt?.blockNumber || null
         });
         
         if (error) {
@@ -672,8 +672,8 @@ export const revealShot = async ({
                 .from('shots')
                 .update({
                   won: result && result.won ? result.won : false,
-                  reveal_tx_hash: result.hash,
-                  reveal_block_number: result.receipt.blockNumber,
+                  reveal_tx_hash: result?.hash || null,
+                  reveal_block_number: result?.receipt?.blockNumber || null,
                   reveal_timestamp: new Date().toISOString()
                 })
                 .eq('tx_hash', commitTxHash);
@@ -700,8 +700,8 @@ export const revealShot = async ({
               .from('shots')
               .update({
                 won: result && result.won ? result.won : false,
-                reveal_tx_hash: result.hash,
-                reveal_block_number: result.receipt.blockNumber,
+                reveal_tx_hash: result?.hash || null,
+                reveal_block_number: result?.receipt?.blockNumber || null,
                 reveal_timestamp: new Date().toISOString()
               })
               .eq('tx_hash', commitTxHash);
