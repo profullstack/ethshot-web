@@ -480,21 +480,21 @@ export const revealShot = async ({
     // Check if user has a pending shot with retry logic
     let hasPending = false;
     let retryCount = 0;
-    const maxRetries = 5;
+    const maxRetries = 3; // Reduced retries to prevent UI hanging
     
     while (!hasPending && retryCount < maxRetries) {
       try {
         hasPending = await contract.hasPendingShot(wallet.address);
         if (!hasPending) {
-          console.log(`Retry ${retryCount + 1}/${maxRetries}: No pending shot found, waiting 2 seconds...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          console.log(`Retry ${retryCount + 1}/${maxRetries}: No pending shot found, waiting 1 second...`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced wait time
           retryCount++;
         }
       } catch (error) {
         console.error(`Error checking pending shot (retry ${retryCount + 1}):`, error);
         retryCount++;
         if (retryCount < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced wait time
         }
       }
     }
@@ -512,7 +512,14 @@ export const revealShot = async ({
         console.error('Failed to get debug info:', debugError);
       }
       
-      throw new Error('No pending shot found to reveal. The commit transaction may still be processing, or the reveal window may have expired. Please wait a moment and try again.');
+      // Instead of throwing an error that might hang the UI, return a specific result
+      console.log('No pending shot found after retries - returning early');
+      return {
+        hash: null,
+        receipt: null,
+        won: false,
+        noPendingShot: true
+      };
     }
 
     updateStatus('estimating_reveal_gas', 'Estimating gas for reveal...');

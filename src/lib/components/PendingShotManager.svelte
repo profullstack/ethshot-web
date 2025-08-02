@@ -61,7 +61,7 @@
 
     loading = true;
     try {
-      await revealShot({
+      const result = await revealShot({
         secret: secret.trim(),
         state,
         contract,
@@ -74,6 +74,14 @@
         walletStore
       });
       
+      // Handle case where no pending shot was found
+      if (result && result.noPendingShot) {
+        toastStore.info('No pending shot found to reveal. You may have already revealed this shot or the reveal window has expired.');
+        console.log('No pending shot found to reveal');
+        await checkPendingShot();
+        return;
+      }
+      
       // Clear the secret and hide input
       secret = '';
       showSecretInput = false;
@@ -82,6 +90,7 @@
       await checkPendingShot();
     } catch (error) {
       console.error('Failed to reveal shot:', error);
+      toastStore.error('Failed to reveal shot: ' + error.message);
     } finally {
       loading = false;
     }

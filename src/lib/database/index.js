@@ -60,7 +60,7 @@ export const db = {
   // Shot operations
   async recordShot(shotData) {
     try {
-      console.log('🎯 Recording shot to Supabase:', {
+      console.log('🎯 Recording shot via secure API:', {
         player_address: shotData.playerAddress.toLowerCase(),
         amount: shotData.amount,
         won: shotData.won || false,
@@ -71,75 +71,36 @@ export const db = {
         contract_address: shotData.contractAddress
       });
 
-      // Try JWT authentication first
-      const jwtToken = localStorage.getItem('ethshot_jwt_token');
-      const storedWalletAddress = localStorage.getItem('ethshot_wallet_address');
-      
-      if (jwtToken && storedWalletAddress && storedWalletAddress.toLowerCase() === shotData.playerAddress.toLowerCase()) {
-        try {
-          console.log('🔐 Attempting JWT authenticated shot recording...');
-          return await withAuthenticatedClient(async (client) => {
-            const { data, error } = await client
-              .from(TABLES.SHOTS)
-              .insert({
-                player_address: shotData.playerAddress.toLowerCase(),
-                amount: shotData.amount,
-                won: shotData.won || false,
-                tx_hash: shotData.txHash,
-                block_number: shotData.blockNumber,
-                timestamp: shotData.timestamp || new Date().toISOString(),
-                crypto_type: shotData.cryptoType || 'ETH',
-                contract_address: shotData.contractAddress
-              })
-              .select()
-              .single();
+      // Import the API client for making authenticated requests
+      const { apiPost } = await import('../api/base.js');
 
-            if (error) {
-              console.error('❌ Authenticated recordShot error:', error);
-              throw error;
-            }
-            
-            console.log('✅ Shot recorded successfully with JWT authentication:', data);
-            return data;
-          });
-        } catch (jwtError) {
-          console.warn('⚠️ JWT authentication failed, falling back to public insert:', jwtError.message);
-        }
-      } else {
-        console.log('ℹ️ No valid JWT token found, using public insert for shot recording');
+      // Make authenticated API call to record the shot
+      const response = await apiPost('/api/shots', {
+        action: 'record_shot',
+        playerAddress: shotData.playerAddress,
+        amount: shotData.amount,
+        won: shotData.won || false,
+        txHash: shotData.txHash,
+        blockNumber: shotData.blockNumber,
+        timestamp: shotData.timestamp || new Date().toISOString(),
+        cryptoType: shotData.cryptoType || 'ETH',
+        contractAddress: shotData.contractAddress
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to record shot via API');
       }
 
-      // Fallback: Use public client for users without profiles
-      // This ensures shots are recorded and triggers fire to update player statistics
-      if (!supabase) {
-        throw new Error('Supabase not configured');
-      }
-
-      console.log('📝 Recording shot with public client (fallback)...');
-      const { data, error } = await supabase
-        .from(TABLES.SHOTS)
-        .insert({
-          player_address: shotData.playerAddress.toLowerCase(),
-          amount: shotData.amount,
-          won: shotData.won || false,
-          tx_hash: shotData.txHash,
-          block_number: shotData.blockNumber,
-          timestamp: shotData.timestamp || new Date().toISOString(),
-          crypto_type: shotData.cryptoType || 'ETH',
-          contract_address: shotData.contractAddress
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ Public recordShot error:', error);
-        throw error;
-      }
-      
-      console.log('✅ Shot recorded successfully with public client:', data);
-      return data;
+      console.log('✅ Shot recorded successfully via secure API:', response.shot);
+      return response.shot;
     } catch (error) {
-      console.error('❌ Error recording shot:', error);
+      console.error('❌ Error recording shot via API:', error);
+      
+      // If it's an authentication error, provide a helpful message
+      if (error.message?.includes('Authentication') || error.message?.includes('token')) {
+        throw new Error('Authentication required. Please connect and authenticate your wallet first.');
+      }
+      
       throw error;
     }
   },

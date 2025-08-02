@@ -278,6 +278,14 @@
       
       console.log('✅ Pending shot revealed successfully!', result);
       
+      // Handle case where no pending shot was found
+      if (result.noPendingShot) {
+        toastStore.info('No pending shot found to reveal. You may have already revealed this shot or the reveal window has expired.');
+        console.log('No pending shot found to reveal');
+        await checkPendingShot();
+        return;
+      }
+      
       // Show appropriate message based on win/loss
       if (result.won) {
         toastStore.success('🎉 JACKPOT! YOU WON! 🎊');

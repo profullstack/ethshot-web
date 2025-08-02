@@ -146,6 +146,16 @@ export const createGameActionHandlers = (dependencies) => {
             console.log('✅ Shot revealed automatically:', revealResult);
             autoRevealSuccess = true;
             
+            // Handle case where no pending shot was found
+            if (revealResult && revealResult.noPendingShot) {
+              toastStore.info('No pending shot found to reveal. You may have already revealed this shot or the reveal window has expired.');
+              console.log('No pending shot found to reveal during auto-reveal');
+              // Clear the pending secret since there's nothing to reveal
+              setPendingSecret(null);
+              setPendingTxHash(null);
+              return;
+            }
+            
             // Clear the pending secret since reveal was successful
             setPendingSecret(null);
             setPendingTxHash(null);
@@ -438,6 +448,13 @@ export const createGameActionHandlers = (dependencies) => {
           });
           
           console.log('✅ Shot revealed successfully via manual reveal:', result);
+          
+          // Handle case where no pending shot was found
+          if (result && result.noPendingShot) {
+            toastStore.info('No pending shot found to reveal. You may have already revealed this shot or the reveal window has expired.');
+            console.log('No pending shot found to reveal');
+            return { success: false, error: 'No pending shot found' };
+          }
           
           // Show appropriate message based on win/loss
           if (result && result.won) {

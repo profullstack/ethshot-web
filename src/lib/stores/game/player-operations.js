@@ -801,6 +801,12 @@ export const revealShot = async ({
         throw new Error('No active cryptocurrency adapter');
       }
 
+      // Check if user has a pending shot first
+      if (!state.pendingShot) {
+        console.log('No pending shot found to reveal');
+        return { noPendingShot: true };
+      }
+      
       // Get the secret from pending shot if not provided
       const pendingShot = state.pendingShot;
       const revealSecret = secret || pendingShot?.secret;
@@ -829,6 +835,13 @@ export const revealShot = async ({
       }
 
       const contractWithSigner = contract.connect(wallet.signer);
+      
+      // Check if user has a pending shot first
+      const hasPending = await contract.hasPendingShot(wallet.address);
+      if (!hasPending) {
+        console.log('No pending shot found to reveal');
+        return { noPendingShot: true };
+      }
       
       // Check if user can reveal
       const canReveal = await contract.canRevealShot(wallet.address);
