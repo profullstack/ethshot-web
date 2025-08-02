@@ -14,8 +14,8 @@ if (typeof window !== 'undefined') {
 export const GAME_CONFIG = {
   SHOT_COST: parseFloat(import.meta.env.VITE_SHOT_COST_ETH || import.meta.env.PUBLIC_SHOT_COST_ETH || '0.0005'),
   SHOT_COST_ETH: import.meta.env.VITE_SHOT_COST_ETH || import.meta.env.PUBLIC_SHOT_COST_ETH || '0.0005',
-  FIRST_SHOT_COST: parseFloat(import.meta.env.VITE_FIRST_SHOT_COST_ETH || import.meta.env.PUBLIC_FIRST_SHOT_COST_ETH || '0.0005'),
-  FIRST_SHOT_COST_ETH: import.meta.env.VITE_FIRST_SHOT_COST_ETH || import.meta.env.PUBLIC_FIRST_SHOT_COST_ETH || '0.0005',
+  FIRST_SHOT_COST: parseFloat(import.meta.env.VITE_FIRST_SHOT_COST_ETH || import.meta.env.PUBLIC_FIRST_SHOT_COST_ETH || '0.001'),
+  FIRST_SHOT_COST_ETH: import.meta.env.VITE_FIRST_SHOT_COST_ETH || import.meta.env.PUBLIC_FIRST_SHOT_COST_ETH || '0.001',
   SPONSOR_COST: parseFloat(import.meta.env.VITE_SPONSOR_COST_ETH || import.meta.env.PUBLIC_SPONSOR_COST_ETH || '0.001'),
   SPONSOR_COST_ETH: import.meta.env.VITE_SPONSOR_COST_ETH || import.meta.env.PUBLIC_SPONSOR_COST_ETH || '0.001',
   WIN_PERCENTAGE: parseFloat(import.meta.env.VITE_WIN_PERCENTAGE || import.meta.env.PUBLIC_WIN_PERCENTAGE || '1'),

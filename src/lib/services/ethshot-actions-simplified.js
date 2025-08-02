@@ -176,13 +176,44 @@ export const takeShot = async ({
     if (isFirstShot) {
       // First shot: no secret storage, no reveal needed - just adds to pot
       console.log('🚀 First shot detected - no secret storage or reveal needed');
+      
       result = {
         hash: receipt.hash,
         receipt,
         isCommitOnly: true,
-        isFirstShot: true
-        // No secret returned for first shots
+        isFirstShot: true,
+        won: false // First shots can't win
       };
+      
+      // Log first shot to database immediately
+      try {
+        await db.recordShot({
+          playerAddress: wallet.address,
+          amount: customShotCost,
+          txHash: result.hash,
+          blockNumber: result.receipt.blockNumber,
+          timestamp: new Date().toISOString(),
+          won: false, // First shots can't win
+          cryptoType: gameState.activeCrypto,
+          contractAddress: gameState.contractAddress
+        });
+        console.log('✅ First shot recorded in database');
+      } catch (dbError) {
+        console.error('Failed to log first shot to database:', dbError);
+        // Don't throw here - the shot was successful even if logging failed
+      }
+      
+      // Update game state for first shot
+      updateGameState({
+        totalShots: gameState.totalShots + 1,
+        lastShotTime: new Date().toISOString(),
+        canShoot: false,
+        cooldownUntil: new Date(Date.now() + GAME_CONFIG.COOLDOWN_PERIOD).toISOString()
+      });
+      
+      // Load updated player data
+      await loadPlayerData();
+      
     } else {
       // Regular shot: store secret for later reveal and automatically reveal
       const pendingShotData = {
@@ -225,6 +256,24 @@ export const takeShot = async ({
         // Don't throw here - the shot was successful even if storage failed
       }
       
+      // Log regular shot to database
+      try {
+        await db.recordShot({
+          playerAddress: wallet.address,
+          amount: customShotCost ? customShotCost : ethers.formatEther(Number(shotCost)),
+          txHash: result.hash,
+          blockNumber: result.receipt.blockNumber,
+          timestamp: new Date().toISOString(),
+          won: false, // Will be updated when revealed
+          cryptoType: gameState.activeCrypto,
+          contractAddress: gameState.contractAddress
+        });
+        console.log('✅ Regular shot recorded in database');
+      } catch (dbError) {
+        console.error('Failed to log regular shot to database:', dbError);
+        // Don't throw here - the shot was successful even if logging failed
+      }
+      
       // Automatically reveal the shot after a short delay
       updateStatus('auto_revealing', 'Automatically revealing shot...');
       
@@ -265,27 +314,13 @@ export const takeShot = async ({
       }
     }
 
-    updateStatus('logging_database', 'Recording shot to database...');
-
-    // Log shot to database
-    try {
-      // Use custom shot cost for display purposes if provided
-      const displayAmount = customShotCost ? customShotCost : ethers.formatEther(Number(shotCost));
-      
-      await db.recordShot({
-        playerAddress: wallet.address,
-        amount: displayAmount,
-        txHash: result.hash,
-        blockNumber: result.receipt.blockNumber,
-        timestamp: new Date().toISOString(),
-        won: result.won || false, // Will be updated when revealed
-        cryptoType: gameState.activeCrypto,
-        contractAddress: gameState.contractAddress
-      });
-    } catch (dbError) {
-      console.error('Failed to log shot to database:', dbError);
-      // Don't throw here - the shot was successful even if logging failed
-    }
+    // Update game state for all shots (first and regular)
+    updateGameState({
+      totalShots: gameState.totalShots + 1,
+      lastShotTime: new Date().toISOString(),
+      canShoot: false,
+      cooldownUntil: new Date(Date.now() + GAME_CONFIG.COOLDOWN_PERIOD).toISOString()
+    });
 
     updateStatus('refreshing_state', 'Refreshing game state...');
 
