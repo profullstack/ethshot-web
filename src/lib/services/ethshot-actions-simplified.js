@@ -160,7 +160,7 @@ export const takeShot = async ({
     updateStatus('sending_transaction', 'Sending transaction to blockchain...');
 
     const tx = await contractWithSigner.commitShot(commitment, {
-      value: shotCost,
+      value: customShotCost ? ethers.parseEther(customShotCost) : shotCost,
       gasLimit: gasLimit
     });
 
@@ -667,16 +667,20 @@ export const revealShot = async ({
     // Check wallet balance first
     const balance = await wallet.provider.getBalance(wallet.address);
     
-    // Estimate gas
+    // Estimate gas with more conservative approach
     let gasEstimate;
     try {
+      // First try with a reasonable secret
       gasEstimate = await contractWithSigner.revealShot.estimateGas(secret);
+      console.log('Gas estimate successful:', gasEstimate.toString());
     } catch (estimateError) {
-      console.warn('Failed to estimate gas for reveal, using default:', estimateError.message);
-      gasEstimate = 100000n;
+      console.warn('Failed to estimate gas for reveal, using conservative default:', estimateError.message);
+      // Use a more conservative default gas limit
+      gasEstimate = 150000n; // Increased from 100000n to 150000n
     }
     
-    const gasLimit = gasEstimate < 80000n ? 100000n : gasEstimate + (gasEstimate * 20n / 100n);
+    // Use more conservative gas limit calculation
+    const gasLimit = gasEstimate < 100000n ? 150000n : gasEstimate + (gasEstimate * 30n / 100n); // 30% buffer
     
     // Get gas price and calculate total cost
     const feeData = await wallet.provider.getFeeData();
@@ -704,7 +708,7 @@ export const revealShot = async ({
     });
     
     // Check if user has enough ETH for gas fees with a very lenient buffer for reveals
-    const minRequiredBalance = BigInt(Math.floor(Number(estimatedGasCost) * 0.5));
+    const minRequiredBalance = BigInt(Math.floor(Number(estimatedGasCost) * 0.1)); // Reduced from 0.5 to 0.1 (10% buffer)
     
     if (balance < minRequiredBalance) {
       const shortfall = ethers.formatEther(minRequiredBalance - balance);
@@ -713,10 +717,12 @@ export const revealShot = async ({
     
     updateStatus('sending_reveal', 'Sending reveal transaction...');
 
+    // Use more conservative gas parameters to avoid reverts
     const tx = await contractWithSigner.revealShot(secret, {
       gasLimit: gasLimit,
-      maxFeePerGas: feeData.maxFeePerGas || gasPrice,
-      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || gasPrice
+      gasPrice: gasPrice, // Use explicit gasPrice instead of EIP-1559 for better compatibility
+      // Add a buffer to gas limit to ensure transaction goes through
+      gasLimit: gasLimit + (gasLimit * 30n / 100n) // 30% buffer
     });
 
     updateStatus('waiting_reveal_confirmation', 'Waiting for reveal confirmation...');

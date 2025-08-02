@@ -59,8 +59,13 @@ export const db = {
 
   // Shot operations
   async recordShot(shotData) {
+    if (!supabase) {
+      console.warn('Supabase not configured - returning null for recordShot');
+      return null;
+    }
+
     try {
-      console.log('🎯 Recording shot via secure API:', {
+      console.log('🎯 Recording shot to Supabase:', {
         player_address: shotData.playerAddress.toLowerCase(),
         amount: shotData.amount,
         won: shotData.won || false,
@@ -71,36 +76,30 @@ export const db = {
         contract_address: shotData.contractAddress
       });
 
-      // Import the API client for making authenticated requests
-      const { apiClient } = await import('../api/base.js');
+      const { data, error } = await supabase
+        .from(TABLES.SHOTS)
+        .insert({
+          player_address: shotData.playerAddress.toLowerCase(),
+          amount: shotData.amount,
+          won: shotData.won || false,
+          tx_hash: shotData.txHash,
+          block_number: shotData.blockNumber,
+          timestamp: shotData.timestamp || new Date().toISOString(),
+          crypto_type: shotData.cryptoType || 'ETH',
+          contract_address: shotData.contractAddress
+        })
+        .select()
+        .single();
 
-      // Make authenticated API call to record the shot
-      const response = await apiClient.post('/api/shots', {
-        action: 'record_shot',
-        playerAddress: shotData.playerAddress,
-        amount: shotData.amount,
-        won: shotData.won || false,
-        txHash: shotData.txHash,
-        blockNumber: shotData.blockNumber,
-        timestamp: shotData.timestamp || new Date().toISOString(),
-        cryptoType: shotData.cryptoType || 'ETH',
-        contractAddress: shotData.contractAddress
-      });
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to record shot via API');
+      if (error) {
+        console.error('❌ Supabase recordShot error:', error);
+        throw error;
       }
-
-      console.log('✅ Shot recorded successfully via secure API:', response.shot);
-      return response.shot;
+      
+      console.log('✅ Shot recorded successfully:', data);
+      return data;
     } catch (error) {
-      console.error('❌ Error recording shot via API:', error);
-      
-      // If it's an authentication error, provide a helpful message
-      if (error.message?.includes('Authentication') || error.message?.includes('token')) {
-        throw new Error('Authentication required. Please connect and authenticate your wallet first.');
-      }
-      
+      console.error('❌ Error recording shot:', error);
       throw error;
     }
   },
