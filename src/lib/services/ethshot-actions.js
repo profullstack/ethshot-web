@@ -12,6 +12,7 @@ import { db } from '../database/index.js';
 import { supabase } from '../database/client.js';
 import { rpcCache } from '../stores/game/cache.js';
 import { safeBigIntToNumber } from '../stores/game/utils.js';
+import { GAME_CONFIG } from '../config.js';
 
 /**
  * Take a shot in the game
@@ -171,8 +172,8 @@ export const takeShot = async ({
     updateStatus('processing', 'Processing transaction result...');
     
     // Check if this is a first shot (pot is empty) by checking if custom shot cost indicates a first shot
-    // First shot cost is typically different from regular shot cost, or we can check if pot is empty
-    const isFirstShot = customShotCost && parseFloat(customShotCost) !== parseFloat(ethers.formatEther(shotCost));
+    // We check if the custom shot cost matches the first shot cost configuration
+    const isFirstShot = customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH);
     
     if (isFirstShot) {
       // First shot: no secret storage, no reveal needed - just adds to pot
