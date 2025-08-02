@@ -155,12 +155,27 @@ export const createGameActionHandlers = (dependencies) => {
         } catch (revealError) {
           console.error('❌ Failed to automatically reveal shot:', revealError);
           
-          // Fallback to manual reveal modal
+          // Fallback to manual reveal modal - with validation
           console.log('🎯 Falling back to manual reveal modal');
-          setPendingSecret(result.secret);
-          setPendingTxHash(result.hash);
-          setShowRevealModal(true);
-          toastStore.error('Shot committed but auto-reveal failed. Please reveal manually.');
+          console.log('🔍 Debug - result object:', result);
+          console.log('🔍 Debug - result.secret:', result.secret);
+          console.log('🔍 Debug - result.hash:', result.hash);
+          
+          // Validate that we have the necessary data for manual reveal
+          if (result.secret && result.hash) {
+            setPendingSecret(result.secret);
+            setPendingTxHash(result.hash);
+            setShowRevealModal(true);
+            toastStore.error('Shot committed but auto-reveal failed. Please reveal manually.');
+            console.log('✅ Manual reveal modal set up with secret and hash');
+          } else {
+            console.error('❌ Missing secret or hash for manual reveal:', {
+              hasSecret: !!result.secret,
+              hasHash: !!result.hash,
+              result
+            });
+            toastStore.error('Shot committed but auto-reveal failed and no secret available for manual reveal. Check debug panel for saved secrets.');
+          }
           
           // Reset transaction status
           resetTransactionStatus(setTransactionStatus, setStatusMessage, setProgressPercentage);

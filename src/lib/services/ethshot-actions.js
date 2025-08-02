@@ -9,6 +9,7 @@ import { get } from 'svelte/store';
 import { getActiveAdapter } from '../crypto/adapters/index.js';
 import { toastStore } from '../stores/toast.js';
 import { db } from '../database/index.js';
+import { supabase } from '../database/client.js';
 import { rpcCache } from '../stores/game/cache.js';
 import { safeBigIntToNumber } from '../stores/game/utils.js';
 
@@ -244,7 +245,8 @@ export const takeShot = async ({
       blockNumber: result.receipt.blockNumber,
       timestamp: new Date().toISOString(),
       won: false, // Will be updated when revealed
-      cryptoType: gameState.activeCrypto
+      cryptoType: gameState.activeCrypto,
+      contractAddress: gameState.contractAddress
     });
   } catch (dbError) {
     console.error('Failed to log shot to database:', dbError);
@@ -541,13 +543,22 @@ export const revealShot = async ({
       balance: ethers.formatEther(balance)
     });
     
-    // Check if user has enough ETH for gas fees with a more lenient buffer
-    // Since revealing might result in winning ETH back, we use a smaller safety margin
-    const minRequiredBalance = estimatedGasCost;
+    // Check if user has enough ETH for gas fees with a very lenient buffer for reveals
+    // Since revealing might result in winning ETH back, we use a much smaller safety margin
+    // We only need about 70% of the estimated gas cost since:
+    // 1. Gas estimates are usually overestimated by 20-30%
+    // 2. Winning reveals will return ETH to the user
+    // 3. The transaction will likely succeed even with a tight margin
+    const minRequiredBalance = BigInt(Math.floor(Number(estimatedGasCost) * 0.7));
     
     if (balance < minRequiredBalance) {
       const shortfall = ethers.formatEther(minRequiredBalance - balance);
       throw new Error(`This transaction may fail because there's not enough ETH to cover the network fee. Please add more ETH to this account and try again. Need ${shortfall} more ETH. Current balance: ${ethers.formatEther(balance)} ETH`);
+    }
+    
+    // Additional check: if balance is very close to gas cost, show a warning but allow the transaction
+    if (balance < estimatedGasCost && balance >= minRequiredBalance) {
+      console.warn('⚠️ Balance is close to gas cost estimate. Transaction may succeed due to potential winnings or gas overestimation.');
     }
     
     updateStatus('sending_reveal', 'Sending reveal transaction...');
@@ -585,6 +596,126 @@ export const revealShot = async ({
       receipt,
       won
     };
+  }
+
+  updateStatus('updating_database', 'Updating database with results...');
+
+  // Update database with reveal results
+  try {
+    // First, try to find and update the original shot record
+    // We need to find the commit transaction hash, not the reveal transaction hash
+    let commitTxHash = null;
+    
+    // Check if we have a pending shot with the commit hash
+    if (gameState.pendingShot && gameState.pendingShot.commitHash) {
+      commitTxHash = gameState.pendingShot.commitHash;
+    } else {
+      // Try to find it in localStorage
+      const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+      const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+      
+      for (const secretKey of existingSecrets) {
+        try {
+          const secretData = JSON.parse(localStorage.getItem(secretKey) || '{}');
+          if (secretData.secret === secret) {
+            commitTxHash = secretData.txHash;
+            break;
+          }
+        } catch (e) {
+          console.warn('Failed to parse secret data:', e);
+        }
+      }
+    }
+    
+    if (commitTxHash) {
+      // Update the shot record with reveal information
+      try {
+        const { data, error } = await supabase.rpc('update_shot_on_reveal', {
+          p_tx_hash: commitTxHash,
+          p_won: result.won,
+          p_reveal_tx_hash: result.hash,
+          p_reveal_block_number: result.receipt.blockNumber
+        });
+        
+        if (error) {
+          console.error('Failed to update shot record:', error);
+          // If the function doesn't exist, try a fallback update
+          if (error.code === '42883' || error.message?.includes('function') || error.message?.includes('does not exist')) {
+            console.log('Database function not available, using fallback update method');
+            try {
+              const { error: fallbackError } = await supabase
+                .from('shots')
+                .update({
+                  won: result.won,
+                  reveal_tx_hash: result.hash,
+                  reveal_block_number: result.receipt.blockNumber,
+                  reveal_timestamp: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('tx_hash', commitTxHash);
+              
+              if (fallbackError) {
+                console.error('Fallback update also failed:', fallbackError);
+              } else {
+                console.log('✅ Shot record updated successfully via fallback method');
+              }
+            } catch (fallbackUpdateError) {
+              console.error('Error in fallback update:', fallbackUpdateError);
+            }
+          }
+        } else {
+          console.log('✅ Shot record updated successfully');
+        }
+      } catch (updateError) {
+        console.error('Error calling update_shot_on_reveal:', updateError);
+        // Try fallback method if the function call fails completely
+        if (updateError.message?.includes('function') || updateError.message?.includes('does not exist')) {
+          console.log('Database function not available, using fallback update method');
+          try {
+            const { error: fallbackError } = await supabase
+              .from('shots')
+              .update({
+                won: result.won,
+                reveal_tx_hash: result.hash,
+                reveal_block_number: result.receipt.blockNumber,
+                reveal_timestamp: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('tx_hash', commitTxHash);
+            
+            if (fallbackError) {
+              console.error('Fallback update also failed:', fallbackError);
+            } else {
+              console.log('✅ Shot record updated successfully via fallback method');
+            }
+          } catch (fallbackUpdateError) {
+            console.error('Error in fallback update:', fallbackUpdateError);
+          }
+        }
+      }
+    } else {
+      console.warn('Could not find commit transaction hash to update shot record');
+    }
+    
+    if (result.won) {
+      // Record the winner in the winners table
+      await db.recordWinner({
+        winnerAddress: wallet.address,
+        amount: gameState.shotCost || '0.0005', // Use the shot cost
+        txHash: result.hash,
+        blockNumber: result.receipt.blockNumber,
+        timestamp: new Date().toISOString(),
+        cryptoType: gameState.activeCrypto,
+        contractAddress: gameState.contractAddress
+      });
+      
+      console.log('✅ Winner recorded successfully');
+    }
+    
+    console.log('✅ Database updated with reveal results');
+  } catch (dbError) {
+    console.error('❌ Failed to update database with reveal results:', dbError);
+    // Don't throw here - the reveal was successful even if database update failed
   }
 
   updateStatus('refreshing_reveal_state', 'Refreshing game state...');

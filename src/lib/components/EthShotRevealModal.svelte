@@ -42,11 +42,20 @@
         <div class="secret-info">
           <p><strong>Your Secret:</strong></p>
           <div class="secret-display">
-            <code class="secret-code">{pendingSecret}</code>
+            {#if pendingSecret}
+              <code class="secret-code">{pendingSecret}</code>
+            {:else}
+              <div class="error-message">
+                <p class="text-red-400">❌ No secret available</p>
+                <p class="text-sm text-gray-400">The secret was not properly saved. Check the debug panel for saved secrets in localStorage.</p>
+              </div>
+            {/if}
           </div>
-          <p class="secret-warning">
-            ⚠️ <strong>Important:</strong> Save this secret! You'll need it to reveal your shot if you don't do it now.
-          </p>
+          {#if pendingSecret}
+            <p class="secret-warning">
+              ⚠️ <strong>Important:</strong> Save this secret! You'll need it to reveal your shot if you don't do it now.
+            </p>
+          {/if}
         </div>
         
         {#if revealingShot}
@@ -80,11 +89,13 @@
           <button
             class="reveal-now-btn"
             on:click={onRevealNow}
-            disabled={revealingShot || savingToLocalStorage || copyingToClipboard}
+            disabled={revealingShot || savingToLocalStorage || copyingToClipboard || !pendingSecret}
           >
             {#if revealingShot}
               <div class="spinner-small"></div>
               Revealing...
+            {:else if !pendingSecret}
+              ❌ No Secret Available
             {:else}
               🎲 Reveal Now
             {/if}
@@ -93,11 +104,13 @@
           <button
             class="save-storage-btn"
             on:click={onSaveToLocalStorage}
-            disabled={revealingShot || savingToLocalStorage || copyingToClipboard}
+            disabled={revealingShot || savingToLocalStorage || copyingToClipboard || !pendingSecret || !pendingTxHash}
           >
             {#if savingToLocalStorage}
               <div class="spinner-small"></div>
               Saving...
+            {:else if !pendingSecret || !pendingTxHash}
+              ❌ Missing Data
             {:else}
               💾 Save to Browser
             {/if}
@@ -106,11 +119,13 @@
           <button
             class="save-clipboard-btn"
             on:click={onSaveForLater}
-            disabled={revealingShot || savingToLocalStorage || copyingToClipboard}
+            disabled={revealingShot || savingToLocalStorage || copyingToClipboard || !pendingSecret}
           >
             {#if copyingToClipboard}
               <div class="spinner-small"></div>
               Copying...
+            {:else if !pendingSecret}
+              ❌ No Secret
             {:else}
               📋 Copy to Clipboard
             {/if}
