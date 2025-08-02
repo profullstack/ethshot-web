@@ -686,31 +686,47 @@ export const revealShot = async ({
 
     updateStatus('waiting_reveal_confirmation', 'Waiting for reveal confirmation...');
 
-    const receipt = await tx.wait();
-    
-    updateStatus('processing_reveal', 'Processing reveal result...');
-
-    // Check if user won by looking at ShotRevealed events
-    const shotRevealedEvent = receipt.logs.find(log => {
-      try {
-        const parsed = contract.interface.parseLog(log);
-        return parsed.name === 'ShotRevealed';
-      } catch {
-        return false;
+    try {
+      const receipt = await tx.wait();
+      
+      updateStatus('processing_reveal', 'Processing reveal result...');
+      
+      // Check if transaction was successful (status === 1)
+      if (receipt.status !== 1) {
+        throw new Error('Reveal transaction failed: Transaction reverted');
       }
-    });
 
-    let won = false;
-    if (shotRevealedEvent) {
-      const parsed = contract.interface.parseLog(shotRevealedEvent);
-      won = parsed.args.won;
+      // Check if user won by looking at ShotRevealed events
+      const shotRevealedEvent = receipt.logs.find(log => {
+        try {
+          const parsed = contract.interface.parseLog(log);
+          return parsed.name === 'ShotRevealed';
+        } catch {
+          return false;
+        }
+      });
+
+      let won = false;
+      if (shotRevealedEvent) {
+        const parsed = contract.interface.parseLog(shotRevealedEvent);
+        won = parsed.args.won;
+      }
+      
+      result = {
+        hash: receipt.hash,
+        receipt,
+        won
+      };
+    } catch (waitError) {
+      console.error('❌ Reveal transaction failed:', waitError);
+      
+      // Check if this is a transaction revert error
+      if (waitError.code === 'CALL_EXCEPTION' || waitError.message?.includes('reverted')) {
+        throw new Error(`Reveal transaction reverted: ${waitError.message || 'Unknown error'}`);
+      } else {
+        throw new Error(`Reveal transaction failed: ${waitError.message || 'Unknown error'}`);
+      }
     }
-    
-    result = {
-      hash: receipt.hash,
-      receipt,
-      won
-    };
   }
 
   updateStatus('updating_database', 'Updating database with results...');
