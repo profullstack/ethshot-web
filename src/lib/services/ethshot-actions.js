@@ -231,30 +231,43 @@ export const takeShot = async ({
         pendingShot: pendingShotData
       };
     }
+
+    updateStatus('logging_database', 'Recording shot to database...');
+
+    // Log shot to database
+    try {
+      // Use custom shot cost for display purposes if provided
+      const displayAmount = customShotCost ? customShotCost : ethers.formatEther(Number(shotCost));
+      
+      await db.recordShot({
+        playerAddress: wallet.address,
+        amount: displayAmount,
+        txHash: result.hash,
+        blockNumber: result.receipt.blockNumber,
+        timestamp: new Date().toISOString(),
+        won: false, // Will be updated when revealed
+        cryptoType: gameState.activeCrypto,
+        contractAddress: gameState.contractAddress
+      });
+    } catch (dbError) {
+      console.error('Failed to log shot to database:', dbError);
+      // Don't throw here - the shot was successful even if logging failed
+    }
+
+    updateStatus('refreshing_state', 'Refreshing game state...');
+
+    // Clear cache and refresh state
+    rpcCache.clear();
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    await loadGameState();
+    await loadPlayerData(wallet.address);
+
+    updateStatus('completed', 'Shot committed successfully!');
+
+    return result;
   }
 
-  updateStatus('logging_database', 'Recording shot to database...');
-
-  // Log shot to database
-  try {
-    // Use custom shot cost for display purposes if provided
-    const displayAmount = customShotCost ? customShotCost : ethers.formatEther(Number(shotCost));
-    
-    await db.recordShot({
-      playerAddress: wallet.address,
-      amount: displayAmount,
-      txHash: result.hash,
-      blockNumber: result.receipt.blockNumber,
-      timestamp: new Date().toISOString(),
-      won: false, // Will be updated when revealed
-      cryptoType: gameState.activeCrypto,
-      contractAddress: gameState.contractAddress
-    });
-  } catch (dbError) {
-    console.error('Failed to log shot to database:', dbError);
-    // Don't throw here - the shot was successful even if logging failed
-  }
-
+  // For multi-crypto mode, refresh state after adapter call
   updateStatus('refreshing_state', 'Refreshing game state...');
 
   // Clear cache and refresh state
