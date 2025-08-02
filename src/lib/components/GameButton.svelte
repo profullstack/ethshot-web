@@ -1,23 +1,40 @@
 <script>
   console.log('🔧 GameButton component loading...');
   
-  import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError, currentPot, GameActions } from '../stores/game/index.js';
+  import { gameStore, canTakeShot, cooldownRemaining, isLoading, contractDeployed, gameError, currentPot } from '../stores/game/index.js';
   import { walletStore, isConnected, isCorrectNetwork } from '../stores/wallet.js';
   import { toastStore } from '../stores/toast.js';
   import { debugMode } from '../stores/debug.js';
-  import { GAME_CONFIG, NETWORK_CONFIG, formatEth, formatTime as configFormatTime } from '../config.js';
+  import { GAME_CONFIG } from '../config.js';
   import { onMount, onDestroy } from 'svelte';
   import { get } from 'svelte/store';
 
+  // Import utilities
+  import {
+    createStatusUpdateHandler,
+    createCooldownTimer,
+    calculateCooldownProgress,
+    resetTransactionStatus,
+    setCooldownStatus,
+    formatTime
+  } from '../utils/game-button-utils.js';
+  import { createGameActionHandlers } from '../utils/game-button-handlers.js';
+  import { checkForSavedSecrets } from '../utils/game-button-storage.js';
+  import { cleanupExpiredPendingShot } from '../services/game-actions.js';
+
+  // Import sub-components
+  import MainGameButton from './MainGameButton.svelte';
+  import StatusBar from './StatusBar.svelte';
+  import GameStats from './GameStats.svelte';
+  import ErrorMessage from './ErrorMessage.svelte';
+  import RevealModal from './RevealModal.svelte';
+  import DebugPanel from './DebugPanel.svelte';
+
   console.log('✅ GameButton imports loaded successfully');
 
-  let cooldownTimer = null;
+  // State variables
   let timeRemaining = 0;
-  let shotFlowState = 'idle'; // 'idle', 'committing', 'pending_reveal', 'revealing', 'completed'
-  let shotFlowMessage = '';
-  
-  // Enhanced status tracking
-  let transactionStatus = 'idle'; // 'idle', 'preparing', 'checking_balance', 'estimating_gas', 'generating_commitment', 'sending_transaction', 'waiting_confirmation', 'processing', 'logging_database', 'refreshing_state', 'completed'
+  let transactionStatus = 'idle'; // 'idle', 'preparing', 'checking_balance', etc.
   let statusMessage = '';
   let progressPercentage = 0;
   
@@ -29,384 +46,58 @@
   let savingToLocalStorage = false;
   let copyingToClipboard = false;
 
-  // Status update handler
-  const handleStatusUpdate = (status, message) => {
-    transactionStatus = status;
-    statusMessage = message;
-    
-    // Update progress percentage based on status
-    const statusProgress = {
-      'idle': 0,
-      'preparing': 5,
-      'checking_balance': 10,
-      'estimating_gas': 15,
-      'generating_commitment': 20,
-      'sending_transaction': 25,
-      'waiting_confirmation': 35,
-      'processing': 40,
-      'logging_database': 45,
-      'refreshing_state': 50,
-      'waiting_reveal_window': 52,
-      'preparing_reveal': 55,
-      'checking_pending': 60,
-      'estimating_reveal_gas': 65,
-      'sending_reveal': 70,
-      'waiting_reveal_confirmation': 80,
-      'processing_reveal': 85,
-      'refreshing_reveal_state': 90,
-      'reveal_completed': 95,
-      'completed': 100
-    };
-    
-    progressPercentage = statusProgress[status] || 0;
-    console.log(`🎯 Transaction Status: ${status} - ${message} (${progressPercentage}%)`);
-  };
+  // Create status update handler
+  const handleStatusUpdate = createStatusUpdateHandler(
+    (status) => transactionStatus = status,
+    (message) => statusMessage = message,
+    (percentage) => progressPercentage = percentage
+  );
 
-  // Format time remaining for display
-  const formatTime = (seconds) => {
-    if (seconds <= 0) return '';
-    
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${secs}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
-    } else {
-      return `${secs}s`;
-    }
-  };
-
-  // Start cooldown timer
-  const startCooldownTimer = () => {
-    if (cooldownTimer) {
-      clearInterval(cooldownTimer);
-    }
-
-    cooldownTimer = setInterval(async () => {
-      timeRemaining = $cooldownRemaining;
-      if (timeRemaining <= 0) {
-        clearInterval(cooldownTimer);
-        cooldownTimer = null;
-        
-        // CRITICAL FIX: Refresh player data when cooldown expires
-        // This ensures canShoot is updated properly when cooldown reaches zero
-        const wallet = get(walletStore);
-        if (wallet.connected && wallet.address) {
-          console.log('🔄 Cooldown expired - refreshing player data to update canShoot state');
-          try {
-            await gameStore.loadPlayerData(wallet.address);
-            console.log('✅ Player data refreshed after cooldown expiry');
-          } catch (error) {
-            console.error('❌ Failed to refresh player data after cooldown:', error);
-          }
-        }
-      }
-    }, 1000);
-  };
-
-  // Handle taking a shot
-  const handleTakeShot = async () => {
-    console.log('🎯 TAKE SHOT BUTTON CLICKED!');
-    console.log('🔍 Button click handler executing...');
-    
-    console.log('Debug info:', {
-      isConnected: $isConnected,
-      isCorrectNetwork: $isCorrectNetwork,
-      canTakeShot: $canTakeShot,
-      contractDeployed: $contractDeployed,
-      isLoading: $isLoading,
-      gameError: $gameError
-    });
-
-    if (!$isConnected) {
-      console.log('❌ Wallet not connected - stopping here');
-      toastStore.error('Please connect your wallet first');
-      return;
-    }
-
-    if (!$isCorrectNetwork) {
-      console.log('❌ Wrong network - stopping here');
-      toastStore.error('Please switch to the correct network');
-      return;
-    }
-
-    if (!$canTakeShot) {
-      console.log('❌ Cannot take shot - stopping here');
-      toastStore.error('Cannot take shot at this time');
-      return;
-    }
-
-    console.log('✅ All checks passed, calling gameStore.takeShot()');
-    console.log('🚀 About to call gameStore.takeShot()...');
-    
-    // Reset status
-    transactionStatus = 'idle';
-    statusMessage = '';
-    progressPercentage = 0;
-    
-    try {
-      const gameState = gameStore.getGameState();
-      const walletStore = gameStore.getWalletStore();
+  // Create cooldown timer
+  const cooldownTimer = createCooldownTimer(
+    () => $cooldownRemaining,
+    (remaining) => timeRemaining = remaining,
+    async () => {
+      // CRITICAL FIX: Refresh player data when cooldown expires
       const wallet = get(walletStore);
-      
-      const result = await GameActions.takeShot({
-        useDiscount: false,
-        discountId: null,
-        customShotCost: null,
-        gameState,
-        wallet,
-        contract: gameStore.getContract(),
-        ethers: gameStore.getEthers(),
-        updateGameState: gameStore.updateState,
-        loadGameState: gameStore.loadGameState,
-        loadPlayerData: gameStore.loadPlayerData,
-        onStatusUpdate: handleStatusUpdate
-      });
-      console.log('✅ GameActions.takeShot() completed:', result);
-      
-      // Handle commit-only result (new approach with automatic reveal)
-      if (result && result.isCommitOnly && result.secret && !result.isFirstShot) {
-        console.log('🎯 Regular shot committed successfully, waiting before automatic reveal...');
-        
-        // Wait a bit for blockchain state to update before attempting reveal
-        handleStatusUpdate('waiting_reveal_window', 'Waiting for reveal window to open...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Automatically reveal the shot
+      if (wallet.connected && wallet.address) {
+        console.log('🔄 Cooldown expired - refreshing player data to update canShoot state');
         try {
-          console.log('🎯 Starting automatic reveal...');
-          const revealResult = await GameActions.revealShot({
-            secret: result.secret,
-            gameState,
-            wallet,
-            contract: gameStore.getContract(),
-            ethers: gameStore.getEthers(),
-            loadGameState: gameStore.loadGameState,
-            loadPlayerData: gameStore.loadPlayerData,
-            onStatusUpdate: handleStatusUpdate
-          });
-          
-          console.log('✅ Shot revealed automatically:', revealResult);
-          
-          // Show appropriate message based on win/loss
-          if (revealResult.won) {
-            toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
-            console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
-          } else {
-            toastStore.info('🎲 Shot completed - No win this time. Better luck next shot!');
-            console.log('🎲 Shot revealed - No win this time');
-          }
-          
-          // Reset transaction status after successful completion, but keep some info during cooldown
-          setTimeout(() => {
-            if (timeRemaining > 0) {
-              // If cooldown is active, show cooldown status instead of idle
-              transactionStatus = 'cooldown';
-              statusMessage = 'Shot completed successfully! Cooldown active.';
-              progressPercentage = 100;
-            } else {
-              transactionStatus = 'idle';
-              statusMessage = '';
-              progressPercentage = 0;
-            }
-          }, 2000);
-          
-        } catch (revealError) {
-          console.error('❌ Failed to automatically reveal shot:', revealError);
-          
-          // Fallback to manual reveal modal
-          console.log('🎯 Falling back to manual reveal modal');
-          pendingSecret = result.secret;
-          pendingTxHash = result.hash;
-          showRevealModal = true;
-          toastStore.error('Shot committed but auto-reveal failed. Please reveal manually.');
-          
-          // Reset transaction status
-          setTimeout(() => {
-            transactionStatus = 'idle';
-            statusMessage = '';
-            progressPercentage = 0;
-          }, 2000);
+          await gameStore.loadPlayerData(wallet.address);
+          console.log('✅ Player data refreshed after cooldown expiry');
+        } catch (error) {
+          console.error('❌ Failed to refresh player data after cooldown:', error);
         }
-      } else if (result && result.isCommitOnly && result.isFirstShot) {
-        // First shot: no reveal needed, just adds to pot
-        console.log('🚀 First shot committed successfully - no reveal needed!');
-        toastStore.success('🚀 First shot committed! The pot has been started. Other players can now take shots to try to win it!');
-        
-        // Reset transaction status after successful completion, but keep some info during cooldown
-        setTimeout(() => {
-          if (timeRemaining > 0) {
-            // If cooldown is active, show cooldown status instead of idle
-            transactionStatus = 'cooldown';
-            statusMessage = 'First shot completed successfully! Cooldown active.';
-            progressPercentage = 100;
-          } else {
-            transactionStatus = 'idle';
-            statusMessage = '';
-            progressPercentage = 0;
-          }
-        }, 2000);
-      } else if (result && result.secret) {
-        // Fallback for old approach
-        console.log('🎯 Shot committed successfully, showing reveal modal');
-        pendingSecret = result.secret;
-        pendingTxHash = result.hash;
-        showRevealModal = true;
-        toastStore.success('Shot committed! Click "Reveal Now" to complete your shot.');
-        
-        // Reset transaction status after successful completion
-        setTimeout(() => {
-          transactionStatus = 'idle';
-          statusMessage = '';
-          progressPercentage = 0;
-        }, 2000);
       }
-    } catch (error) {
-      console.error('❌ Failed to take shot:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
-      toastStore.error('Failed to take shot: ' + error.message);
-      
-      // Reset status on error
-      transactionStatus = 'idle';
-      statusMessage = '';
-      progressPercentage = 0;
     }
-  };
+  );
 
-  // Handle taking the first shot (when pot is empty)
-  const handleTakeFirstShot = async () => {
-    console.log('🎯 TAKE FIRST SHOT BUTTON CLICKED!');
-    console.log('🔍 First shot handler executing...');
-    
-    console.log('Debug info:', {
-      isConnected: $isConnected,
-      isCorrectNetwork: $isCorrectNetwork,
-      canTakeShot: $canTakeShot,
-      contractDeployed: $contractDeployed,
-      isLoading: $isLoading,
-      currentPot: $currentPot,
-      gameError: $gameError
-    });
+  // Create game action handlers
+  const gameHandlers = createGameActionHandlers({
+    gameStore,
+    walletStore,
+    toastStore,
+    handleStatusUpdate,
+    setTransactionStatus: (status) => transactionStatus = status,
+    setStatusMessage: (message) => statusMessage = message,
+    setProgressPercentage: (percentage) => progressPercentage = percentage,
+    setPendingSecret: (secret) => pendingSecret = secret,
+    setPendingTxHash: (hash) => pendingTxHash = hash,
+    setShowRevealModal: (show) => showRevealModal = show,
+    setRevealingShot: (revealing) => revealingShot = revealing,
+    setSavingToLocalStorage: (saving) => savingToLocalStorage = saving,
+    setCopyingToClipboard: (copying) => copyingToClipboard = copying,
+    timeRemaining,
+    // Add reactive store getters
+    getIsConnected: () => $isConnected,
+    getIsCorrectNetwork: () => $isCorrectNetwork,
+    getCanTakeShot: () => $canTakeShot,
+    getContractDeployed: () => $contractDeployed,
+    getIsLoading: () => $isLoading,
+    getGameError: () => $gameError
+  });
 
-    if (!$isConnected) {
-      console.log('❌ Wallet not connected - stopping here');
-      toastStore.error('Please connect your wallet first');
-      return;
-    }
-
-    if (!$isCorrectNetwork) {
-      console.log('❌ Wrong network - stopping here');
-      toastStore.error('Please switch to the correct network');
-      return;
-    }
-
-    if (!$canTakeShot) {
-      console.log('❌ Cannot take shot - stopping here');
-      toastStore.error('Cannot take shot at this time');
-      return;
-    }
-
-    console.log('✅ All checks passed, calling gameStore.takeShot() with first shot cost');
-    console.log('🚀 About to call gameStore.takeShot() for first shot...');
-    
-    // Reset status
-    transactionStatus = 'idle';
-    statusMessage = '';
-    progressPercentage = 0;
-    
-    try {
-      const gameState = gameStore.getGameState();
-      const walletStore = gameStore.getWalletStore();
-      const wallet = get(walletStore);
-      
-      const result = await GameActions.takeShot({
-        useDiscount: false,
-        discountId: null,
-        customShotCost: GAME_CONFIG.FIRST_SHOT_COST_ETH,
-        gameState,
-        wallet,
-        contract: gameStore.getContract(),
-        ethers: gameStore.getEthers(),
-        updateGameState: gameStore.updateState,
-        loadGameState: gameStore.loadGameState,
-        loadPlayerData: gameStore.loadPlayerData,
-        onStatusUpdate: handleStatusUpdate
-      });
-      console.log('✅ GameActions.takeShot() (first shot) completed:', result);
-      
-      // First shots are now handled by the main takeShot logic above
-      // This function should only be called for first shots, but the result handling
-      // is now unified in the main handleTakeShot function
-      console.log('✅ First shot handled by main takeShot logic');
-    } catch (error) {
-      console.error('❌ Failed to take first shot:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
-      toastStore.error('Failed to take first shot: ' + error.message);
-      
-      // Reset status on error
-      transactionStatus = 'idle';
-      statusMessage = '';
-      progressPercentage = 0;
-    }
-  };
-
-  // Handle sponsor round
-  const handleSponsorRound = async () => {
-    console.log('💰 SPONSOR ROUND BUTTON CLICKED!');
-    
-    if (!$isConnected) {
-      toastStore.error('Please connect your wallet first');
-      return;
-    }
-
-    if (!$isCorrectNetwork) {
-      toastStore.error('Please switch to the correct network');
-      return;
-    }
-
-    try {
-      const gameState = gameStore.getGameState();
-      const walletStore = gameStore.getWalletStore();
-      const wallet = get(walletStore);
-      
-      const result = await GameActions.sponsorRound({
-        name: 'Anonymous Sponsor',
-        logoUrl: '/icons/sponsor-default.png',
-        sponsorUrl: null,
-        gameState,
-        wallet,
-        contract: gameStore.getContract(),
-        ethers: gameStore.getEthers(),
-        loadGameState: gameStore.loadGameState
-      });
-      console.log('✅ GameActions.sponsorRound() completed:', result);
-    } catch (error) {
-      console.error('❌ Failed to sponsor round:', error);
-      toastStore.error('Failed to sponsor round: ' + error.message);
-    }
-  };
-
-  // Switch to correct network
-  const handleSwitchNetwork = async () => {
-    try {
-      await walletStore.switchNetwork(NETWORK_CONFIG.CHAIN_ID);
-    } catch (error) {
-      toastStore.error('Failed to switch network');
-    }
-  };
-
-  // Manual refresh for debugging
+  // Debug handlers
   const handleManualRefresh = async () => {
     console.log('🔄 Manual refresh triggered');
     const wallet = get(walletStore);
@@ -433,7 +124,6 @@
     }
   };
 
-  // Deep contract debugging
   const handleDeepDebug = async () => {
     console.log('🔍 Deep contract debugging...');
     const wallet = get(walletStore);
@@ -472,7 +162,6 @@
     }
   };
 
-  // Check for pending shots that might be blocking new shots
   const handleCheckPendingShot = async () => {
     console.log('🔍 Checking for pending shots...');
     const wallet = get(walletStore);
@@ -557,159 +246,6 @@
     }
   };
 
-  // Handle revealing the shot immediately
-  const handleRevealNow = async () => {
-    if (!pendingSecret) {
-      toastStore.error('No secret available to reveal');
-      return;
-    }
-
-    console.log('🎯 Revealing shot with secret:', pendingSecret);
-    revealingShot = true;
-    
-    try {
-      const gameState = gameStore.getGameState();
-      const walletStore = gameStore.getWalletStore();
-      const wallet = get(walletStore);
-      
-      const result = await GameActions.revealShot({
-        secret: pendingSecret,
-        gameState,
-        wallet,
-        contract: gameStore.getContract(),
-        ethers: gameStore.getEthers(),
-        loadGameState: gameStore.loadGameState,
-        loadPlayerData: gameStore.loadPlayerData
-      });
-      
-      console.log('✅ Shot revealed successfully:', result);
-      
-      // Show appropriate message based on win/loss
-      if (result.won) {
-        toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
-        console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
-      } else {
-        toastStore.info('🎲 Shot revealed - No win this time. Better luck next shot!');
-        console.log('🎲 Shot revealed - No win this time');
-      }
-      
-      // Close the modal and clear state
-      showRevealModal = false;
-      pendingSecret = null;
-      pendingTxHash = null;
-      
-      // Remove the revealed secret from localStorage
-      try {
-        const wallet = get(walletStore);
-        if (wallet.connected && wallet.address) {
-          const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
-          const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
-          
-          // Filter out the revealed secret
-          const updatedSecrets = existingSecrets.filter(key => {
-            const secretDataStr = localStorage.getItem(key);
-            if (secretDataStr) {
-              const secretData = JSON.parse(secretDataStr);
-              return secretData.txHash !== result.receipt.hash;
-            }
-            return true;
-          });
-          
-          // Update the saved secrets list
-          localStorage.setItem(savedSecretsKey, JSON.stringify(updatedSecrets));
-          
-          // Also remove the individual secret entry
-          const secretKey = `ethshot_secret_${wallet.address}_${result.receipt.hash.slice(0, 10)}`;
-          localStorage.removeItem(secretKey);
-        }
-      } catch (error) {
-        console.error('❌ Failed to remove revealed secret from localStorage:', error);
-      }
-      
-    } catch (error) {
-      console.error('❌ Failed to reveal shot:', error);
-      toastStore.error('Failed to reveal shot: ' + error.message);
-    } finally {
-      revealingShot = false;
-    }
-  };
-
-  // Handle saving secret to localStorage
-  const handleSaveToLocalStorage = () => {
-    if (!pendingSecret || !pendingTxHash) {
-      toastStore.error('No secret or transaction hash available to save');
-      return;
-    }
-
-    savingToLocalStorage = true;
-    
-    try {
-      const wallet = get(walletStore);
-      const secretData = {
-        secret: pendingSecret,
-        txHash: pendingTxHash,
-        walletAddress: wallet.address,
-        timestamp: Date.now(),
-        blockNumber: null // Will be filled when we get block info
-      };
-
-      // Create a unique key for this secret
-      const secretKey = `ethshot_secret_${wallet.address}_${pendingTxHash.slice(0, 10)}`;
-      
-      // Save to localStorage
-      localStorage.setItem(secretKey, JSON.stringify(secretData));
-      
-      // Also maintain a list of all saved secrets for this wallet
-      const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
-      const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
-      
-      // Add this secret to the list if not already there
-      if (!existingSecrets.includes(secretKey)) {
-        existingSecrets.push(secretKey);
-        localStorage.setItem(savedSecretsKey, JSON.stringify(existingSecrets));
-      }
-      
-      toastStore.success('Secret saved to browser storage! You can retrieve it later from the debug panel.');
-      console.log('💾 Secret saved to localStorage:', secretKey);
-      
-    } catch (error) {
-      console.error('❌ Failed to save secret to localStorage:', error);
-      toastStore.error('Failed to save secret to browser storage');
-    } finally {
-      savingToLocalStorage = false;
-    }
-    
-    // Don't close modal - let user choose to reveal or close manually
-    // showRevealModal = false;
-    // pendingSecret = null;
-    // pendingTxHash = null;
-  };
-
-  // Handle saving secret for later (clipboard + localStorage)
-  const handleSaveForLater = () => {
-    if (!pendingSecret) {
-      toastStore.error('No secret available to copy');
-      return;
-    }
-    
-    copyingToClipboard = true;
-    
-    // Copy secret to clipboard
-    navigator.clipboard.writeText(pendingSecret).then(() => {
-      toastStore.success(`Secret copied to clipboard: ${pendingSecret}`);
-    }).catch(() => {
-      toastStore.info(`Save this secret: ${pendingSecret}`);
-    }).finally(() => {
-      copyingToClipboard = false;
-    });
-    
-    // Don't close modal - let user choose to reveal or close manually
-    // showRevealModal = false;
-    // pendingSecret = null;
-    // pendingTxHash = null;
-  };
-
-  // Clean up expired pending shot
   const handleCleanupExpiredShot = async () => {
     console.log('🧹 Cleaning up expired pending shot...');
     const wallet = get(walletStore);
@@ -733,7 +269,7 @@
       const cleanupWalletStore = gameStore.getWalletStore();
       const cleanupWallet = get(cleanupWalletStore);
       
-      await GameActions.cleanupExpiredPendingShot({
+      await cleanupExpiredPendingShot({
         playerAddress: cleanupWallet.address,
         gameState: cleanupGameState,
         wallet: cleanupWallet,
@@ -765,10 +301,35 @@
     }
   };
 
+  // Modal handlers
+  const handleRevealNow = async () => {
+    const result = await gameHandlers.handleRevealNow(pendingSecret);
+    if (result.success) {
+      // Close the modal and clear state
+      showRevealModal = false;
+      pendingSecret = null;
+      pendingTxHash = null;
+    }
+  };
+
+  const handleSaveToLocalStorage = () => {
+    gameHandlers.handleSaveToLocalStorage(pendingSecret, pendingTxHash);
+  };
+
+  const handleSaveForLater = () => {
+    gameHandlers.handleSaveForLater(pendingSecret);
+  };
+
+  const handleCloseModal = () => {
+    showRevealModal = false;
+    pendingSecret = null;
+    pendingTxHash = null;
+  };
+
   // Reactive statements
   $: timeRemaining = $cooldownRemaining;
   $: if (timeRemaining > 0 && !cooldownTimer) {
-    startCooldownTimer();
+    cooldownTimer.start();
   }
   
   // Get individual loading states from the store
@@ -796,68 +357,45 @@
 
   // Update status message during cooldown
   $: if (timeRemaining > 0 && transactionStatus === 'idle') {
-    transactionStatus = 'cooldown';
-    statusMessage = `Shot committed successfully! Cooldown: ${Math.ceil(timeRemaining / 1000)}s remaining`;
-    progressPercentage = Math.max(0, 100 - (timeRemaining / (GAME_CONFIG.COOLDOWN_SECONDS * 1000)) * 100);
+    setCooldownStatus(
+      (status) => transactionStatus = status,
+      (message) => statusMessage = message,
+      (percentage) => progressPercentage = percentage,
+      `Shot committed successfully! Cooldown: ${Math.ceil(timeRemaining / 1000)}s remaining`,
+      calculateCooldownProgress(timeRemaining)
+    );
   } else if (timeRemaining <= 0 && transactionStatus === 'cooldown') {
-    transactionStatus = 'idle';
-    statusMessage = '';
-    progressPercentage = 0;
+    resetTransactionStatus(
+      (status) => transactionStatus = status,
+      (message) => statusMessage = message,
+      (percentage) => progressPercentage = percentage,
+      0
+    );
   }
 
   // Update cooldown message dynamically
   $: if (transactionStatus === 'cooldown' && timeRemaining > 0) {
     statusMessage = `Shot committed successfully! Cooldown: ${Math.ceil(timeRemaining / 1000)}s remaining`;
-    progressPercentage = Math.max(0, 100 - (timeRemaining / (GAME_CONFIG.COOLDOWN_SECONDS * 1000)) * 100);
+    progressPercentage = calculateCooldownProgress(timeRemaining);
   }
 
   // Check for saved secrets in localStorage on component mount
-  const checkForSavedSecrets = () => {
+  const checkForSavedSecretsOnMount = () => {
     try {
       const wallet = get(walletStore);
       if (!wallet.connected || !wallet.address) {
         return;
       }
 
-      // Get the list of saved secrets for this wallet
-      const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
-      let savedSecretKeys = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
-      
-      // Filter out any invalid or expired secrets
-      savedSecretKeys = savedSecretKeys.filter(key => {
-        try {
-          const secretDataStr = localStorage.getItem(key);
-          if (!secretDataStr) return false;
-          
-          const secretData = JSON.parse(secretDataStr);
-          // Basic validation - check if required fields exist
-          return secretData.secret && secretData.txHash && secretData.walletAddress === wallet.address;
-        } catch (e) {
-          // Remove invalid entries
-          return false;
-        }
-      });
-      
-      // Update the saved secrets list in localStorage
-      localStorage.setItem(savedSecretsKey, JSON.stringify(savedSecretKeys));
-      
-      // If we have saved secrets, get the most recent one
-      if (savedSecretKeys.length > 0) {
-        // Get the most recent secret (last in the array)
-        const mostRecentKey = savedSecretKeys[savedSecretKeys.length - 1];
-        const secretDataStr = localStorage.getItem(mostRecentKey);
+      const savedSecret = checkForSavedSecrets(wallet.address);
+      if (savedSecret) {
+        // Set the pending secret and show the reveal modal
+        pendingSecret = savedSecret.secret;
+        pendingTxHash = savedSecret.txHash;
+        showRevealModal = true;
         
-        if (secretDataStr) {
-          const secretData = JSON.parse(secretDataStr);
-          
-          // Set the pending secret and show the reveal modal
-          pendingSecret = secretData.secret;
-          pendingTxHash = secretData.txHash;
-          showRevealModal = true;
-          
-          toastStore.info('Found saved shot! Click "Reveal Now" to complete your shot.');
-          console.log('💾 Found saved secret in localStorage:', mostRecentKey);
-        }
+        toastStore.info('Found saved shot! Click "Reveal Now" to complete your shot.');
+        console.log('💾 Found saved secret in localStorage for wallet:', wallet.address);
       }
     } catch (error) {
       console.error('❌ Failed to check for saved secrets in localStorage:', error);
@@ -869,247 +407,75 @@
     console.log('🔧 Cooldown remaining:', $cooldownRemaining);
     
     // Check for saved secrets in localStorage
-    checkForSavedSecrets();
+    checkForSavedSecretsOnMount();
     
     if ($cooldownRemaining > 0) {
-      startCooldownTimer();
+      cooldownTimer.start();
     }
     
     console.log('✅ GameButton component mounted successfully');
   });
 
   onDestroy(() => {
-    if (cooldownTimer) {
-      clearInterval(cooldownTimer);
-    }
+    cooldownTimer.stop();
   });
 </script>
 
 <div class="flex flex-col items-center space-y-6">
   <!-- Main Game Button -->
-  <div class="relative">
-    {#if $contractDeployed === false}
-      <!-- Contract Not Deployed -->
-      <button
-        class="btn-game btn-error"
-        disabled
-      >
-        <span class="text-2xl font-bold">Contract Not Deployed</span>
-        <span class="text-sm opacity-80">Please deploy the smart contract first</span>
-      </button>
-    {:else if !$isConnected}
-      <!-- Not Connected -->
-      <button
-        on:click={() => walletStore.connect()}
-        class="btn-game btn-connect"
-        disabled={$isLoading}
-      >
-        <span class="text-2xl font-bold">Connect Wallet</span>
-        <span class="text-sm opacity-80">to take your shot</span>
-      </button>
-    {:else if !$isCorrectNetwork}
-      <!-- Wrong Network -->
-      <button
-        on:click={handleSwitchNetwork}
-        class="btn-game btn-warning"
-        disabled={$isLoading}
-      >
-        <span class="text-2xl font-bold">Switch Network</span>
-        <span class="text-sm opacity-80">to continue playing</span>
-      </button>
-    {:else if timeRemaining > 0}
-      <!-- Cooldown Active -->
-      <button
-        class="btn-game btn-disabled"
-        disabled
-      >
-        <span class="text-2xl font-bold">Cooldown Active</span>
-        <span class="text-sm opacity-80">Next shot in {formatTime(timeRemaining)}</span>
-      </button>
-    {:else if isLoadingState}
-      <!-- Enhanced Loading State with Detailed Status -->
-      <button
-        class="btn-game btn-loading"
-        disabled
-      >
-        <div class="flex items-center space-x-3">
-          <div class="spinner w-6 h-6"></div>
-          <div class="flex flex-col">
-            <span class="text-2xl font-bold">{loadingMessage}</span>
-            <span class="text-sm opacity-80">
-              {#if isTransactionInProgress}
-                {progressPercentage}% complete
-              {:else if isTakingShot}
-                Confirm in wallet
-              {:else}
-                Please wait...
-              {/if}
-            </span>
-          </div>
-        </div>
-      </button>
-    {:else if isFirstShotReady}
-      <!-- First Shot (Empty Pot) -->
-      <div class="flex flex-col space-y-3">
-        <button
-          on:click={handleTakeFirstShot}
-          class="btn-game btn-first-shot animate-glow"
-          disabled={false}
-          style="pointer-events: auto; cursor: pointer;"
-        >
-          <span class="text-3xl font-black">🚀 TAKE THE FIRST SHOT</span>
-          <span class="text-sm opacity-90">{formatEth(GAME_CONFIG.FIRST_SHOT_COST_ETH)} ETH • Start the pot!</span>
-        </button>
-        
-        <!-- Sponsor Option -->
-        <button
-          on:click={handleSponsorRound}
-          class="btn-sponsor"
-          disabled={$isLoading}
-        >
-          <span class="text-lg font-bold">💰 Sponsor Round</span>
-          <span class="text-xs opacity-80">{formatEth(GAME_CONFIG.SPONSOR_COST_ETH)} ETH • Add to pot without playing</span>
-        </button>
-      </div>
-    {:else if isRegularShotReady}
-      <!-- Ready to Take Shot -->
-      <button
-        on:click={handleTakeShot}
-        class="btn-game btn-primary animate-glow"
-        disabled={false}
-        style="pointer-events: auto; cursor: pointer;"
-      >
-        <span class="text-3xl font-black">🎯 TAKE SHOT</span>
-        <span class="text-sm opacity-90">{formatEth(GAME_CONFIG.SHOT_COST_ETH)} ETH • {GAME_CONFIG.WIN_PERCENTAGE}% chance to win</span>
-      </button>
-    {:else}
-      <!-- Cannot Take Shot -->
-      <div class="flex flex-col space-y-2">
-        <button
-          class="btn-game btn-disabled"
-          disabled
-        >
-          <span class="text-2xl font-bold">Cannot Take Shot</span>
-          <span class="text-sm opacity-80">Check wallet connection and cooldown</span>
-        </button>
-        
-        <!-- Debug info and manual refresh - only show when debug mode is enabled -->
-        {#if $isConnected && $debugMode}
-          <div class="text-xs text-gray-400 text-center">
-            Debug: canShoot={$canTakeShot}, cooldown={$cooldownRemaining}s, pot={$currentPot}
-          </div>
-          <div class="flex flex-col space-y-2">
-            <button
-              on:click={handleManualRefresh}
-              class="btn-debug"
-              disabled={$isLoading}
-            >
-              🔄 Refresh Player Data
-            </button>
-            <button
-              on:click={handleCheckPendingShot}
-              class="btn-debug"
-              disabled={$isLoading}
-            >
-              🔍 Check Pending Shots
-            </button>
-            <button
-              on:click={handleDeepDebug}
-              class="btn-debug"
-              disabled={$isLoading}
-            >
-              🔧 Deep Debug
-            </button>
-            <button
-              on:click={handleCleanupExpiredShot}
-              class="btn-debug"
-              disabled={$isLoading}
-            >
-              🧹 Cleanup Expired Shot
-            </button>
-          </div>
-        {/if}
-      </div>
-    {/if}
+  <MainGameButton
+    {contractDeployed}
+    isConnected={$isConnected}
+    isCorrectNetwork={$isCorrectNetwork}
+    {timeRemaining}
+    {isLoadingState}
+    {loadingMessage}
+    {progressPercentage}
+    {isTransactionInProgress}
+    {isTakingShot}
+    {isFirstShotReady}
+    {isRegularShotReady}
+    currentPot={$currentPot}
+    isLoading={$isLoading}
+    onConnect={() => walletStore.connect()}
+    onSwitchNetwork={gameHandlers.handleSwitchNetwork}
+    onTakeFirstShot={gameHandlers.handleTakeFirstShot}
+    onTakeShot={gameHandlers.handleTakeShot}
+    onSponsorRound={gameHandlers.handleSponsorRound}
+  />
 
-    <!-- Pulse Effect for Ready State -->
-    {#if isRegularShotReady || isFirstShotReady}
-      <div class="absolute inset-0 rounded-2xl bg-red-500/20 animate-ping pointer-events-none"></div>
-    {/if}
-
-    <!-- Enhanced Status Bar for Loading States -->
-    {#if isLoadingState}
-      <div class="status-bar-container">
-        <div class="status-bar">
-          <div class="status-bar-fill transaction-progress" style="width: {progressPercentage}%;"></div>
-        </div>
-        <div class="status-text">
-          <span class="status-message">{loadingMessage}</span>
-          <span class="status-detail">
-            {#if isTransactionInProgress}
-              {#if progressPercentage <= 50}
-                Commit Phase: Step {Math.ceil(progressPercentage / 10)} of 10 • {progressPercentage}% complete
-              {:else if progressPercentage <= 95}
-                Reveal Phase: Step {Math.ceil((progressPercentage - 50) / 9)} of 5 • {progressPercentage}% complete
-              {:else}
-                Finalizing: {progressPercentage}% complete
-              {/if}
-            {:else if isTakingShot}
-              Waiting for wallet confirmation...
-            {:else}
-              Initializing...
-            {/if}
-          </span>
-        </div>
-      </div>
-    {:else if isCooldownState}
-      <!-- Cooldown Status Bar -->
-      <div class="status-bar-container">
-        <div class="status-bar cooldown-bar">
-          <div class="status-bar-fill cooldown-fill" style="width: {Math.max(0, 100 - (timeRemaining / (GAME_CONFIG.COOLDOWN_SECONDS * 1000)) * 100)}%;"></div>
-        </div>
-        <div class="status-text">
-          <span class="status-message">{transactionStatus === 'cooldown' ? 'Shot Committed!' : 'Cooldown Active'}</span>
-          <span class="status-detail">
-            {#if transactionStatus === 'cooldown'}
-              {cooldownMessage}
-            {:else}
-              Next shot in {formatTime(timeRemaining)}
-            {/if}
-          </span>
-        </div>
-      </div>
-    {/if}
-  </div>
+  <!-- Status Bar -->
+  <StatusBar
+    {isLoadingState}
+    {isCooldownState}
+    {progressPercentage}
+    {loadingMessage}
+    {statusMessage}
+    {transactionStatus}
+    {timeRemaining}
+    {isTransactionInProgress}
+    {isTakingShot}
+  />
 
   <!-- Game Stats -->
-  <div class="grid grid-cols-3 gap-4 text-center">
-    <div class="bg-gray-800/50 rounded-lg p-3">
-      <div class="text-lg font-bold text-yellow-400">{GAME_CONFIG.WIN_PERCENTAGE}%</div>
-      <div class="text-xs text-gray-400">Win Chance</div>
-    </div>
-    <div class="bg-gray-800/50 rounded-lg p-3">
-      <div class="text-lg font-bold text-green-400">{GAME_CONFIG.WINNER_PERCENTAGE}%</div>
-      <div class="text-xs text-gray-400">Winner Gets</div>
-    </div>
-    <div class="bg-gray-800/50 rounded-lg p-3">
-      <div class="text-lg font-bold text-blue-400">{configFormatTime(GAME_CONFIG.COOLDOWN_SECONDS)}</div>
-      <div class="text-xs text-gray-400">Cooldown</div>
-    </div>
-  </div>
+  <GameStats />
 
   <!-- Error Message -->
-  {#if $gameError}
-    <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4 text-center max-w-md">
-      <div class="text-red-400 font-semibold mb-2">⚠️ Game Error</div>
-      <div class="text-red-300 text-sm">{$gameError}</div>
-      {#if $contractDeployed === false}
-        <div class="text-red-200 text-xs mt-2">
-          Deploy the smart contract using: <code class="bg-red-800/30 px-1 rounded">pnpm run deploy:testnet</code>
-        </div>
-      {/if}
-    </div>
-  {/if}
+  <ErrorMessage gameError={$gameError} {contractDeployed} />
+
+  <!-- Debug Panel -->
+  <DebugPanel
+    isConnected={$isConnected}
+    debugMode={$debugMode}
+    canTakeShot={$canTakeShot}
+    cooldownRemaining={$cooldownRemaining}
+    currentPot={$currentPot}
+    isLoading={$isLoading}
+    onManualRefresh={handleManualRefresh}
+    onCheckPendingShot={handleCheckPendingShot}
+    onDeepDebug={handleDeepDebug}
+    onCleanupExpiredShot={handleCleanupExpiredShot}
+  />
 
   <!-- Risk Warning -->
   <div class="text-center text-xs text-gray-500 max-w-md">
@@ -1121,489 +487,15 @@
 </div>
 
 <!-- Reveal Confirmation Modal -->
-{#if showRevealModal}
-  <div class="modal-overlay" on:click|self={() => showRevealModal = false}>
-    <div class="reveal-modal">
-      <div class="modal-header">
-        <h2>🎯 Shot Committed Successfully!</h2>
-        <button
-          class="close-btn"
-          on:click={() => showRevealModal = false}
-          disabled={revealingShot}
-        >
-          ✕
-        </button>
-      </div>
-      
-      <div class="modal-content">
-        <p class="success-message">
-          Your shot has been committed to the blockchain! Now you need to reveal it to see if you won.
-        </p>
-        
-        {#if pendingTxHash}
-          <div class="tx-info">
-            <p><strong>Transaction:</strong> <code class="tx-hash">{pendingTxHash.slice(0, 10)}...{pendingTxHash.slice(-8)}</code></p>
-          </div>
-        {/if}
-        
-        <div class="secret-info">
-          <p><strong>Your Secret:</strong></p>
-          <div class="secret-display">
-            <code class="secret-code">{pendingSecret}</code>
-          </div>
-          <p class="secret-warning">
-            ⚠️ <strong>Important:</strong> Save this secret! You'll need it to reveal your shot if you don't do it now.
-          </p>
-        </div>
-        
-        {#if revealingShot}
-          <div class="status-message">
-            <div class="flex items-center space-x-2">
-              <div class="spinner-small"></div>
-              <span>Communicating with blockchain...</span>
-            </div>
-          </div>
-        {/if}
-        
-        {#if savingToLocalStorage}
-          <div class="status-message">
-            <div class="flex items-center space-x-2">
-              <div class="spinner-small"></div>
-              <span>Saving to browser storage...</span>
-            </div>
-          </div>
-        {/if}
-        
-        {#if copyingToClipboard}
-          <div class="status-message">
-            <div class="flex items-center space-x-2">
-              <div class="spinner-small"></div>
-              <span>Copying to clipboard...</span>
-            </div>
-          </div>
-        {/if}
-        
-        <div class="modal-actions">
-          <button
-            class="reveal-now-btn"
-            on:click={handleRevealNow}
-            disabled={revealingShot || savingToLocalStorage || copyingToClipboard}
-          >
-            {#if revealingShot}
-              <div class="spinner-small"></div>
-              Revealing...
-            {:else}
-              🎲 Reveal Now
-            {/if}
-          </button>
-          
-          <button
-            class="save-storage-btn"
-            on:click={handleSaveToLocalStorage}
-            disabled={revealingShot || savingToLocalStorage || copyingToClipboard}
-          >
-            {#if savingToLocalStorage}
-              <div class="spinner-small"></div>
-              Saving...
-            {:else}
-              💾 Save to Browser
-            {/if}
-          </button>
-          
-          <button
-            class="save-clipboard-btn"
-            on:click={handleSaveForLater}
-            disabled={revealingShot || savingToLocalStorage || copyingToClipboard}
-          >
-            {#if copyingToClipboard}
-              <div class="spinner-small"></div>
-              Copying...
-            {:else}
-              📋 Copy to Clipboard
-            {/if}
-          </button>
-        </div>
-        
-        <div class="modal-footer">
-          <p class="footer-text">
-            You can reveal your shot anytime within 256 blocks (~51-85 minutes) after committing.
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-{/if}
-
-<style>
-  .btn-game {
-    @apply relative flex flex-col items-center justify-center;
-    @apply w-80 h-32 rounded-2xl border-2;
-    @apply font-bold text-white transition-all duration-300;
-    @apply focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-gray-900;
-    @apply transform hover:scale-105 active:scale-95;
-  }
-
-  .btn-primary {
-    @apply bg-gradient-to-br from-red-500 to-red-600;
-    @apply border-red-400 hover:from-red-400 hover:to-red-500;
-    @apply shadow-lg hover:shadow-xl;
-    @apply focus:ring-red-500;
-  }
-
-  .btn-connect {
-    @apply bg-gradient-to-br from-blue-500 to-blue-600;
-    @apply border-blue-400 hover:from-blue-400 hover:to-blue-500;
-    @apply shadow-lg hover:shadow-xl;
-    @apply focus:ring-blue-500;
-  }
-
-  .btn-warning {
-    @apply bg-gradient-to-br from-yellow-500 to-yellow-600;
-    @apply border-yellow-400 hover:from-yellow-400 hover:to-yellow-500;
-    @apply shadow-lg hover:shadow-xl;
-    @apply focus:ring-yellow-500;
-  }
-
-  .btn-error {
-    @apply bg-gradient-to-br from-red-800 to-red-900;
-    @apply border-red-700 cursor-not-allowed;
-    @apply opacity-80;
-  }
-
-  .btn-disabled {
-    @apply bg-gray-700 border-gray-600 cursor-not-allowed;
-    @apply opacity-60;
-  }
-
-  .btn-loading {
-    @apply bg-gradient-to-br from-purple-500 to-purple-600;
-    @apply border-purple-400;
-    @apply focus:ring-purple-500;
-  }
-
-  .btn-first-shot {
-    @apply bg-gradient-to-br from-green-500 to-green-600;
-    @apply border-green-400 hover:from-green-400 hover:to-green-500;
-    @apply shadow-lg hover:shadow-xl;
-    @apply focus:ring-green-500;
-  }
-
-  .btn-sponsor {
-    @apply relative flex flex-col items-center justify-center;
-    @apply w-80 h-20 rounded-xl border-2;
-    @apply font-bold text-white transition-all duration-300;
-    @apply focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-gray-900;
-    @apply transform hover:scale-105 active:scale-95;
-    @apply bg-gradient-to-br from-yellow-600 to-yellow-700;
-    @apply border-yellow-500 hover:from-yellow-500 hover:to-yellow-600;
-    @apply shadow-md hover:shadow-lg;
-    @apply focus:ring-yellow-500;
-  }
-
-  .btn-sponsor:disabled {
-    @apply transform-none hover:scale-100;
-    @apply opacity-60 cursor-not-allowed;
-  }
-
-  .btn-game:disabled {
-    @apply transform-none hover:scale-100;
-  }
-
-  .spinner {
-    @apply border-2 border-gray-300 border-t-white rounded-full animate-spin;
-  }
-
-  /* Status Bar Styles */
-  .status-bar-container {
-    @apply w-80 mt-4 mx-auto;
-  }
-
-  .status-bar {
-    @apply w-full h-2 bg-gray-700 rounded-full overflow-hidden;
-  }
-
-  .status-bar-fill {
-    @apply h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500 ease-out;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .status-bar-fill::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-    animation: shimmer 2s infinite;
-  }
-
-  .transaction-progress {
-    @apply bg-gradient-to-r from-green-500 to-blue-500;
-  }
-
-  .transaction-progress::after {
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-    animation: shimmer 1.5s infinite;
-  }
-
-  .cooldown-bar {
-    @apply bg-gray-600;
-  }
-
-  .cooldown-fill {
-    @apply bg-gradient-to-r from-red-500 to-orange-500 rounded-full transition-all duration-1000 ease-out;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .cooldown-fill::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    animation: shimmer 2s infinite;
-  }
-
-  @keyframes shimmer {
-    0% {
-      transform: translateX(-100%);
-    }
-    100% {
-      transform: translateX(100%);
-    }
-  }
-
-  .status-text {
-    @apply mt-2 text-center space-y-1;
-  }
-
-  .status-message {
-    @apply text-sm font-semibold text-white;
-  }
-
-  .status-detail {
-    @apply text-xs text-gray-400;
-  }
-
-  @keyframes glow {
-    0%, 100% {
-      box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
-    }
-    50% {
-      box-shadow: 0 0 40px rgba(239, 68, 68, 0.8);
-    }
-  }
-
-  .animate-glow {
-    animation: glow 2s ease-in-out infinite;
-  }
-
-  @keyframes ping {
-    75%, 100% {
-      transform: scale(1.1);
-      opacity: 0;
-    }
-  }
-
-  .animate-ping {
-    animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-  }
-
-  .btn-debug {
-    @apply px-4 py-2 text-xs font-medium text-gray-300;
-    @apply bg-gray-700 hover:bg-gray-600 border border-gray-600;
-    @apply rounded-lg transition-colors duration-200;
-    @apply focus:outline-none focus:ring-2 focus:ring-gray-500;
-  }
-
-  .btn-debug:disabled {
-    @apply opacity-50 cursor-not-allowed;
-  }
-
-  /* Reveal Modal Styles */
-  .modal-overlay {
-    @apply fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50;
-    backdrop-filter: blur(4px);
-  }
-
-  .reveal-modal {
-    @apply bg-gray-900 border-2 border-red-500 rounded-2xl p-6 max-w-md w-full mx-4;
-    @apply shadow-2xl;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    animation: modalSlideIn 0.3s ease-out;
-  }
-
-  @keyframes modalSlideIn {
-    from {
-      transform: translateY(-20px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  .modal-header {
-    @apply flex justify-between items-center mb-4;
-  }
-
-  .modal-header h2 {
-    @apply text-xl font-bold text-green-400 m-0;
-  }
-
-  .close-btn {
-    @apply text-gray-400 hover:text-white text-xl font-bold;
-    @apply w-8 h-8 flex items-center justify-center rounded-full;
-    @apply hover:bg-gray-700 transition-colors duration-200;
-    @apply border-none bg-transparent cursor-pointer;
-  }
-
-  .close-btn:disabled {
-    @apply opacity-50 cursor-not-allowed;
-  }
-
-  .modal-content {
-    @apply text-white;
-  }
-
-  .success-message {
-    @apply text-green-300 mb-4 text-sm leading-relaxed;
-  }
-
-  .tx-info {
-    @apply bg-gray-800 rounded-lg p-3 mb-4;
-  }
-
-  .tx-info p {
-    @apply text-sm text-gray-300 m-0;
-  }
-
-  .tx-hash {
-    @apply bg-gray-700 px-2 py-1 rounded text-xs font-mono text-blue-300;
-  }
-
-  .secret-info {
-    @apply bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-4 mb-4;
-  }
-
-  .secret-info p {
-    @apply text-sm text-yellow-200 m-0 mb-2;
-  }
-
-  .secret-display {
-    @apply bg-gray-800 rounded-lg p-3 mb-3;
-  }
-
-  .secret-code {
-    @apply font-mono text-lg text-green-400 font-bold;
-    word-break: break-all;
-  }
-
-  .secret-warning {
-    @apply text-xs text-yellow-300 font-medium;
-  }
-
-  .modal-actions {
-    @apply flex flex-col gap-2 mb-4;
-  }
-
-  .reveal-now-btn {
-    @apply w-full bg-gradient-to-r from-green-500 to-green-600;
-    @apply text-white font-bold py-3 px-4 rounded-lg;
-    @apply hover:from-green-400 hover:to-green-500 transition-all duration-200;
-    @apply border-none cursor-pointer;
-    @apply flex items-center justify-center gap-2;
-  }
-
-  .save-storage-btn {
-    @apply w-full bg-gradient-to-r from-purple-500 to-purple-600;
-    @apply text-white font-bold py-3 px-4 rounded-lg;
-    @apply hover:from-purple-400 hover:to-purple-500 transition-all duration-200;
-    @apply border-none cursor-pointer;
-  }
-
-  .save-clipboard-btn {
-    @apply w-full bg-gradient-to-r from-blue-500 to-blue-600;
-    @apply text-white font-bold py-3 px-4 rounded-lg;
-    @apply hover:from-blue-400 hover:to-blue-500 transition-all duration-200;
-    @apply border-none cursor-pointer;
-  }
-
-  .reveal-now-btn:disabled,
-  .save-storage-btn:disabled,
-  .save-clipboard-btn:disabled {
-    @apply opacity-60 cursor-not-allowed;
-  }
-
-  .spinner-small {
-    @apply w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin;
-  }
-
-  .modal-footer {
-    @apply border-t border-gray-700 pt-3;
-  }
-
-  .footer-text {
-    @apply text-xs text-gray-400 text-center m-0;
-  }
-
-  .status-message {
-    @apply bg-gray-800 rounded-lg p-3 mb-4 text-center;
-  }
-
-  .status-message span {
-    @apply text-sm text-blue-300 font-medium;
-  }
-
-  /* Mobile Responsive */
-  @media (max-width: 640px) {
-    .btn-game {
-      @apply w-72 h-28;
-    }
-    
-    .btn-game span:first-child {
-      @apply text-xl;
-    }
-    
-    .btn-sponsor {
-      @apply w-72 h-16;
-    }
-    
-    .btn-sponsor span:first-child {
-      @apply text-base;
-    }
-
-    .reveal-modal {
-      @apply mx-2 p-4;
-    }
-
-    .modal-actions {
-      @apply flex-col gap-2;
-    }
-    
-    .reveal-now-btn,
-    .save-storage-btn,
-    .save-clipboard-btn {
-      @apply text-sm py-2;
-    }
-
-    /* Mobile Status Bar Styles */
-    .status-bar-container {
-      @apply w-72 mx-auto;
-    }
-    
-    .status-message {
-      @apply text-xs;
-    }
-    
-    .status-detail {
-      @apply text-xs;
-    }
-  }
-</style>
+<RevealModal
+  {showRevealModal}
+  {pendingSecret}
+  {pendingTxHash}
+  {revealingShot}
+  {savingToLocalStorage}
+  {copyingToClipboard}
+  onClose={handleCloseModal}
+  onRevealNow={handleRevealNow}
+  onSaveToLocalStorage={handleSaveToLocalStorage}
+  onSaveForLater={handleSaveForLater}
+/>

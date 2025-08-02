@@ -200,13 +200,14 @@ export const takeShot = async ({
         takingShot: false
       }));
       
-      // Store secret in localStorage for persistence
+      // Store secret in localStorage for persistence - ONLY for regular shots, not first shots
       try {
         const secretKey = `ethshot_secret_${wallet.address}_${receipt.hash.slice(0, 10)}`;
         const secretData = {
           secret,
           txHash: receipt.hash,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          isFirstShot: false // Mark as regular shot
         };
         localStorage.setItem(secretKey, JSON.stringify(secretData));
         
@@ -540,10 +541,13 @@ export const revealShot = async ({
       balance: ethers.formatEther(balance)
     });
     
-    // Check if user has enough ETH for gas fees
-    if (balance < estimatedGasCost) {
-      const shortfall = ethers.formatEther(estimatedGasCost - balance);
-      throw new Error(`Insufficient ETH for gas fees. Need ${shortfall} more ETH to reveal your shot. Your current balance: ${ethers.formatEther(balance)} ETH`);
+    // Check if user has enough ETH for gas fees with a more lenient buffer
+    // Since revealing might result in winning ETH back, we use a smaller safety margin
+    const minRequiredBalance = estimatedGasCost;
+    
+    if (balance < minRequiredBalance) {
+      const shortfall = ethers.formatEther(minRequiredBalance - balance);
+      throw new Error(`This transaction may fail because there's not enough ETH to cover the network fee. Please add more ETH to this account and try again. Need ${shortfall} more ETH. Current balance: ${ethers.formatEther(balance)} ETH`);
     }
     
     updateStatus('sending_reveal', 'Sending reveal transaction...');
