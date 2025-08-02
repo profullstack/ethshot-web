@@ -133,7 +133,7 @@ export const createGameActionHandlers = (dependencies) => {
           console.log('✅ Shot revealed automatically:', revealResult);
           
           // Show appropriate message based on win/loss
-          if (revealResult.won) {
+          if (revealResult && revealResult.won) {
             toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
             console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
           } else {
@@ -391,7 +391,7 @@ export const createGameActionHandlers = (dependencies) => {
       console.log('✅ Shot revealed successfully:', result);
       
       // Show appropriate message based on win/loss
-      if (result.won) {
+      if (result && result.won) {
         toastStore.success('🎉 JACKPOT! YOU WON! 🎊');
         console.log('🎉 Shot revealed - YOU WON THE JACKPOT!');
       } else {
