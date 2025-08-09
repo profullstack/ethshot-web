@@ -457,6 +457,19 @@ export const CONTRACT_ABI = [
         "type": "bytes32"
       }
     ],
+    "name": "commitFirstShot",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "commitment",
+        "type": "bytes32"
+      }
+    ],
     "name": "commitShot",
     "outputs": [],
     "stateMutability": "payable",
