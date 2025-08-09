@@ -242,6 +242,47 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     }
     
     /**
+     * @dev Commit to taking a first shot with configurable amount (step 1 of commit-reveal)
+     * @param commitment Hash of (secret + player address)
+     * @notice Accepts any amount >= SHOT_COST for first shots when pot is empty
+     * @notice This allows frontend to configure first shot cost via VITE_FIRST_SHOT_COST_ETH
+     */
+    function commitFirstShot(bytes32 commitment)
+        external
+        payable
+        whenNotPaused
+        nonReentrant
+        canCommit(msg.sender)
+    {
+        require(commitment != bytes32(0), "Invalid commitment");
+        require(msg.value >= SHOT_COST, "Payment too low");
+        require(currentPot == 0, "Not a first shot - pot must be empty");
+        
+        // Store pending shot with actual amount paid
+        pendingShots[msg.sender] = PendingShot({
+            commitment: commitment,
+            blockNumber: block.number,
+            amount: msg.value, // Store actual amount paid
+            exists: true
+        });
+        
+        // Update player stats with actual amount
+        PlayerStats storage stats = playerStats[msg.sender];
+        unchecked {
+            stats.totalShots++;
+            stats.totalSpent += msg.value;
+        }
+        lastShotTime[msg.sender] = block.timestamp;
+        
+        // Add full amount to pot
+        unchecked {
+            currentPot += msg.value;
+        }
+        
+        emit ShotCommitted(msg.sender, commitment, msg.value);
+    }
+    
+    /**
      * @dev Reveal the shot and determine outcome (step 2 of commit-reveal)
      * @param secret The secret used in the commitment
      * @notice FIXED: Prevent first shot from winning when pot only contains their contribution
