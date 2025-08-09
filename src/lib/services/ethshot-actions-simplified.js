@@ -111,9 +111,21 @@ export const takeShot = async ({
       
       // ethers v6: estimateGas is a namespace, not a property on the function
       console.log('🔧 [takeShot] Calling contractWithSigner.estimateGas.commitShot...');
-      gasEstimate = await contractWithSigner.estimateGas.commitShot(tempCommitment, {
-        value: shotCost
-      });
+      
+      // Check if estimateGas is available (ethers v6 style)
+      if (contractWithSigner.estimateGas && contractWithSigner.estimateGas.commitShot) {
+        gasEstimate = await contractWithSigner.estimateGas.commitShot(tempCommitment, {
+          value: shotCost
+        });
+      } else if (contractWithSigner.commitShot && contractWithSigner.commitShot.estimateGas) {
+        // Fallback to ethers v5 style
+        console.log('🔧 [takeShot] Using ethers v5 style gas estimation...');
+        gasEstimate = await contractWithSigner.commitShot.estimateGas(tempCommitment, {
+          value: shotCost
+        });
+      } else {
+        throw new Error('Gas estimation not available on contract');
+      }
       console.log('✅ [takeShot] Gas estimation successful:', gasEstimate.toString());
     } catch (estimateError) {
       console.error('❌ [takeShot] Failed to estimate gas:', estimateError);
