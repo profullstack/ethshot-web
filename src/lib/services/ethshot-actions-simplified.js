@@ -155,8 +155,11 @@ export const takeShot = async ({
     const estimatedGasCost = gasLimit * gasPrice;
     const totalCost = shotCost + estimatedGasCost;
 
+    // Calculate payment amounts and first shot detection early
+    const customCostWei = customShotCost ? ethers.parseEther(customShotCost) : null;
+    const isFirstShot = customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH);
+
     // For balance check, use the higher of actual cost or custom cost (in wei)
-    // Note: customCostWei is already defined in the payment validation section above
     const balanceCheckCost = customCostWei
       ? ((customCostWei > shotCost ? customCostWei : shotCost) + estimatedGasCost)
       : totalCost;
@@ -259,9 +262,6 @@ export const takeShot = async ({
       }
       
       // Check 5: Verify payment amount and handle first shot logic
-      const customCostWei = customShotCost ? ethers.parseEther(customShotCost) : null;
-      const isFirstShot = customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH);
-      
       console.log('🔧 [takeShot] Payment validation:', {
         shotCostFromContract: ethers.formatEther(shotCost),
         customCost: customShotCost || 'none',
