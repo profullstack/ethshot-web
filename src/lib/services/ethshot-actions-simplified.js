@@ -171,9 +171,94 @@ export const takeShot = async ({
     console.log('🔧 [takeShot] Generating secret and commitment...');
     const secret = ethers.hexlify(ethers.randomBytes(32));
     console.log('🔧 [takeShot] Generated secret:', secret);
+    
+    // IMPORTANT: Contract expects uint256 secret, not bytes32
+    // Convert hex string to BigInt for proper encoding
+    const secretBigInt = BigInt(secret);
+    console.log('🔧 [takeShot] Secret as BigInt:', secretBigInt.toString());
+    
     // Contract expects: keccak256(abi.encodePacked(secret, msg.sender))
-    const commitment = ethers.keccak256(ethers.solidityPacked(['uint256', 'address'], [secret, wallet.address]));
+    const commitment = ethers.keccak256(ethers.solidityPacked(['uint256', 'address'], [secretBigInt, wallet.address]));
     console.log('🔧 [takeShot] Generated commitment:', commitment);
+    
+    // Validate commitment is not zero
+    if (commitment === ethers.ZeroHash) {
+      throw new Error('Generated invalid commitment (zero hash)');
+    }
+
+    updateStatus('pre_flight_check', 'Performing pre-flight validation...');
+    
+    // Pre-flight validation checks
+    try {
+      console.log('🔧 [takeShot] Running comprehensive pre-flight checks...');
+      
+      // Check 1: Contract not paused
+      try {
+        const isPaused = await contract.paused();
+        console.log('🔧 [takeShot] Contract paused:', isPaused);
+        if (isPaused) {
+          throw new Error('Contract is currently paused. Please try again later.');
+        }
+      } catch (pauseError) {
+        console.warn('⚠️ [takeShot] Could not check pause status:', pauseError.message);
+        // Continue - some contracts might not have paused() function
+      }
+      
+      // Check 2: Player can commit shot
+      const canCommit = await contract.canCommitShot(wallet.address);
+      console.log('🔧 [takeShot] Can commit shot:', canCommit);
+      
+      if (!canCommit) {
+        // Get more specific information about why they can't commit
+        const cooldownRemaining = await contract.getCooldownRemaining(wallet.address);
+        const hasPending = await contract.hasPendingShot(wallet.address);
+        
+        console.log('🔧 [takeShot] Cooldown remaining:', cooldownRemaining.toString(), 'seconds');
+        console.log('🔧 [takeShot] Has pending shot:', hasPending);
+        
+        if (cooldownRemaining > 0) {
+          throw new Error(`Cooldown period not elapsed. Please wait ${cooldownRemaining} more seconds.`);
+        }
+        
+        if (hasPending) {
+          throw new Error('You have a pending shot that needs to be revealed first.');
+        }
+        
+        throw new Error('Cannot commit shot at this time. Please check contract conditions.');
+      }
+      
+      // Check 3: Verify the commitment is not zero
+      if (commitment === ethers.ZeroHash) {
+        throw new Error('Invalid commitment generated');
+      }
+      
+      // Check 4: Verify wallet is EOA (not a contract)
+      // This is critical because the contract requires tx.origin == msg.sender
+      try {
+        const code = await wallet.provider.getCode(wallet.address);
+        if (code !== '0x') {
+          console.warn('⚠️ [takeShot] Wallet appears to be a smart contract. This may cause transaction to revert due to EOA requirement.');
+          // Don't throw here, but warn the user
+        } else {
+          console.log('✅ [takeShot] Wallet is EOA (externally owned account)');
+        }
+      } catch (codeError) {
+        console.warn('⚠️ [takeShot] Could not verify wallet type:', codeError.message);
+      }
+      
+      // Check 5: Verify payment amount matches contract expectation
+      const expectedValue = customCostWei ? customCostWei : shotCost;
+      console.log('🔧 [takeShot] Payment validation:', {
+        expectedValue: ethers.formatEther(expectedValue),
+        shotCostFromContract: ethers.formatEther(shotCost),
+        customCost: customShotCost || 'none'
+      });
+      
+      console.log('✅ [takeShot] Pre-flight checks passed');
+    } catch (preFlightError) {
+      console.error('❌ [takeShot] Pre-flight check failed:', preFlightError);
+      throw preFlightError;
+    }
 
     updateStatus('sending_transaction', 'Sending transaction to blockchain...');
 
@@ -182,15 +267,59 @@ export const takeShot = async ({
       value: customCostWei ? ethers.formatEther(customCostWei) : ethers.formatEther(shotCost),
       gasLimit: gasLimit.toString()
     });
-    const tx = await contractWithSigner.commitShot(commitment, {
-      value: customCostWei ? customCostWei : shotCost,
-      gasLimit
-    });
-    console.log('✅ [takeShot] Transaction sent, hash:', tx.hash);
+    let tx;
+    try {
+      tx = await contractWithSigner.commitShot(commitment, {
+        value: customCostWei ? customCostWei : shotCost,
+        gasLimit
+      });
+      console.log('✅ [takeShot] Transaction sent, hash:', tx.hash);
+    } catch (sendError) {
+      console.error('❌ [takeShot] Failed to send commitShot transaction:', sendError);
+      
+      // Check for specific revert reasons
+      if (sendError.code === 'CALL_EXCEPTION') {
+        // Try to get more specific error information
+        let errorMessage = 'Transaction would revert';
+        
+        if (sendError.reason) {
+          errorMessage = `Contract rejected transaction: ${sendError.reason}`;
+        } else if (sendError.data) {
+          errorMessage = `Contract rejected transaction with data: ${sendError.data}`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      throw sendError;
+    }
 
     updateStatus('waiting_confirmation', 'Waiting for blockchain confirmation...');
 
-    const receipt = await tx.wait();
+    let receipt;
+    try {
+      receipt = await tx.wait();
+      console.log('✅ [takeShot] Transaction confirmed:', {
+        hash: receipt.hash,
+        status: receipt.status,
+        gasUsed: receipt.gasUsed?.toString(),
+        blockNumber: receipt.blockNumber
+      });
+      
+      // Check if transaction was successful
+      if (receipt.status !== 1) {
+        throw new Error('Transaction reverted during execution');
+      }
+    } catch (waitError) {
+      console.error('❌ [takeShot] Transaction failed during confirmation:', waitError);
+      
+      if (waitError.code === 'CALL_EXCEPTION' && waitError.receipt?.status === 0) {
+        // Transaction was mined but reverted
+        throw new Error('Transaction was mined but reverted. This could be due to: insufficient balance, cooldown not elapsed, or contract validation failure.');
+      }
+      
+      throw waitError;
+    }
     
     updateStatus('processing', 'Processing transaction result...');
     
