@@ -72,6 +72,17 @@ export const takeShot = async ({
     throw new Error('Shot already in progress');
   }
 
+  // Validate callback/function parameters to avoid vague "t is not a function" errors
+  const assertFn = (fn, name) => {
+    if (fn != null && typeof fn !== 'function') {
+      throw new Error(`${name} is not a function`);
+    }
+  };
+  assertFn(updateGameState, 'updateGameState');
+  assertFn(loadGameState, 'loadGameState');
+  assertFn(loadPlayerData, 'loadPlayerData');
+  assertFn(onStatusUpdate, 'onStatusUpdate');
+
   let result;
 
   if (gameState.isMultiCryptoMode) {
@@ -446,7 +457,7 @@ export const takeShot = async ({
       });
       
       // Load updated player data
-      await loadPlayerData();
+      await loadPlayerData(wallet.address);
       
     } else {
       // Regular shot: store secret for later reveal and automatically reveal

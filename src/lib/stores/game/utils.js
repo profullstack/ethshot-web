@@ -54,6 +54,7 @@ export const ETH_SHOT_ABI = [
   'function commitShot(bytes32 commitment) external payable',
   'function revealShot(uint256 secret) external',
   'function sponsorRound(string calldata name, string calldata logoUrl) external payable',
+  'function paused() external view returns (bool)',
   'function getCurrentPot() external view returns (uint256)',
   'function getContractBalance() external view returns (uint256)',
   'function getHouseFunds() external view returns (uint256)',
