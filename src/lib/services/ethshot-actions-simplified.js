@@ -156,7 +156,7 @@ export const takeShot = async ({
     const totalCost = shotCost + estimatedGasCost;
 
     // For balance check, use the higher of actual cost or custom cost (in wei)
-    const customCostWei = customShotCost ? ethers.parseEther(customShotCost) : null;
+    // Note: customCostWei is already defined in the payment validation section above
     const balanceCheckCost = customCostWei
       ? ((customCostWei > shotCost ? customCostWei : shotCost) + estimatedGasCost)
       : totalCost;
@@ -258,13 +258,31 @@ export const takeShot = async ({
         console.warn('⚠️ [takeShot] Could not verify wallet type:', codeError.message);
       }
       
-      // Check 5: Verify payment amount matches contract expectation
-      const expectedValue = customCostWei ? customCostWei : shotCost;
+      // Check 5: Verify payment amount and handle first shot logic
+      const customCostWei = customShotCost ? ethers.parseEther(customShotCost) : null;
+      const isFirstShot = customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH);
+      
       console.log('🔧 [takeShot] Payment validation:', {
-        expectedValue: ethers.formatEther(expectedValue),
         shotCostFromContract: ethers.formatEther(shotCost),
-        customCost: customShotCost || 'none'
+        customCost: customShotCost || 'none',
+        isFirstShot: isFirstShot,
+        firstShotCostConfig: GAME_CONFIG.FIRST_SHOT_COST_ETH
       });
+      
+      // CRITICAL: Contract always requires exactly SHOT_COST payment
+      // For first shots, we send SHOT_COST to contract but track the higher amount for UI/database
+      if (customCostWei && customCostWei !== shotCost) {
+        if (isFirstShot) {
+          console.log('🔧 [takeShot] First shot detected - will send contract SHOT_COST but track higher amount');
+          console.log('🔧 [takeShot] Contract payment:', ethers.formatEther(shotCost), 'ETH');
+          console.log('🔧 [takeShot] UI/Database amount:', customShotCost, 'ETH');
+        } else {
+          console.warn('⚠️ [takeShot] Custom shot cost differs from contract SHOT_COST');
+          console.warn('⚠️ [takeShot] Contract expects exactly:', ethers.formatEther(shotCost), 'ETH');
+          console.warn('⚠️ [takeShot] Custom cost provided:', ethers.formatEther(customCostWei), 'ETH');
+          console.warn('⚠️ [takeShot] Overriding to match contract requirement');
+        }
+      }
       
       console.log('✅ [takeShot] Pre-flight checks passed');
     } catch (preFlightError) {
@@ -274,15 +292,19 @@ export const takeShot = async ({
 
     updateStatus('sending_transaction', 'Sending transaction to blockchain...');
 
+    // Final validation: always send exactly SHOT_COST to contract
     console.log('🔧 [takeShot] Sending commitShot transaction with:', {
       commitment,
-      value: customCostWei ? ethers.formatEther(customCostWei) : ethers.formatEther(shotCost),
-      gasLimit: gasLimit.toString()
+      value: ethers.formatEther(shotCost), // Always contract's SHOT_COST
+      gasLimit: gasLimit.toString(),
+      isFirstShot: isFirstShot,
+      customShotCost: customShotCost || 'none'
     });
+    
     let tx;
     try {
       tx = await contractWithSigner.commitShot(commitment, {
-        value: customCostWei ? customCostWei : shotCost,
+        value: shotCost, // Always use contract's SHOT_COST regardless of custom amount
         gasLimit
       });
       console.log('✅ [takeShot] Transaction sent, hash:', tx.hash);
@@ -335,26 +357,27 @@ export const takeShot = async ({
     
     updateStatus('processing', 'Processing transaction result...');
     
-    // Check if this is a first shot (pot is empty) by checking if custom shot cost indicates a first shot
-    const isFirstShot = customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH);
-    
     if (isFirstShot) {
       // First shot: no secret storage, no reveal needed - just adds to pot
       console.log('🚀 First shot detected - no secret storage or reveal needed');
+      console.log('🚀 Contract received:', ethers.formatEther(shotCost), 'ETH');
+      console.log('🚀 UI shows:', customShotCost, 'ETH');
       
       result = {
         hash: receipt.hash,
         receipt,
         isCommitOnly: true,
         isFirstShot: true,
-        won: false // First shots can't win
+        won: false, // First shots can't win
+        displayAmount: customShotCost, // Amount to show in UI
+        contractAmount: ethers.formatEther(shotCost) // Amount actually sent to contract
       };
       
-      // Log first shot to database immediately
+      // Log first shot to database with the display amount (what user intended to pay)
       try {
         await db.recordShot({
           playerAddress: wallet.address,
-          amount: customShotCost,
+          amount: customShotCost, // Use the display amount for database
           txHash: result?.hash || null,
           blockNumber: result?.receipt?.blockNumber || null,
           timestamp: new Date().toISOString(),
@@ -362,7 +385,7 @@ export const takeShot = async ({
           cryptoType: gameState.activeCrypto,
           contractAddress: gameState.contractAddress
         });
-        console.log('✅ First shot recorded in database');
+        console.log('✅ First shot recorded in database with display amount:', customShotCost);
       } catch (dbError) {
         console.error('Failed to log first shot to database:', dbError);
         // Don't throw here - the shot was successful even if logging failed
