@@ -93,6 +93,11 @@ export const takeShot = async ({
     const contractWithSigner = contract.connect(wallet.signer);
     const shotCost = await contract.SHOT_COST();
 
+    // Determine first-shot parameters and amount
+    const customCostWei = customShotCost ? ethers.parseEther(customShotCost) : null;
+    const isFirstShot = !!customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH);
+    const firstShotValue = isFirstShot ? (customCostWei || shotCost) : shotCost;
+
     updateStatus('checking_balance', 'Checking wallet balance...');
     
     // Check user balance
@@ -104,15 +109,16 @@ export const takeShot = async ({
     let gasEstimate;
     try {
       console.log('🔧 [takeShot] Starting gas estimation...');
-      // Generate a proper commitment for gas estimation
-      const tempSecret = 123456;
-      const tempCommitment = ethers.keccak256(ethers.solidityPacked(['uint256'], [tempSecret]));
-      console.log('🔧 [takeShot] Generated temp commitment for gas estimation:', tempCommitment);
+      // Generate a proper commitment for gas estimation (include sender for parity)
+      const tempSecret = 123456n;
+      const tempCommitment = ethers.keccak256(
+        ethers.solidityPacked(['uint256', 'address'], [tempSecret, wallet.address])
+      );
+      console.log('🔧 [takeShot] Generated temp commitment for gas estimation (with sender):', tempCommitment);
       
       // Choose the appropriate function for gas estimation
       if (isFirstShot) {
         console.log('🔧 [takeShot] Estimating gas for commitFirstShot...');
-        const firstShotValue = customCostWei || shotCost;
         
         if (contractWithSigner.estimateGas && contractWithSigner.estimateGas.commitFirstShot) {
           gasEstimate = await contractWithSigner.estimateGas.commitFirstShot(tempCommitment, {
@@ -164,22 +170,25 @@ export const takeShot = async ({
       // Fallback to a reasonable gas price (20 gwei)
       gasPrice = ethers.parseUnits('20', 'gwei');
     }
+
+    // Build explicit fee overrides to cap wallet's worst-case calculation
+    const txOverrides = { gasLimit };
+    if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+      txOverrides.maxFeePerGas = feeData.maxFeePerGas;
+      txOverrides.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
+    } else {
+      txOverrides.gasPrice = gasPrice;
+    }
     
     // Use BigInt for all cost math to avoid BigInt/number mixing errors
     const estimatedGasCost = gasLimit * gasPrice;
-    const totalCost = shotCost + estimatedGasCost;
-
-    // Calculate payment amounts and first shot detection early
-    const customCostWei = customShotCost ? ethers.parseEther(customShotCost) : null;
-    const isFirstShot = customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH);
-
-    // For balance check, use the higher of actual cost or custom cost (in wei)
-    const balanceCheckCost = customCostWei
-      ? ((customCostWei > shotCost ? customCostWei : shotCost) + estimatedGasCost)
-      : totalCost;
+    const totalCost = firstShotValue + estimatedGasCost;
+    const buffer = estimatedGasCost / 5n; // 20% safety buffer for wallet warnings
+    const balanceCheckCost = totalCost + buffer;
     
     console.log('Gas estimation details:', {
       shotCost: ethers.formatEther(shotCost),
+      firstShotValue: ethers.formatEther(firstShotValue),
       customShotCost: customShotCost || 'none',
       gasLimit: gasLimit.toString(),
       gasPrice: ethers.formatUnits(gasPrice, 'gwei') + ' gwei',
@@ -321,8 +330,8 @@ export const takeShot = async ({
         });
         
         tx = await contractWithSigner.commitFirstShot(commitment, {
-          value: firstShotValue, // Use the configured first shot amount
-          gasLimit
+          value: firstShotValue,
+          ...txOverrides
         });
         console.log('✅ [takeShot] First shot transaction sent, hash:', tx.hash);
       } else {
@@ -336,8 +345,8 @@ export const takeShot = async ({
         });
         
         tx = await contractWithSigner.commitShot(commitment, {
-          value: shotCost, // Always use contract's SHOT_COST for regular shots
-          gasLimit
+          value: shotCost,
+          ...txOverrides
         });
         console.log('✅ [takeShot] Regular shot transaction sent, hash:', tx.hash);
       }
