@@ -50,6 +50,7 @@ export const safeBigIntToNumber = (value) => {
  */
 export const ETH_SHOT_ABI = [
   // Game functions
+  'function commitFirstShot(bytes32 commitment) external payable',
   'function commitShot(bytes32 commitment) external payable',
   'function revealShot(uint256 secret) external',
   'function sponsorRound(string calldata name, string calldata logoUrl) external payable',
