@@ -2,8 +2,8 @@
  * Simplified Game Actions Service
  * 
  * Simplified business logic functions for game operations
- * This removes all pending shot complexity and implements a streamlined flow:
- * - First shot: Commit only (no reveal needed since it can't win)
+ * This implements a streamlined flow:
+ * - First shot: Commit then automatically reveal (cannot win; clears pending)
  * - Subsequent shots: Commit then automatically reveal
  * - Simple spinner during blockchain operations
  */
@@ -15,6 +15,27 @@ import { supabase } from '../database/client.js';
 import { rpcCache } from '../stores/game/cache.js';
 import { GAME_CONFIG } from '../config.js';
 
+/**
+ * Wait until the contract allows reveal (handles REVEAL_DELAY block requirement).
+ * Returns true when reveal window is open or pending shot cleared, false on timeout.
+ */
+const waitForRevealEligibility = async ({ wallet, contract, maxWaitMs = 45000, intervalMs = 1500 }) => {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const canReveal = await contract.canRevealShot(wallet.address);
+      if (canReveal) return true;
+
+      const hasPending = await contract.hasPendingShot(wallet.address);
+      // If no longer pending, nothing to reveal; treat as ready to stop waiting
+      if (!hasPending) return true;
+    } catch (e) {
+      console.warn('⚠️ [takeShot] Reveal eligibility check failed:', e?.message || e);
+    }
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+  return false;
+};
 /**
  * Take a shot in the game (simplified flow)
  * @param {Object} params - Parameters object
@@ -443,21 +464,87 @@ export const takeShot = async ({
           contractAddress: gameState.contractAddress
         });
         console.log('✅ First shot recorded in database with actual amount:', customShotCost || actualFirstShotAmountEth);
+
+        // Store secret in localStorage for persistence and recovery (first shot)
+        try {
+          const secretKey = `ethshot_secret_${wallet.address}_${receipt.hash.slice(0, 10)}`;
+          const secretData = {
+            secret,
+            txHash: receipt.hash,
+            timestamp: Date.now(),
+            isFirstShot: true // Mark as first shot
+          };
+          localStorage.setItem(secretKey, JSON.stringify(secretData));
+
+          // Also maintain a list of saved secrets for this wallet
+          const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+          const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+          existingSecrets.push(secretKey);
+          localStorage.setItem(savedSecretsKey, JSON.stringify(existingSecrets));
+
+          console.log('✅ Secret stored in localStorage for recovery (first shot):', secretKey);
+        } catch (storageError) {
+          console.warn('Failed to save secret to localStorage (first shot):', storageError);
+          // Don't throw here - the shot was successful even if storage failed
+        }
+
+        // Automatically reveal the first shot to clear pending state (cannot win by design)
+        updateStatus('waiting_reveal_window', 'Waiting for reveal window...');
+        const readyFirst = await waitForRevealEligibility({ wallet, contract });
+        if (readyFirst) {
+          updateStatus('auto_revealing', 'Automatically revealing shot...');
+          try {
+            console.log('🔧 [takeShot] Starting auto-reveal for first shot with secret:', secret);
+            const revealResult = await revealShot({
+              secret,
+              gameState,
+              wallet,
+              contract,
+              ethers,
+              loadGameState,
+              loadPlayerData,
+              onStatusUpdate
+            });
+            console.log('✅ [takeShot] Auto-reveal (first shot) completed:', revealResult);
+
+            // Update result with reveal information
+            result.revealResult = revealResult;
+            result.won = revealResult.won;
+          } catch (revealError) {
+            console.error('❌ [takeShot] Auto-reveal (first shot) failed:', revealError);
+            console.error('❌ [takeShot] Auto-reveal (first shot) error stack:', revealError.stack);
+
+            // Don't throw the error - instead provide a helpful message
+            // The secret is already stored in localStorage for manual recovery
+            toastStore.info('First shot committed but auto-reveal failed. Your secret is saved for manual reveal if needed.');
+
+            // Return the result without reveal information for the UI to handle
+            result.revealResult = {
+              hash: null,
+              receipt: null,
+              won: false,
+              autoRevealFailed: true,
+              error: revealError.message
+            };
+            result.won = false;
+          }
+        } else {
+          console.warn('⚠️ [takeShot] Reveal window did not open in time for first shot; leaving pending with saved secret');
+          toastStore.info('First shot committed. Waiting for the next block to reveal automatically soon.');
+          result.revealResult = {
+            hash: null,
+            receipt: null,
+            won: false,
+            autoRevealFailed: true,
+            error: 'Reveal window not yet open'
+          };
+          result.won = false;
+        }
       } catch (dbError) {
         console.error('Failed to log first shot to database:', dbError);
         // Don't throw here - the shot was successful even if logging failed
       }
       
-      // Update game state for first shot
-      updateGameState({
-        totalShots: gameState.totalShots + 1,
-        lastShotTime: new Date().toISOString(),
-        canShoot: false,
-        cooldownUntil: new Date(Date.now() + (parseInt(GAME_CONFIG.COOLDOWN_PERIOD) || 60000)).toISOString()
-      });
-      
-      // Load updated player data
-      await loadPlayerData(wallet.address);
       
     } else {
       // Regular shot: store secret for later reveal and automatically reveal
@@ -519,57 +606,68 @@ export const takeShot = async ({
         // Don't throw here - the shot was successful even if logging failed
       }
       
-      // Automatically reveal the shot after a short delay
-      updateStatus('auto_revealing', 'Automatically revealing shot...');
-      
-      // Wait a moment for blockchain state to update
-      console.log('🔧 [takeShot] Waiting 2 seconds before auto-reveal...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      try {
-        console.log('🔧 [takeShot] Starting auto-reveal with secret:', secret);
-        const revealResult = await revealShot({
-          secret,
-          gameState,
-          wallet,
-          contract,
-          ethers,
-          loadGameState,
-          loadPlayerData,
-          onStatusUpdate
-        });
-        console.log('✅ [takeShot] Auto-reveal completed:', revealResult);
-        
-        // Update result with reveal information
-        result.revealResult = revealResult;
-        result.won = revealResult.won;
-      } catch (revealError) {
-        console.error('❌ [takeShot] Auto-reveal failed:', revealError);
-        console.error('❌ [takeShot] Auto-reveal error stack:', revealError.stack);
-        
-        // Don't throw the error - instead provide a helpful message
-        // The secret is already stored in localStorage for manual recovery
-        toastStore.info('Shot committed but auto-reveal failed. Your secret is saved for manual reveal if needed.');
-        
-        // Return the result without reveal information for the UI to handle
+      // Automatically reveal the shot after commitment; wait until reveal window is open
+      updateStatus('waiting_reveal_window', 'Waiting for reveal window...');
+      const readyRegular = await waitForRevealEligibility({ wallet, contract });
+      if (readyRegular) {
+        updateStatus('auto_revealing', 'Automatically revealing shot...');
+        try {
+          console.log('🔧 [takeShot] Starting auto-reveal with secret:', secret);
+          const revealResult = await revealShot({
+            secret,
+            gameState,
+            wallet,
+            contract,
+            ethers,
+            loadGameState,
+            loadPlayerData,
+            onStatusUpdate
+          });
+          console.log('✅ [takeShot] Auto-reveal completed:', revealResult);
+          
+          // Update result with reveal information
+          result.revealResult = revealResult;
+          result.won = revealResult.won;
+        } catch (revealError) {
+          console.error('❌ [takeShot] Auto-reveal failed:', revealError);
+          console.error('❌ [takeShot] Auto-reveal error stack:', revealError.stack);
+          
+          // Don't throw the error - instead provide a helpful message
+          // The secret is already stored in localStorage for manual recovery
+          toastStore.info('Shot committed but auto-reveal failed. Your secret is saved for manual reveal if needed.');
+          
+          // Return the result without reveal information for the UI to handle
+          result.revealResult = {
+            hash: null,
+            receipt: null,
+            won: false,
+            autoRevealFailed: true,
+            error: revealError.message
+          };
+          result.won = false;
+        }
+      } else {
+        console.warn('⚠️ [takeShot] Reveal window did not open in time; leaving pending with saved secret');
+        toastStore.info('Shot committed. Waiting for the next block to reveal automatically soon.');
         result.revealResult = {
           hash: null,
           receipt: null,
           won: false,
           autoRevealFailed: true,
-          error: revealError.message
+          error: 'Reveal window not yet open'
         };
         result.won = false;
       }
     }
 
     // Update game state for all shots (first and regular)
-    updateGameState({
-      totalShots: gameState.totalShots + 1,
+    updateGameState(s => ({
+      ...(s ?? gameState),
+      totalShots: (s?.totalShots ?? gameState.totalShots) + 1,
       lastShotTime: new Date().toISOString(),
       canShoot: false,
       cooldownUntil: new Date(Date.now() + (parseInt(GAME_CONFIG.COOLDOWN_PERIOD) || 60000)).toISOString()
-    });
+    }));
 
     updateStatus('refreshing_state', 'Refreshing game state...');
 
