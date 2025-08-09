@@ -44,8 +44,15 @@ export const takeShot = async ({
   onStatusUpdate = null // New callback for status updates
 }) => {
   const updateStatus = (status, message) => {
-    if (onStatusUpdate) {
-      onStatusUpdate(status, message);
+    console.log(`🔄 [takeShot] Status: ${status} - ${message}`);
+    if (typeof onStatusUpdate === 'function') {
+      try {
+        onStatusUpdate(status, message);
+      } catch (e) {
+        console.error('❌ [takeShot] onStatusUpdate callback error:', e);
+      }
+    } else if (onStatusUpdate) {
+      console.warn('⚠️ [takeShot] onStatusUpdate provided but is not a function:', typeof onStatusUpdate);
     }
   };
 
@@ -96,15 +103,21 @@ export const takeShot = async ({
     // Estimate gas with proper commitment hash
     let gasEstimate;
     try {
+      console.log('🔧 [takeShot] Starting gas estimation...');
       // Generate a proper commitment for gas estimation
       const tempSecret = 123456;
       const tempCommitment = ethers.keccak256(ethers.solidityPacked(['uint256'], [tempSecret]));
+      console.log('🔧 [takeShot] Generated temp commitment for gas estimation:', tempCommitment);
       
-      gasEstimate = await contractWithSigner.commitShot.estimateGas(tempCommitment, {
+      // ethers v6: estimateGas is a namespace, not a property on the function
+      console.log('🔧 [takeShot] Calling contractWithSigner.estimateGas.commitShot...');
+      gasEstimate = await contractWithSigner.estimateGas.commitShot(tempCommitment, {
         value: shotCost
       });
+      console.log('✅ [takeShot] Gas estimation successful:', gasEstimate.toString());
     } catch (estimateError) {
-      console.warn('Failed to estimate gas, using default:', estimateError.message);
+      console.error('❌ [takeShot] Failed to estimate gas:', estimateError);
+      console.warn('⚠️ [takeShot] Using default gas estimate');
       gasEstimate = 100000n;
     }
     
@@ -126,13 +139,15 @@ export const takeShot = async ({
       gasPrice = ethers.parseUnits('20', 'gwei');
     }
     
-    const estimatedGasCost = Number(gasLimit) * Number(gasPrice);
-    const totalCost = Number(shotCost) + Number(estimatedGasCost);
+    // Use BigInt for all cost math to avoid BigInt/number mixing errors
+    const estimatedGasCost = gasLimit * gasPrice;
+    const totalCost = shotCost + estimatedGasCost;
 
-    // For balance check, use the higher of actual cost or custom cost
-    const balanceCheckCost = customShotCost ?
-      Math.max(Number(ethers.parseEther(customShotCost)), Number(shotCost)) + Number(estimatedGasCost) :
-      Number(totalCost);
+    // For balance check, use the higher of actual cost or custom cost (in wei)
+    const customCostWei = customShotCost ? ethers.parseEther(customShotCost) : null;
+    const balanceCheckCost = customCostWei
+      ? ((customCostWei > shotCost ? customCostWei : shotCost) + estimatedGasCost)
+      : totalCost;
     
     console.log('Gas estimation details:', {
       shotCost: ethers.formatEther(shotCost),
@@ -153,16 +168,25 @@ export const takeShot = async ({
     updateStatus('generating_commitment', 'Generating secure commitment...');
 
     // Generate commitment - CRITICAL FIX: Must match contract's expectation
+    console.log('🔧 [takeShot] Generating secret and commitment...');
     const secret = ethers.hexlify(ethers.randomBytes(32));
+    console.log('🔧 [takeShot] Generated secret:', secret);
     // Contract expects: keccak256(abi.encodePacked(secret, msg.sender))
     const commitment = ethers.keccak256(ethers.solidityPacked(['uint256', 'address'], [secret, wallet.address]));
+    console.log('🔧 [takeShot] Generated commitment:', commitment);
 
     updateStatus('sending_transaction', 'Sending transaction to blockchain...');
 
-    const tx = await contractWithSigner.commitShot(commitment, {
-      value: customShotCost ? ethers.parseEther(customShotCost) : shotCost,
-      gasLimit: gasLimit
+    console.log('🔧 [takeShot] Sending commitShot transaction with:', {
+      commitment,
+      value: customCostWei ? ethers.formatEther(customCostWei) : ethers.formatEther(shotCost),
+      gasLimit: gasLimit.toString()
     });
+    const tx = await contractWithSigner.commitShot(commitment, {
+      value: customCostWei ? customCostWei : shotCost,
+      gasLimit
+    });
+    console.log('✅ [takeShot] Transaction sent, hash:', tx.hash);
 
     updateStatus('waiting_confirmation', 'Waiting for blockchain confirmation...');
 
@@ -260,7 +284,7 @@ export const takeShot = async ({
       try {
         await db.recordShot({
           playerAddress: wallet.address,
-          amount: customShotCost ? customShotCost : ethers.formatEther(Number(shotCost)),
+          amount: customShotCost ? customShotCost : ethers.formatEther(shotCost),
           txHash: result?.hash || null,
           blockNumber: result?.receipt?.blockNumber || null,
           timestamp: new Date().toISOString(),
@@ -278,9 +302,11 @@ export const takeShot = async ({
       updateStatus('auto_revealing', 'Automatically revealing shot...');
       
       // Wait a moment for blockchain state to update
+      console.log('🔧 [takeShot] Waiting 2 seconds before auto-reveal...');
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       try {
+        console.log('🔧 [takeShot] Starting auto-reveal with secret:', secret);
         const revealResult = await revealShot({
           secret,
           gameState,
@@ -291,12 +317,14 @@ export const takeShot = async ({
           loadPlayerData,
           onStatusUpdate
         });
+        console.log('✅ [takeShot] Auto-reveal completed:', revealResult);
         
         // Update result with reveal information
         result.revealResult = revealResult;
         result.won = revealResult.won;
       } catch (revealError) {
-        console.error('❌ Auto-reveal failed:', revealError);
+        console.error('❌ [takeShot] Auto-reveal failed:', revealError);
+        console.error('❌ [takeShot] Auto-reveal error stack:', revealError.stack);
         
         // Don't throw the error - instead provide a helpful message
         // The secret is already stored in localStorage for manual recovery
@@ -383,6 +411,7 @@ export const sponsorRound = async ({
   }
 
   let result;
+  let sponsorAmountWei = null;
 
   if (gameState.isMultiCryptoMode) {
     // Multi-crypto mode: use adapter
@@ -400,6 +429,7 @@ export const sponsorRound = async ({
 
     const contractWithSigner = contract.connect(wallet.signer);
     const sponsorCost = await contract.SPONSOR_COST();
+    sponsorAmountWei = sponsorCost;
 
     // Check user balance
     const balance = await wallet.provider.getBalance(wallet.address);
@@ -407,7 +437,7 @@ export const sponsorRound = async ({
     // Estimate gas
     let gasEstimate;
     try {
-      gasEstimate = await contractWithSigner.sponsorRound.estimateGas(name, logoUrl, {
+      gasEstimate = await contractWithSigner.estimateGas.sponsorRound(name, logoUrl, {
         value: sponsorCost
       });
     } catch (estimateError) {
@@ -470,7 +500,7 @@ export const sponsorRound = async ({
       name,
       logoUrl,
       sponsorUrl,
-      amount: ethers.formatEther(Number(sponsorCost)),
+      amount: sponsorAmountWei !== null ? ethers.formatEther(sponsorAmountWei) : null,
       txHash: result?.hash || null,
       blockNumber: result?.receipt?.blockNumber || null,
       timestamp: new Date().toISOString(),
@@ -571,7 +601,7 @@ export const clearPendingShot = async ({
     // Estimate gas
     let gasEstimate;
     try {
-      gasEstimate = await contractWithSigner.revealShot.estimateGas(secret);
+      gasEstimate = await contractWithSigner.estimateGas.revealShot(secret);
     } catch (estimateError) {
       console.warn('Failed to estimate gas for clear, using default:', estimateError.message);
       gasEstimate = 100000n;
@@ -616,8 +646,15 @@ export const revealShot = async ({
   onStatusUpdate = null // New callback for status updates
 }) => {
   const updateStatus = (status, message) => {
-    if (onStatusUpdate) {
-      onStatusUpdate(status, message);
+    console.log(`🔄 [revealShot] Status: ${status} - ${message}`);
+    if (typeof onStatusUpdate === 'function') {
+      try {
+        onStatusUpdate(status, message);
+      } catch (e) {
+        console.error('❌ [revealShot] onStatusUpdate callback error:', e);
+      }
+    } else if (onStatusUpdate) {
+      console.warn('⚠️ [revealShot] onStatusUpdate provided but is not a function:', typeof onStatusUpdate);
     }
   };
   updateStatus('preparing_reveal', 'Preparing to reveal shot...');
@@ -667,14 +704,17 @@ export const revealShot = async ({
     // Check wallet balance first
     const balance = await wallet.provider.getBalance(wallet.address);
     
-    // Estimate gas with more conservative approach
+    // Estimate gas with more conservative approach (ethers v6)
     let gasEstimate;
     try {
-      // First try with a reasonable secret
-      gasEstimate = await contractWithSigner.revealShot.estimateGas(secret);
-      console.log('Gas estimate successful:', gasEstimate.toString());
+      console.log('🔧 [revealShot] Starting gas estimation for reveal...');
+      console.log('🔧 [revealShot] Secret for estimation:', secret);
+      gasEstimate = await contractWithSigner.estimateGas.revealShot(secret);
+      console.log('✅ [revealShot] Gas estimate successful:', gasEstimate.toString());
     } catch (estimateError) {
-      console.warn('Failed to estimate gas for reveal, using conservative default:', estimateError.message);
+      console.error('❌ [revealShot] Failed to estimate gas for reveal:', estimateError);
+      console.error('❌ [revealShot] Gas estimation error stack:', estimateError.stack);
+      console.warn('⚠️ [revealShot] Using conservative default gas limit');
       // Use a more conservative default gas limit
       gasEstimate = 150000n; // Increased from 100000n to 150000n
     }
@@ -707,8 +747,8 @@ export const revealShot = async ({
       balance: ethers.formatEther(balance)
     });
     
-    // Check if user has enough ETH for gas fees with a very lenient buffer for reveals
-    const minRequiredBalance = BigInt(Math.floor(Number(estimatedGasCost) * 0.1)); // Reduced from 0.5 to 0.1 (10% buffer)
+    // Check if user has enough ETH for gas fees (require at least the estimated gas cost)
+    const minRequiredBalance = estimatedGasCost;
     
     if (balance < minRequiredBalance) {
       const shortfall = ethers.formatEther(minRequiredBalance - balance);
@@ -718,17 +758,39 @@ export const revealShot = async ({
     updateStatus('sending_reveal', 'Sending reveal transaction...');
 
     // Use more conservative gas parameters to avoid reverts
-    const tx = await contractWithSigner.revealShot(secret, {
-      gasLimit: gasLimit,
-      gasPrice: gasPrice, // Use explicit gasPrice instead of EIP-1559 for better compatibility
-      // Add a buffer to gas limit to ensure transaction goes through
-      gasLimit: gasLimit + (gasLimit * 30n / 100n) // 30% buffer
+    const finalGasLimit = gasLimit + (gasLimit * 30n / 100n); // 30% buffer
+    const txOverrides = { gasLimit: finalGasLimit };
+    if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+      txOverrides.maxFeePerGas = feeData.maxFeePerGas;
+      txOverrides.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
+    } else {
+      txOverrides.gasPrice = gasPrice;
+    }
+    
+    console.log('🔧 [revealShot] Sending revealShot transaction with:', {
+      secret,
+      txOverrides: {
+        gasLimit: finalGasLimit.toString(),
+        maxFeePerGas: txOverrides.maxFeePerGas ? ethers.formatUnits(txOverrides.maxFeePerGas, 'gwei') + ' gwei' : 'N/A',
+        maxPriorityFeePerGas: txOverrides.maxPriorityFeePerGas ? ethers.formatUnits(txOverrides.maxPriorityFeePerGas, 'gwei') + ' gwei' : 'N/A',
+        gasPrice: txOverrides.gasPrice ? ethers.formatUnits(txOverrides.gasPrice, 'gwei') + ' gwei' : 'N/A'
+      }
     });
+    
+    const tx = await contractWithSigner.revealShot(secret, txOverrides);
+    console.log('✅ [revealShot] Transaction sent, hash:', tx.hash);
 
     updateStatus('waiting_reveal_confirmation', 'Waiting for reveal confirmation...');
 
     try {
+      console.log('🔧 [revealShot] Waiting for transaction confirmation...');
       const receipt = await tx.wait();
+      console.log('✅ [revealShot] Transaction confirmed:', {
+        hash: receipt.hash,
+        status: receipt.status,
+        gasUsed: receipt.gasUsed?.toString(),
+        blockNumber: receipt.blockNumber
+      });
       
       updateStatus('processing_reveal', 'Processing reveal result...');
       
@@ -737,20 +799,42 @@ export const revealShot = async ({
         throw new Error('Reveal transaction failed: Transaction reverted');
       }
 
-      // Check if user won by looking at ShotRevealed events
-      const shotRevealedEvent = receipt.logs.find(log => {
+      // Check if user won by looking at ShotRevealed events (safe parsing)
+      console.log('🔧 [revealShot] Parsing transaction logs for ShotRevealed event...');
+      console.log('🔧 [revealShot] Total logs:', receipt.logs.length);
+      
+      let parsedShotRevealed = null;
+      for (const [index, log] of receipt.logs.entries()) {
         try {
+          console.log(`🔧 [revealShot] Parsing log ${index}:`, {
+            address: log.address,
+            topics: log.topics
+          });
           const parsed = contract.interface.parseLog(log);
-          return parsed.name === 'ShotRevealed';
-        } catch {
-          return false;
+          console.log(`🔧 [revealShot] Parsed log ${index}:`, {
+            name: parsed?.name,
+            args: parsed?.args ? Object.keys(parsed.args) : 'N/A'
+          });
+          if (parsed?.name === 'ShotRevealed') {
+            parsedShotRevealed = parsed;
+            console.log('✅ [revealShot] Found ShotRevealed event:', {
+              player: parsed.args.player,
+              amount: parsed.args.amount?.toString(),
+              won: parsed.args.won
+            });
+            break;
+          }
+        } catch (parseError) {
+          console.log(`🔧 [revealShot] Log ${index} not from this contract (expected):`, parseError.message);
         }
-      });
+      }
 
       let won = false;
-      if (shotRevealedEvent) {
-        const parsed = contract.interface.parseLog(shotRevealedEvent);
-        won = parsed.args.won;
+      if (parsedShotRevealed?.args) {
+        won = Boolean(parsedShotRevealed.args.won);
+        console.log('🔧 [revealShot] Extracted win result:', won);
+      } else {
+        console.warn('⚠️ [revealShot] No ShotRevealed event found in transaction logs');
       }
       
       result = {
@@ -758,8 +842,10 @@ export const revealShot = async ({
         receipt,
         won
       };
+      console.log('✅ [revealShot] Final result:', result);
     } catch (waitError) {
-      console.error('❌ Reveal transaction failed:', waitError);
+      console.error('❌ [revealShot] Reveal transaction failed:', waitError);
+      console.error('❌ [revealShot] Wait error stack:', waitError.stack);
       
       // Check if this is a transaction revert error
       if (waitError.code === 'CALL_EXCEPTION' || waitError.message?.includes('reverted')) {
