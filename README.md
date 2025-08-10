@@ -1,5 +1,6 @@
 # ETH Shot 🎯
 
+<!-- BADGES_START -->
 [![Node.js](https://img.shields.io/badge/Node.js-20+-339933?style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![SvelteKit](https://img.shields.io/badge/SvelteKit-Latest-FF3E00?style=flat&logo=svelte&logoColor=white)](https://kit.svelte.dev/)
 [![Ethers.js](https://img.shields.io/badge/Ethers.js-v6-627EEA?style=flat&logo=ethereum&logoColor=white)](https://ethers.org/)
@@ -9,6 +10,7 @@
 [![Deploy with Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat&logo=vercel&logoColor=white)](https://vercel.com/)
 [![Sepolia Network](https://img.shields.io/badge/Network-Sepolia-FFC947?style=flat&logo=ethereum&logoColor=white)](https://sepolia.etherscan.io/)
 [![Ethereum Mainnet](https://img.shields.io/badge/Network-Mainnet-627EEA?style=flat&logo=ethereum&logoColor=white)](https://etherscan.io/)
+<!-- BADGES_END -->
 
 A viral Ethereum-powered game where users pay 0.0005 ETH per shot for a 1% chance to win the jackpot.
 
