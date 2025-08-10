@@ -349,6 +349,7 @@ export const sponsorRound = async ({
   }
 
   let result;
+  let sponsorCost = null;
 
   if (gameState.isMultiCryptoMode) {
     // Multi-crypto mode: use adapter
@@ -365,7 +366,7 @@ export const sponsorRound = async ({
     }
 
     const contractWithSigner = contract.connect(wallet.signer);
-    const sponsorCost = await contract.SPONSOR_COST();
+    sponsorCost = await contract.SPONSOR_COST();
 
     // Check user balance
     const balance = await wallet.provider.getBalance(wallet.address);
@@ -436,7 +437,7 @@ export const sponsorRound = async ({
       name,
       logoUrl,
       sponsorUrl,
-      amount: ethers.formatEther(sponsorCost),
+      amount: sponsorCost ? ethers.formatEther(sponsorCost) : null,
       txHash: result?.hash || null,
       blockNumber: result?.receipt?.blockNumber || null,
       timestamp: new Date().toISOString(),
