@@ -281,6 +281,24 @@ export const takeShot = async ({
         cryptoType: gameState.activeCrypto,
         contractAddress: gameState.contractAddress
       });
+
+      // Upsert/initialize player stats after a committed shot
+      // Prefer authenticated path via db.upsertPlayer; if auth is missing, the function will throw and we log it.
+      try {
+        const spentStr = displayAmount ?? '0';
+        await db.upsertPlayer({
+          address: wallet.address,
+          totalShots: 1, // server-side upsert should aggregate based on RLS or conflict policy; we send minimal increment intent
+          totalSpent: spentStr,
+          totalWon: '0',
+          lastShotTime: new Date().toISOString(),
+          cryptoType: gameState.activeCrypto,
+          contractAddress: gameState.contractAddress
+        });
+        console.log('✅ Player stats upserted/initialized after commit for', wallet.address);
+      } catch (playerUpsertErr) {
+        console.warn('⚠️ Player stats upsert after commit failed (auth likely missing). Shot was logged. Address:', wallet.address, playerUpsertErr?.message || playerUpsertErr);
+      }
     } catch (dbError) {
       console.error('Failed to log shot to database:', dbError);
       // Don't throw here - the shot was successful even if logging failed
@@ -753,6 +771,24 @@ export const revealShot = async ({
       console.warn('Could not find commit transaction hash to update shot record');
     }
     
+    // Upsert/adjust player stats after reveal (win updates total_won)
+    try {
+      const wonAmountStr = result && result.won ? (gameState.currentPot || gameState.shotCost || '0') : '0';
+      await db.upsertPlayer({
+        address: wallet.address,
+        // We do not increment totalShots here; commit path already handled it
+        totalShots: 0,
+        totalSpent: '0',
+        totalWon: wonAmountStr,
+        lastShotTime: new Date().toISOString(),
+        cryptoType: gameState.activeCrypto,
+        contractAddress: gameState.contractAddress
+      });
+      console.log('✅ Player stats upserted after reveal for', wallet.address, 'won:', !!result?.won);
+    } catch (revealUpsertErr) {
+      console.warn('⚠️ Player stats upsert after reveal failed (auth likely missing). Address:', wallet.address, revealUpsertErr?.message || revealUpsertErr);
+    }
+
     if (result && result.won) {
       // Record the winner in the winners table
       // Get the actual pot amount from the game state, not just the shot cost
