@@ -471,6 +471,23 @@ export const takeShot = async ({
         // Don't throw here - the shot was successful even if logging failed
       }
 
+      // Upsert/initialize player stats after first shot commit
+      try {
+        const spentStr = (customShotCost || actualFirstShotAmountEth) ?? '0';
+        await db.upsertPlayer({
+          address: wallet.address,
+          totalShots: 1, // server-side may aggregate on conflict
+          totalSpent: spentStr,
+          totalWon: '0',
+          lastShotTime: new Date().toISOString(),
+          cryptoType: gameState.activeCrypto,
+          contractAddress: gameState.contractAddress
+        });
+        console.log('✅ Player stats upserted/initialized after first shot for', wallet.address);
+      } catch (playerUpsertErr) {
+        console.warn('⚠️ Player stats upsert after first shot failed (auth likely missing). Address:', wallet.address, playerUpsertErr?.message || playerUpsertErr);
+      }
+
       // Store secret in localStorage for persistence and recovery (first shot)
       try {
         const secretKey = `ethshot_secret_${wallet.address}_${receipt.hash.slice(0, 10)}`;
@@ -607,6 +624,23 @@ export const takeShot = async ({
       } catch (dbError) {
         console.error('Failed to log regular shot to database:', dbError);
         // Don't throw here - the shot was successful even if logging failed
+      }
+
+      // Upsert/initialize player stats after regular shot commit
+      try {
+        const spentStr = (customShotCost ? customShotCost : ethers.formatEther(shotCost)) ?? '0';
+        await db.upsertPlayer({
+          address: wallet.address,
+          totalShots: 1, // server-side may aggregate on conflict
+          totalSpent: spentStr,
+          totalWon: '0',
+          lastShotTime: new Date().toISOString(),
+          cryptoType: gameState.activeCrypto,
+          contractAddress: gameState.contractAddress
+        });
+        console.log('✅ Player stats upserted/initialized after regular shot for', wallet.address);
+      } catch (playerUpsertErr) {
+        console.warn('⚠️ Player stats upsert after regular shot failed (auth likely missing). Address:', wallet.address, playerUpsertErr?.message || playerUpsertErr);
       }
       
       // Automatically reveal the shot after commitment; wait until reveal window is open
@@ -1329,6 +1363,22 @@ export const revealShot = async ({
         });
         
         console.log('✅ Winner recorded successfully with amount:', winAmount);
+
+        // Also upsert/adjust player stats with winnings
+        try {
+          await db.upsertPlayer({
+            address: wallet.address,
+            totalShots: 0,
+            totalSpent: '0',
+            totalWon: winAmount,
+            lastShotTime: new Date().toISOString(),
+            cryptoType: gameState.activeCrypto,
+            contractAddress: gameState.contractAddress
+          });
+          console.log('✅ Player stats upserted after win for', wallet.address, 'amount:', winAmount);
+        } catch (revealUpsertErr) {
+          console.warn('⚠️ Player stats upsert after win failed (auth likely missing). Address:', wallet.address, revealUpsertErr?.message || revealUpsertErr);
+        }
         
         // Automatically trigger deposit reveal/withdrawal for winnings
         updateStatus('withdrawing_winnings', 'Withdrawing your winnings...');
