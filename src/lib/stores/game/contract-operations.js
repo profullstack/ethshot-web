@@ -160,7 +160,27 @@ export const loadGameState = async ({ state, contract, ethers, db, updateState }
           else if (key === 'recentWinners') recentWinners = recentWinners || [];
         }
       }
-
+      
+      // Normalize current sponsor timestamp (contract returns seconds as uint256/BigInt)
+      try {
+        if (currentSponsor && currentSponsor.timestamp != null) {
+          const rawTs = currentSponsor.timestamp;
+          const n = typeof rawTs === 'bigint' ? Number(rawTs) : Number(rawTs);
+          const ms = n < 1e12 ? n * 1000 : n; // seconds -> ms if needed
+          currentSponsor = {
+            sponsor: currentSponsor.sponsor,
+            name: currentSponsor.name,
+            logoUrl: currentSponsor.logoUrl,
+            active: currentSponsor.active,
+            timestamp: new Date(ms).toISOString(),
+          };
+          // keep cache consistent
+          rpcCache.set('currentSponsor', currentSponsor);
+        }
+      } catch (normalizeErr) {
+        console.warn('Failed to normalize currentSponsor timestamp:', normalizeErr);
+      }
+      
       // Calculate actual pot (contract balance minus house funds)
       // Ensure pot never goes negative
       const rawPot = contractBalance && houseFunds ?

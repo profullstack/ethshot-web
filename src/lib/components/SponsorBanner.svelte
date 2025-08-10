@@ -19,20 +19,44 @@
 
   // Format time remaining for sponsorship
   const timeAgo = (timestamp) => {
-    const now = new Date();
-    // Convert BigInt to number if needed
-    const timestampValue = typeof timestamp === 'bigint' ? Number(timestamp) : timestamp;
-    const time = new Date(timestampValue);
-    const diffInSeconds = Math.floor((now - time) / 1000);
+    try {
+      const now = new Date();
+      let ms;
 
-    if (diffInSeconds < 60) {
-      return `${diffInSeconds}s ago`;
-    } else if (diffInSeconds < 3600) {
-      return `${Math.floor(diffInSeconds / 60)}m ago`;
-    } else if (diffInSeconds < 86400) {
-      return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    } else {
-      return `${Math.floor(diffInSeconds / 86400)}d ago`;
+      if (timestamp == null) {
+        return 'just now';
+      }
+
+      if (typeof timestamp === 'bigint') {
+        const n = Number(timestamp);
+        ms = n < 1e12 ? n * 1000 : n;
+      } else if (typeof timestamp === 'number') {
+        ms = timestamp < 1e12 ? timestamp * 1000 : timestamp;
+      } else if (typeof timestamp === 'string') {
+        const parsed = Date.parse(timestamp);
+        ms = isNaN(parsed) ? null : parsed;
+      } else if (timestamp instanceof Date) {
+        ms = timestamp.getTime();
+      }
+
+      if (ms == null) return 'just now';
+
+      const time = new Date(ms);
+      if (isNaN(time.getTime())) return 'just now';
+
+      const diffInSeconds = Math.floor((now - time) / 1000);
+
+      if (diffInSeconds < 60) {
+        return `${diffInSeconds}s ago`;
+      } else if (diffInSeconds < 3600) {
+        return `${Math.floor(diffInSeconds / 60)}m ago`;
+      } else if (diffInSeconds < 86400) {
+        return `${Math.floor(diffInSeconds / 3600)}h ago`;
+      } else {
+        return `${Math.floor(diffInSeconds / 86400)}d ago`;
+      }
+    } catch {
+      return 'just now';
     }
   };
 </script>
