@@ -23,7 +23,7 @@
     "deploy:testnet-advanced": "hardhat run scripts/deploy-testnet.js --network sepolia",
     "deploy:phantom": "hardhat run scripts/deploy-phantom.js --network sepolia",
     "setup:deployment": "node scripts/setup-deployment.js",
-    "deploy:mainnet": "hardhat run scripts/deploy.js --network mainnet",
+    "deploy:mainnet": "hardhat run scripts/deploy-mainnet.js --network mainnet",
     "verify:testnet": "hardhat verify --network sepolia",
     "verify:mainnet": "hardhat verify --network mainnet",
     "verify:contract": "node scripts/verify-contract.js",
