@@ -1,5 +1,5 @@
 <script>
-  import { GAME_CONFIG, SOCIAL_CONFIG, formatEth, calculateUSDValue, formatCooldownTime } from '$lib/config.js';
+  import { GAME_CONFIG, SOCIAL_CONFIG, NETWORK_CONFIG, formatEth, calculateUSDValue, formatCooldownTime } from '$lib/config.js';
 </script>
 
 <svelte:head>
@@ -121,22 +121,32 @@
       </h2>
       <div class="text-gray-300 space-y-3">
         <div class="bg-yellow-800/30 border border-yellow-500/30 rounded-lg p-4">
-          <p class="font-semibold text-yellow-300 mb-2">🧪 Important: ETH Shot runs on Sepolia Testnet</p>
-          <p class="text-sm">If you see "0 ETH" in the pot, your wallet is likely connected to Ethereum Mainnet instead of Sepolia Testnet.</p>
+          <p class="font-semibold text-yellow-300 mb-2">
+            {NETWORK_CONFIG.CHAIN_ID === 1 ? '🌐 Important: ETH Shot runs on Ethereum Mainnet' : '🧪 Important: ETH Shot runs on ' + NETWORK_CONFIG.NETWORK_NAME}
+          </p>
+          <p class="text-sm">
+            {#if NETWORK_CONFIG.CHAIN_ID === 1}
+              If you see "0 ETH" in the pot, your wallet might be connected to a different network. Make sure you're on Ethereum Mainnet.
+            {:else}
+              If you see "0 ETH" in the pot, your wallet is likely connected to Ethereum Mainnet instead of {NETWORK_CONFIG.NETWORK_NAME}.
+            {/if}
+          </p>
         </div>
         <div class="space-y-2">
           <p><strong class="text-white">To fix this:</strong></p>
           <p>1. Connect your wallet - we'll automatically detect if you're on the wrong network</p>
-          <p>2. When prompted, click "Switch to Sepolia Testnet" in the popup</p>
+          <p>2. When prompted, click "Switch to {NETWORK_CONFIG.NETWORK_NAME}" in the popup</p>
           <p>3. Approve the network switch in your wallet</p>
           <p>4. The pot amount should now display correctly!</p>
         </div>
-        <div class="bg-blue-800/30 border border-blue-500/30 rounded-lg p-3">
-          <p class="text-blue-300 text-sm">
-            <strong>Need testnet ETH?</strong> Get free Sepolia ETH from faucets like
-            <a href="https://sepoliafaucet.com" target="_blank" rel="noopener noreferrer" class="underline hover:text-blue-200">sepoliafaucet.com</a>
-          </p>
-        </div>
+        {#if NETWORK_CONFIG.CHAIN_ID !== 1}
+          <div class="bg-blue-800/30 border border-blue-500/30 rounded-lg p-3">
+            <p class="text-blue-300 text-sm">
+              <strong>Need testnet ETH?</strong> Get free {NETWORK_CONFIG.NETWORK_NAME} ETH from faucets like
+              <a href="https://sepoliafaucet.com" target="_blank" rel="noopener noreferrer" class="underline hover:text-blue-200">sepoliafaucet.com</a>
+            </p>
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -147,10 +157,10 @@
         <span>What if I have technical issues?</span>
       </h2>
       <div class="text-gray-300 space-y-2">
-        <p>Make sure you're connected to <strong class="text-yellow-400">Sepolia Testnet</strong> (not Ethereum Mainnet).</p>
-        <p>Ensure your wallet has enough testnet ETH for both the shot cost and gas fees.</p>
+        <p>Make sure you're connected to <strong class="text-yellow-400">{NETWORK_CONFIG.NETWORK_NAME}</strong>.</p>
+        <p>Ensure your wallet has enough {NETWORK_CONFIG.CHAIN_ID === 1 ? 'ETH' : 'testnet ETH'} for both the shot cost and gas fees.</p>
         <p>Try refreshing the page if the wallet connection seems stuck.</p>
-        <p>Check your transaction on <a href="https://sepolia.etherscan.io" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline hover:text-blue-300">Sepolia Etherscan</a> if you're unsure about its status.</p>
+        <p>Check your transaction on <a href="{NETWORK_CONFIG.BLOCK_EXPLORER_URL}" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline hover:text-blue-300">{NETWORK_CONFIG.CHAIN_ID === 1 ? 'Etherscan' : 'Block Explorer'}</a> if you're unsure about its status.</p>
       </div>
     </div>
 

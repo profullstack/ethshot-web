@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { isCorrectNetwork, switchToSepolia, getNetworkStatus, onNetworkChange, getTestnetInfo } from '../utils/network-detection.js';
+  import { isCorrectNetwork, switchToNetwork, getNetworkStatus, onNetworkChange, getTestnetInfo } from '../utils/network-detection.js';
+  import { NETWORK_CONFIG } from '../config.js';
   import { toastStore } from '../stores/toast.js';
 
   // Component props
@@ -25,7 +26,7 @@
       if (await isCorrectNetwork()) {
         show = false;
         onNetworkSwitched();
-        toastStore.success('Successfully switched to Sepolia Testnet!');
+        toastStore.success(`Successfully switched to ${NETWORK_CONFIG.NETWORK_NAME}!`);
       }
     });
   });
@@ -55,7 +56,7 @@
   const handleSwitchNetwork = async () => {
     isSwitching = true;
     try {
-      await switchToSepolia();
+      await switchToNetwork();
       toastStore.info('Network switch initiated. Please approve in your wallet.');
       
       // Check if switch was successful after a short delay
@@ -64,7 +65,7 @@
         if (networkStatus?.isCorrectNetwork) {
           show = false;
           onNetworkSwitched();
-          toastStore.success('Successfully switched to Sepolia Testnet!');
+          toastStore.success(`Successfully switched to ${NETWORK_CONFIG.NETWORK_NAME}!`);
         }
       }, 2000);
     } catch (error) {
@@ -116,11 +117,13 @@
       <!-- Explanation -->
       <div class="mb-6">
         <p class="text-sm text-gray-600 mb-3">
-          ETH Shot runs on Sepolia Testnet. You need to switch your wallet to the correct network to see the current pot and play the game.
+          ETH Shot runs on {NETWORK_CONFIG.NETWORK_NAME}. You need to switch your wallet to the correct network to see the current pot and play the game.
         </p>
-        <p class="text-xs text-gray-500">
-          Don't worry - this is a testnet, so you won't spend real ETH!
-        </p>
+        {#if NETWORK_CONFIG.CHAIN_ID !== 1}
+          <p class="text-xs text-gray-500">
+            Don't worry - this is a testnet, so you won't spend real ETH!
+          </p>
+        {/if}
       </div>
 
       <!-- Action Buttons -->
@@ -138,17 +141,19 @@
             </svg>
             Switching Network...
           {:else}
-            Switch to Sepolia Testnet
+            Switch to {NETWORK_CONFIG.NETWORK_NAME}
           {/if}
         </button>
 
-        <!-- Get Testnet ETH Button -->
-        <button
-          on:click={toggleTestnetInfo}
-          class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-        >
-          {showTestnetInfo ? 'Hide' : 'Show'} Testnet ETH Instructions
-        </button>
+        <!-- Get Testnet ETH Button (only show for testnets) -->
+        {#if NETWORK_CONFIG.CHAIN_ID !== 1}
+          <button
+            on:click={toggleTestnetInfo}
+            class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+          >
+            {showTestnetInfo ? 'Hide' : 'Show'} Testnet ETH Instructions
+          </button>
+        {/if}
 
         <!-- Refresh Button -->
         <button
@@ -172,14 +177,16 @@
           
           <div class="space-y-2">
             <p class="text-xs font-medium text-blue-900">Recommended Faucets:</p>
-            <a 
-              href={testnetInfo.faucetUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              class="block text-xs text-blue-600 hover:text-blue-800 underline"
-            >
-              🚰 Sepolia Faucet (Primary)
-            </a>
+            {#if testnetInfo.faucetUrl}
+              <a
+                href={testnetInfo.faucetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="block text-xs text-blue-600 hover:text-blue-800 underline"
+              >
+                🚰 {NETWORK_CONFIG.NETWORK_NAME} Faucet (Primary)
+              </a>
+            {/if}
             {#each testnetInfo.alternativeFaucets as faucet}
               <a 
                 href={faucet} 
@@ -197,8 +204,8 @@
       <!-- Manual Instructions -->
       <div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
         <p class="text-xs text-gray-600">
-          <span class="font-medium">Manual Setup:</span> If the automatic switch doesn't work, 
-          manually add Sepolia network in your wallet settings with Chain ID: 11155111
+          <span class="font-medium">Manual Setup:</span> If the automatic switch doesn't work,
+          manually add {NETWORK_CONFIG.NETWORK_NAME} in your wallet settings with Chain ID: {NETWORK_CONFIG.CHAIN_ID}
         </p>
       </div>
     </div>
