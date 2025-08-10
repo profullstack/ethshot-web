@@ -291,12 +291,9 @@
     }, 5000);
   }
 
-  // Helper function to get Etherscan URL
-  const getEtherscanUrl = (txHash) => {
-    const baseUrl = testModeConfig.currentChainId === 1
-      ? 'https://etherscan.io'
-      : 'https://sepolia.etherscan.io';
-    return `${baseUrl}/tx/${txHash}`;
+  // Helper function to get block explorer URL
+  const getBlockExplorerUrl = (txHash) => {
+    return `${NETWORK_CONFIG.BLOCK_EXPLORER_URL}/tx/${txHash}`;
   };
 </script>
 
@@ -440,13 +437,13 @@
         {#if withdrawalTxHash}
           <div class="mt-2">
             <a
-              href={getEtherscanUrl(withdrawalTxHash)}
+              href={getBlockExplorerUrl(withdrawalTxHash)}
               target="_blank"
               rel="noopener noreferrer"
               class="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm underline transition-colors"
             >
               <span>🔗</span>
-              <span>View tx on Etherscan</span>
+              <span>View tx on {NETWORK_CONFIG.CHAIN_ID === 1 ? 'Etherscan' : 'Block Explorer'}</span>
             </a>
           </div>
         {/if}

@@ -1,17 +1,17 @@
 // Network detection utility for ETH Shot
-// Handles wallet network detection and switching for Sepolia testnet
+// Handles wallet network detection and switching for configured network
 
 import { NETWORK_CONFIG } from '../config.js';
 
 // Convert decimal chain ID to hex format
 const toHex = (chainId) => `0x${parseInt(chainId).toString(16)}`;
 
-// Network configuration for Sepolia
-const SEPOLIA_CONFIG = {
+// Dynamic network configuration based on NETWORK_CONFIG
+const NETWORK_WALLET_CONFIG = {
   chainId: toHex(NETWORK_CONFIG.CHAIN_ID),
   chainName: NETWORK_CONFIG.NETWORK_NAME,
   nativeCurrency: {
-    name: 'Sepolia ETH',
+    name: NETWORK_CONFIG.CHAIN_ID === 1 ? 'Ether' : `${NETWORK_CONFIG.NETWORK_NAME} ETH`,
     symbol: 'ETH',
     decimals: 18,
   },
@@ -72,11 +72,11 @@ export const getNetworkName = (chainId) => {
 };
 
 /**
- * Switch the user's wallet to Sepolia testnet
+ * Switch the user's wallet to the configured network
  * @returns {Promise<boolean>} True if switch was successful
  * @throws {Error} If wallet is not available or switch fails
  */
-export const switchToSepolia = async () => {
+export const switchToNetwork = async () => {
   if (!window?.ethereum) {
     throw new Error('No wallet detected. Please install MetaMask or another Web3 wallet.');
   }
@@ -97,17 +97,20 @@ export const switchToSepolia = async () => {
       try {
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',
-          params: [SEPOLIA_CONFIG],
+          params: [NETWORK_WALLET_CONFIG],
         });
         return true;
       } catch (addError) {
-        throw new Error(`Failed to add Sepolia network: ${addError.message}`);
+        throw new Error(`Failed to add ${NETWORK_CONFIG.NETWORK_NAME}: ${addError.message}`);
       }
     } else {
       throw new Error(`Failed to switch network: ${switchError.message}`);
     }
   }
 };
+
+// Backward compatibility alias
+export const switchToSepolia = switchToNetwork;
 
 /**
  * Listen for network changes and execute callback
@@ -172,17 +175,49 @@ export const getNetworkStatus = async () => {
  * @returns {Object} Information about getting testnet ETH
  */
 export const getTestnetInfo = () => {
+  // Return different info based on network
+  if (NETWORK_CONFIG.CHAIN_ID === 1) {
+    return {
+      faucetUrl: null,
+      alternativeFaucets: [],
+      instructions: [
+        'You are on Ethereum Mainnet',
+        'You need real ETH to play',
+        'Purchase ETH from an exchange like Coinbase, Binance, or Kraken',
+        'Transfer ETH to your wallet',
+        'Return to ETH Shot to start playing!',
+      ],
+    };
+  }
+  
+  // Sepolia testnet info
+  if (NETWORK_CONFIG.CHAIN_ID === 11155111) {
+    return {
+      faucetUrl: 'https://sepoliafaucet.com',
+      alternativeFaucets: [
+        'https://sepolia-faucet.pk910.de',
+        'https://www.alchemy.com/faucets/ethereum-sepolia',
+      ],
+      instructions: [
+        'Visit a Sepolia faucet website',
+        'Connect your wallet',
+        'Request testnet ETH (usually 0.5 ETH per day)',
+        'Wait for the transaction to complete',
+        'Return to ETH Shot to start playing!',
+      ],
+    };
+  }
+  
+  // Generic testnet info
   return {
-    faucetUrl: 'https://sepoliafaucet.com',
-    alternativeFaucets: [
-      'https://sepolia-faucet.pk910.de',
-      'https://www.alchemy.com/faucets/ethereum-sepolia',
-    ],
+    faucetUrl: null,
+    alternativeFaucets: [],
     instructions: [
-      'Visit a Sepolia faucet website',
-      'Connect your wallet',
-      'Request testnet ETH (usually 0.5 ETH per day)',
-      'Wait for the transaction to complete',
+      `You are on ${NETWORK_CONFIG.NETWORK_NAME}`,
+      'You may need testnet ETH to play',
+      'Look for faucets specific to this network',
+      'Connect your wallet to the faucet',
+      'Request testnet ETH',
       'Return to ETH Shot to start playing!',
     ],
   };

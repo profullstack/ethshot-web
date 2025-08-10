@@ -6,14 +6,39 @@ import 'dotenv/config';
 /**
  * Contract Verification Script
  *
- * This script verifies the deployed EthShot contract on Etherscan
+ * This script verifies the deployed EthShot contract on the configured network's block explorer
  * so that function names appear properly instead of raw signatures.
  *
  * Usage: node scripts/verify-contract.js
  */
 
+// Get network configuration from environment
+const getNetworkConfig = () => {
+  const chainId = parseInt(process.env.VITE_CHAIN_ID || process.env.PUBLIC_CHAIN_ID || '11155111');
+  const networkName = process.env.VITE_NETWORK_NAME || process.env.PUBLIC_NETWORK_NAME || 'Sepolia Testnet';
+  const blockExplorerUrl = process.env.VITE_BLOCK_EXPLORER_URL || process.env.PUBLIC_BLOCK_EXPLORER_URL || 'https://sepolia.etherscan.io';
+  
+  // Map chain ID to Hardhat network name
+  const networkMap = {
+    1: 'mainnet',
+    11155111: 'sepolia',
+    8453: 'base',
+    42161: 'arbitrum'
+  };
+  
+  const hardhatNetwork = networkMap[chainId] || 'sepolia';
+  
+  return {
+    chainId,
+    networkName,
+    blockExplorerUrl,
+    hardhatNetwork
+  };
+};
+
 async function main() {
-  console.log('🔍 Verifying EthShot contract on Etherscan...\n');
+  const networkConfig = getNetworkConfig();
+  console.log(`🔍 Verifying EthShot contract on ${networkConfig.networkName}...\n`);
 
   // Read deployment info
   const deploymentPath = path.join(process.cwd(), 'deployment.json');
@@ -32,7 +57,8 @@ async function main() {
   }
 
   console.log(`📋 Contract Address: ${contractAddress}`);
-  console.log(`🌐 Network: ${deploymentInfo.network || 'sepolia'}`);
+  console.log(`🌐 Network: ${deploymentInfo.network || networkConfig.hardhatNetwork}`);
+  console.log(`🔗 Chain ID: ${networkConfig.chainId}`);
 
   // Import ethers
   const { ethers } = await import('ethers');
@@ -79,7 +105,7 @@ async function main() {
     console.log('⏳ Starting verification process...');
     
     // Use hardhat CLI directly with proper network specification
-    const command = `npx hardhat verify --network sepolia ${contractAddress} ${constructorArgs}`;
+    const command = `npx hardhat verify --network ${networkConfig.hardhatNetwork} ${contractAddress} ${constructorArgs}`;
     console.log(`🔧 Running: ${command}\n`);
     
     const output = execSync(command, {
@@ -89,28 +115,37 @@ async function main() {
     
     console.log(output);
     console.log('\n✅ Contract verification completed successfully!');
-    console.log(`🔗 View verified contract: https://sepolia.etherscan.io/address/${contractAddress}#code`);
+    console.log(`🔗 View verified contract: ${networkConfig.blockExplorerUrl}/address/${contractAddress}#code`);
     console.log('\n📋 After verification:');
     console.log('• Function names will appear instead of signatures (0x736036b1 → revealShot)');
     console.log('• Transaction details will be more readable');
-    console.log('• Users can interact with the contract directly on Etherscan');
+    console.log(`• Users can interact with the contract directly on the block explorer`);
 
   } catch (error) {
     console.error('\n❌ Verification failed:', error.message);
     
     if (error.message.includes('Already Verified')) {
       console.log('✅ Contract is already verified!');
-      console.log(`🔗 View contract: https://sepolia.etherscan.io/address/${contractAddress}#code`);
+      console.log(`🔗 View contract: ${networkConfig.blockExplorerUrl}/address/${contractAddress}#code`);
     } else if (error.message.includes('ETHERSCAN_API_KEY')) {
       console.log('\n💡 To fix this:');
-      console.log('1. Get an API key from https://etherscan.io/apis');
-      console.log('2. Add ETHERSCAN_API_KEY=your-key to your .env file');
+      if (networkConfig.chainId === 1) {
+        console.log('1. Get an API key from https://etherscan.io/apis');
+        console.log('2. Add ETHERSCAN_API_KEY=your-key to your .env file');
+      } else if (networkConfig.chainId === 11155111) {
+        console.log('1. Get an API key from https://etherscan.io/apis');
+        console.log('2. Add ETHERSCAN_API_KEY=your-key to your .env file');
+      } else {
+        console.log(`1. Get an API key for ${networkConfig.networkName} block explorer`);
+        console.log('2. Add the appropriate API key to your .env file');
+      }
       console.log('3. Run this script again');
     } else {
       console.log('\n💡 Common issues:');
       console.log('• Check that constructor arguments match deployment');
-      console.log('• Ensure ETHERSCAN_API_KEY is set in .env');
+      console.log('• Ensure the correct API key is set in .env');
       console.log('• Wait a few minutes after deployment before verifying');
+      console.log(`• Verify the network (${networkConfig.hardhatNetwork}) is correctly configured in hardhat.config.js`);
     }
   }
 }

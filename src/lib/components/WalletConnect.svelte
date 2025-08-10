@@ -4,6 +4,7 @@
   import { isMobile } from '../utils/device-detection.js';
   import { isCorrectNetwork } from '../utils/network-detection.js';
   import NetworkSwitchPrompt from './NetworkSwitchPrompt.svelte';
+  import { NETWORK_CONFIG } from '../config.js';
   import { onMount } from 'svelte';
 
   let connecting = false;
@@ -43,7 +44,7 @@
         const isCorrect = await isCorrectNetwork();
         if (!isCorrect) {
           showNetworkPrompt = true;
-          toastStore.warning('Please switch to Sepolia Testnet to see the current pot and play the game.');
+          toastStore.warning(`Please switch to ${NETWORK_CONFIG.NETWORK_NAME} to see the current pot and play the game.`);
         }
       } catch (error) {
         console.warn('Failed to check network after connection:', error);
@@ -170,14 +171,21 @@
         </div>
       {/if}
       <p class="text-gray-400 text-center max-w-md">
-        Connect your Ethereum wallet to start playing ETH Shot on Sepolia Testnet.
+        Connect your Ethereum wallet to start playing ETH Shot on {NETWORK_CONFIG.NETWORK_NAME}.
         We support MetaMask, WalletConnect, and other popular wallets.
       </p>
       <div class="bg-yellow-900/30 border border-yellow-500/30 rounded-lg p-3 mt-3">
-        <p class="text-yellow-300 text-sm font-medium mb-1">🧪 Testnet Notice</p>
+        <p class="text-yellow-300 text-sm font-medium mb-1">
+          {NETWORK_CONFIG.CHAIN_ID === 1 ? '🌐 Mainnet Notice' : '🧪 Testnet Notice'}
+        </p>
         <p class="text-yellow-200 text-xs">
-          ETH Shot runs on Sepolia Testnet. You'll need testnet ETH to play (free from faucets).
-          After connecting, we'll help you switch to the correct network if needed.
+          {#if NETWORK_CONFIG.CHAIN_ID === 1}
+            ETH Shot runs on {NETWORK_CONFIG.NETWORK_NAME}. You'll need real ETH to play.
+            After connecting, we'll help you switch to the correct network if needed.
+          {:else}
+            ETH Shot runs on {NETWORK_CONFIG.NETWORK_NAME}. You'll need testnet ETH to play (free from faucets).
+            After connecting, we'll help you switch to the correct network if needed.
+          {/if}
         </p>
       </div>
     </div>
