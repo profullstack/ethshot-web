@@ -24,8 +24,8 @@
     "deploy:phantom": "hardhat run scripts/deploy-phantom.js --network sepolia",
     "setup:deployment": "node scripts/setup-deployment.js",
     "deploy:mainnet": "hardhat run scripts/deploy-mainnet.js --network mainnet",
-    "verify:testnet": "hardhat verify --network sepolia",
-    "verify:mainnet": "hardhat verify --network mainnet",
+    "verify:testnet": "node scripts/verify-contract.js",
+    "verify:mainnet": "node scripts/verify-contract.js",
     "verify:contract": "node scripts/verify-contract.js",
     "server:dev": "nodemon server/index.js",
     "server:start": "node server/index.js",
@@ -42,7 +42,8 @@
     "db:setup": "pnpm run db:link && pnpm run db:migrate",
     "vercel:update-contract": "node scripts/update-vercel-contract.js",
     "railway:update-contract": "node scripts/update-railway-contract.js",
-    "check-address": "node scripts/check-address.js"
+    "check-address": "node scripts/check-address.js",
+    "setup:mainnet-env": "node scripts/update-mainnet-env.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
