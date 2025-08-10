@@ -102,7 +102,7 @@ export const getTopPlayers = async (limit = 10, orderBy = 'total_shots') => {
 
   try {
     const contractAddress = NETWORK_CONFIG.CONTRACT_ADDRESS;
-    
+
     // Use the new contract-aware function
     const { data, error } = await supabase.rpc('get_top_players_by_contract', {
       p_contract_address: contractAddress || 'default',
@@ -110,34 +110,40 @@ export const getTopPlayers = async (limit = 10, orderBy = 'total_shots') => {
       order_by_field: orderBy
     });
 
-    if (error) {
-      console.warn('Supabase getTopPlayers RPC error, falling back to direct query:', error);
-      
-      // Fallback to direct query if RPC fails
+    // Fallback to a more permissive direct query when:
+    // - RPC errors, or
+    // - RPC succeeds but returns no rows (common when historical rows have NULL/default contract_address)
+    if (error || !data || data.length === 0) {
+      if (error) {
+        console.warn('Supabase getTopPlayers RPC error, falling back to direct query:', error);
+      } else {
+        console.warn('Supabase getTopPlayers RPC returned no data, falling back to direct query for compatibility');
+      }
+
       let query = supabase
         .from(TABLES.PLAYERS)
         .select('*')
-        .gt('total_shots', 0)  // Only include players with shots
+        .gt('total_shots', 0) // Only include players with shots
         .order(orderBy, { ascending: false })
         .limit(limit);
 
-      // Contract address filtering
+      // Contract address filtering (include legacy rows with NULL or "default")
       if (contractAddress) {
-        query = query.eq('contract_address', contractAddress);
+        query = query.or(`contract_address.eq.${contractAddress},contract_address.is.null,contract_address.eq.default`);
       } else {
         query = query.or('contract_address.is.null,contract_address.eq.default');
       }
 
       const { data: fallbackData, error: fallbackError } = await query;
-      
+
       if (fallbackError) {
         console.warn('Fallback getTopPlayers query also failed:', fallbackError);
         return [];
       }
-      
+
       return fallbackData || [];
     }
-    
+
     return data || [];
   } catch (error) {
     console.warn('Error fetching top players:', error);
