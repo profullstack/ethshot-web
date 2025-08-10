@@ -126,9 +126,12 @@ export const takeShot = async ({
     const shotCost = await contract.SHOT_COST();
 
     // Determine first-shot parameters and amount
+    // Treat pot-empty as first shot even if customShotCost is not explicitly provided.
+    const isPotEmpty = parseFloat(gameState?.currentPot ?? '0') === 0;
+    const configuredFirstShotWei = ethers.parseEther(String(GAME_CONFIG.FIRST_SHOT_COST_ETH || '0.001'));
     const customCostWei = customShotCost ? ethers.parseEther(customShotCost) : null;
-    const isFirstShot = !!customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH);
-    const firstShotValue = isFirstShot ? (customCostWei || shotCost) : shotCost;
+    const isFirstShot = isPotEmpty || (!!customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH));
+    const firstShotValue = isFirstShot ? (customCostWei || configuredFirstShotWei) : shotCost;
 
     updateStatus('checking_balance', 'Checking wallet balance...');
     
@@ -351,8 +354,7 @@ export const takeShot = async ({
     let tx;
     try {
       if (isFirstShot) {
-        // Use commitFirstShot for first shots with configurable amount
-        const firstShotValue = customCostWei || shotCost;
+        // Use commitFirstShot for first shots with configurable amount (env-configured if not provided)
         console.log('🔧 [takeShot] Sending commitFirstShot transaction with:', {
           commitment,
           value: ethers.formatEther(firstShotValue),
@@ -433,7 +435,7 @@ export const takeShot = async ({
     
     if (isFirstShot) {
       // First shot: no secret storage, no reveal needed - just adds to pot
-      const actualFirstShotAmount = customCostWei || shotCost;
+      const actualFirstShotAmount = firstShotValue;
       const actualFirstShotAmountEth = ethers.formatEther(actualFirstShotAmount);
       
       console.log('🚀 First shot detected - no secret storage or reveal needed');
@@ -451,7 +453,7 @@ export const takeShot = async ({
         actualAmount: actualFirstShotAmountEth // The real amount paid
       };
       
-      // Log first shot to database with the actual amount paid
+      // Log first shot to database with the actual amount paid (non-blocking)
       try {
         await db.recordShot({
           playerAddress: wallet.address,
@@ -464,85 +466,86 @@ export const takeShot = async ({
           contractAddress: gameState.contractAddress
         });
         console.log('✅ First shot recorded in database with actual amount:', customShotCost || actualFirstShotAmountEth);
+      } catch (dbError) {
+        console.error('Failed to log first shot to database:', dbError);
+        // Don't throw here - the shot was successful even if logging failed
+      }
 
-        // Store secret in localStorage for persistence and recovery (first shot)
+      // Store secret in localStorage for persistence and recovery (first shot)
+      try {
+        const secretKey = `ethshot_secret_${wallet.address}_${receipt.hash.slice(0, 10)}`;
+        const secretData = {
+          secret,
+          txHash: receipt.hash,
+          timestamp: Date.now(),
+          isFirstShot: true // Mark as first shot
+        };
+        localStorage.setItem(secretKey, JSON.stringify(secretData));
+
+        // Also maintain a list of saved secrets for this wallet
+        const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
+        const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
+        existingSecrets.push(secretKey);
+        localStorage.setItem(savedSecretsKey, JSON.stringify(existingSecrets));
+
+        console.log('✅ Secret stored in localStorage for recovery (first shot):', secretKey);
+      } catch (storageError) {
+        console.warn('Failed to save secret to localStorage (first shot):', storageError);
+        // Don't throw here - the shot was successful even if storage failed
+      }
+
+      // Automatically reveal the first shot to clear pending state (cannot win by design)
+      // This ALWAYS runs regardless of database logging outcome to ensure on-chain pending is cleared
+      updateStatus('waiting_reveal_window', 'Waiting for reveal window...');
+      const readyFirst = await waitForRevealEligibility({ wallet, contract });
+      if (readyFirst) {
+        updateStatus('auto_revealing', 'Automatically revealing shot...');
         try {
-          const secretKey = `ethshot_secret_${wallet.address}_${receipt.hash.slice(0, 10)}`;
-          const secretData = {
+          console.log('🔧 [takeShot] Starting auto-reveal for first shot with secret:', secret);
+          const revealResult = await revealShot({
             secret,
-            txHash: receipt.hash,
-            timestamp: Date.now(),
-            isFirstShot: true // Mark as first shot
-          };
-          localStorage.setItem(secretKey, JSON.stringify(secretData));
+            gameState,
+            wallet,
+            contract,
+            ethers,
+            loadGameState,
+            loadPlayerData,
+            onStatusUpdate
+          });
+          console.log('✅ [takeShot] Auto-reveal (first shot) completed:', revealResult);
 
-          // Also maintain a list of saved secrets for this wallet
-          const savedSecretsKey = `ethshot_saved_secrets_${wallet.address}`;
-          const existingSecrets = JSON.parse(localStorage.getItem(savedSecretsKey) || '[]');
-          existingSecrets.push(secretKey);
-          localStorage.setItem(savedSecretsKey, JSON.stringify(existingSecrets));
+          // Update result with reveal information
+          result.revealResult = revealResult;
+          result.won = revealResult.won;
+        } catch (revealError) {
+          console.error('❌ [takeShot] Auto-reveal (first shot) failed:', revealError);
+          console.error('❌ [takeShot] Auto-reveal (first shot) error stack:', revealError.stack);
 
-          console.log('✅ Secret stored in localStorage for recovery (first shot):', secretKey);
-        } catch (storageError) {
-          console.warn('Failed to save secret to localStorage (first shot):', storageError);
-          // Don't throw here - the shot was successful even if storage failed
-        }
+          // Don't throw the error - instead provide a helpful message
+          // The secret is already stored in localStorage for manual recovery
+          toastStore.info('First shot committed but auto-reveal failed. Your secret is saved for manual reveal if needed.');
 
-        // Automatically reveal the first shot to clear pending state (cannot win by design)
-        updateStatus('waiting_reveal_window', 'Waiting for reveal window...');
-        const readyFirst = await waitForRevealEligibility({ wallet, contract });
-        if (readyFirst) {
-          updateStatus('auto_revealing', 'Automatically revealing shot...');
-          try {
-            console.log('🔧 [takeShot] Starting auto-reveal for first shot with secret:', secret);
-            const revealResult = await revealShot({
-              secret,
-              gameState,
-              wallet,
-              contract,
-              ethers,
-              loadGameState,
-              loadPlayerData,
-              onStatusUpdate
-            });
-            console.log('✅ [takeShot] Auto-reveal (first shot) completed:', revealResult);
-
-            // Update result with reveal information
-            result.revealResult = revealResult;
-            result.won = revealResult.won;
-          } catch (revealError) {
-            console.error('❌ [takeShot] Auto-reveal (first shot) failed:', revealError);
-            console.error('❌ [takeShot] Auto-reveal (first shot) error stack:', revealError.stack);
-
-            // Don't throw the error - instead provide a helpful message
-            // The secret is already stored in localStorage for manual recovery
-            toastStore.info('First shot committed but auto-reveal failed. Your secret is saved for manual reveal if needed.');
-
-            // Return the result without reveal information for the UI to handle
-            result.revealResult = {
-              hash: null,
-              receipt: null,
-              won: false,
-              autoRevealFailed: true,
-              error: revealError.message
-            };
-            result.won = false;
-          }
-        } else {
-          console.warn('⚠️ [takeShot] Reveal window did not open in time for first shot; leaving pending with saved secret');
-          toastStore.info('First shot committed. Waiting for the next block to reveal automatically soon.');
+          // Return the result without reveal information for the UI to handle
           result.revealResult = {
             hash: null,
             receipt: null,
             won: false,
             autoRevealFailed: true,
-            error: 'Reveal window not yet open'
+            error: revealError.message
           };
           result.won = false;
         }
-      } catch (dbError) {
-        console.error('Failed to log first shot to database:', dbError);
-        // Don't throw here - the shot was successful even if logging failed
+      } else {
+        console.warn('⚠️ [takeShot] Reveal window did not open in time for first shot; leaving pending with saved secret');
+        toastStore.info('First shot committed. Waiting for the next block to reveal automatically soon.');
+        result.revealResult = {
+          hash: null,
+          receipt: null,
+          won: false,
+          autoRevealFailed: true,
+          error: 'Reveal window not yet open'
+        };
+        result.won = false;
       }
       
       
@@ -1118,11 +1121,12 @@ export const revealShot = async ({
         throw new Error('Reveal transaction failed: Transaction reverted');
       }
 
-      // Check if user won by looking at ShotRevealed events (safe parsing)
-      console.log('🔧 [revealShot] Parsing transaction logs for ShotRevealed event...');
+      // Check if user won by looking at ShotRevealed or JackpotWon events (safe parsing)
+      console.log('🔧 [revealShot] Parsing transaction logs for ShotRevealed/JackpotWon events...');
       console.log('🔧 [revealShot] Total logs:', receipt.logs.length);
       
       let parsedShotRevealed = null;
+      let jackpotWin = false;
       for (const [index, log] of receipt.logs.entries()) {
         try {
           console.log(`🔧 [revealShot] Parsing log ${index}:`, {
@@ -1141,7 +1145,16 @@ export const revealShot = async ({
               amount: parsed.args.amount?.toString(),
               won: parsed.args.won
             });
-            break;
+            // keep scanning in case JackpotWon is also present in same tx
+          } else if (parsed?.name === 'JackpotWon') {
+            const winnerAddr = (parsed.args.winner || '').toLowerCase?.() || String(parsed.args.winner || '').toLowerCase();
+            const myAddr = (wallet.address || '').toLowerCase();
+            if (winnerAddr === myAddr) {
+              jackpotWin = true;
+              console.log('✅ [revealShot] Found JackpotWon event for this wallet');
+            } else {
+              console.log('🔧 [revealShot] JackpotWon emitted but for different address:', winnerAddr);
+            }
           }
         } catch (parseError) {
           console.log(`🔧 [revealShot] Log ${index} not from this contract (expected):`, parseError.message);
@@ -1151,9 +1164,42 @@ export const revealShot = async ({
       let won = false;
       if (parsedShotRevealed?.args) {
         won = Boolean(parsedShotRevealed.args.won);
-        console.log('🔧 [revealShot] Extracted win result:', won);
+        console.log('🔧 [revealShot] Extracted win result from ShotRevealed:', won);
       } else {
         console.warn('⚠️ [revealShot] No ShotRevealed event found in transaction logs');
+      }
+
+      // If ShotRevealed didn't indicate a win but JackpotWon fired for this wallet, treat as win
+      if (!won && jackpotWin) {
+        won = true;
+        console.log('🔧 [revealShot] Overriding won=true based on JackpotWon event for current wallet');
+      }
+
+      // Final defensive check: query recent winners if available, to cover any provider/parsing edge cases
+      if (!won) {
+        try {
+          if (typeof contract.getRecentWinners === 'function') {
+            console.log('🔧 [revealShot] Falling back to getRecentWinners() verification...');
+            const recent = await contract.getRecentWinners();
+            if (Array.isArray(recent) && recent.length > 0) {
+              const myAddr = (wallet.address || '').toLowerCase();
+              const receiptBlock = (receipt.blockNumber ?? '').toString();
+              const matched = recent.find(w => {
+                const wAddr = (w.winner || '').toLowerCase?.() || String(w.winner || '').toLowerCase();
+                const wBlock = w.blockNumber?.toString?.() || String(w.blockNumber || '');
+                return wAddr === myAddr && wBlock === receiptBlock;
+              });
+              if (matched) {
+                won = true;
+                console.log('✅ [revealShot] Detected win via getRecentWinners fallback:', matched);
+              } else {
+                console.log('🔧 [revealShot] No match via getRecentWinners fallback');
+              }
+            }
+          }
+        } catch (fallbackErr) {
+          console.warn('⚠️ [revealShot] getRecentWinners fallback failed:', fallbackErr?.message || fallbackErr);
+        }
       }
       
       result = {

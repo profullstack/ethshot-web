@@ -26,7 +26,7 @@ export const SERVER_CONFIG = {
   
   // Game Configuration (Server-side access)
   SHOT_COST_ETH: parseFloat(process.env.VITE_SHOT_COST_ETH || '0.0005'),
-  FIRST_SHOT_COST_ETH: parseFloat(process.env.VITE_FIRST_SHOT_COST_ETH || '0.0005'),
+  FIRST_SHOT_COST_ETH: parseFloat(process.env.VITE_FIRST_SHOT_COST_ETH || '0.001'),
   SPONSOR_COST_ETH: parseFloat(process.env.VITE_SPONSOR_COST_ETH || '0.001'),
   
   // Development mode flag

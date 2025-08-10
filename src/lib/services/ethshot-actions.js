@@ -87,6 +87,13 @@ export const takeShot = async ({
     // Custom shot costs are handled at UI/database level for display only
     const shotCost = await contract.SHOT_COST();
 
+    // Determine first-shot parameters and amount using env-configured FIRST_SHOT_COST_ETH
+    const isPotEmpty = parseFloat(gameState?.currentPot ?? '0') === 0;
+    const configuredFirstShotWei = ethers.parseEther(String(GAME_CONFIG.FIRST_SHOT_COST_ETH || '0.001'));
+    const customCostWei = customShotCost ? ethers.parseEther(customShotCost) : null;
+    const isFirstShot = isPotEmpty || (!!customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH));
+    const firstShotValue = isFirstShot ? (customCostWei || configuredFirstShotWei) : shotCost;
+
     updateStatus('checking_balance', 'Checking wallet balance...');
     
     // Check user balance
@@ -97,13 +104,29 @@ export const takeShot = async ({
     // Estimate gas with proper commitment hash
     let gasEstimate;
     try {
-      // Generate a proper commitment for gas estimation
-      const tempSecret = 123456;
-      const tempCommitment = ethers.keccak256(ethers.solidityPacked(['uint256'], [tempSecret]));
-      
-      gasEstimate = await contractWithSigner.commitShot.estimateGas(tempCommitment, {
-        value: shotCost
-      });
+      // Generate a proper commitment for gas estimation (include sender for parity)
+      const tempSecret = 123456n;
+      const tempCommitment = ethers.keccak256(
+        ethers.solidityPacked(['uint256', 'address'], [tempSecret, wallet.address])
+      );
+
+      if (isFirstShot) {
+        if (contractWithSigner.estimateGas && contractWithSigner.estimateGas.commitFirstShot) {
+          gasEstimate = await contractWithSigner.estimateGas.commitFirstShot(tempCommitment, { value: firstShotValue });
+        } else if (contractWithSigner.commitFirstShot && contractWithSigner.commitFirstShot.estimateGas) {
+          gasEstimate = await contractWithSigner.commitFirstShot.estimateGas(tempCommitment, { value: firstShotValue });
+        } else {
+          throw new Error('commitFirstShot gas estimation not available on contract');
+        }
+      } else {
+        if (contractWithSigner.estimateGas && contractWithSigner.estimateGas.commitShot) {
+          gasEstimate = await contractWithSigner.estimateGas.commitShot(tempCommitment, { value: shotCost });
+        } else if (contractWithSigner.commitShot && contractWithSigner.commitShot.estimateGas) {
+          gasEstimate = await contractWithSigner.commitShot.estimateGas(tempCommitment, { value: shotCost });
+        } else {
+          throw new Error('commitShot gas estimation not available on contract');
+        }
+      }
     } catch (estimateError) {
       console.warn('Failed to estimate gas, using default:', estimateError.message);
       gasEstimate = 100000n;
@@ -160,10 +183,18 @@ export const takeShot = async ({
 
     updateStatus('sending_transaction', 'Sending transaction to blockchain...');
 
-    const tx = await contractWithSigner.commitShot(commitment, {
-      value: shotCost,
-      gasLimit: gasLimit
-    });
+    let tx;
+    if (isFirstShot) {
+      tx = await contractWithSigner.commitFirstShot(commitment, {
+        value: firstShotValue,
+        gasLimit: gasLimit
+      });
+    } else {
+      tx = await contractWithSigner.commitShot(commitment, {
+        value: shotCost,
+        gasLimit: gasLimit
+      });
+    }
 
     updateStatus('waiting_confirmation', 'Waiting for blockchain confirmation...');
 
@@ -171,9 +202,8 @@ export const takeShot = async ({
     
     updateStatus('processing', 'Processing transaction result...');
     
-    // Check if this is a first shot (pot is empty) by checking if custom shot cost indicates a first shot
-    // We check if the custom shot cost matches the first shot cost configuration
-    const isFirstShot = customShotCost && parseFloat(customShotCost) === parseFloat(GAME_CONFIG.FIRST_SHOT_COST_ETH);
+    // First shot already determined earlier based on pot state or config
+    // Using precomputed isFirstShot variable.
     
     if (isFirstShot) {
       // First shot: no secret storage, no reveal needed - just adds to pot
@@ -236,8 +266,10 @@ export const takeShot = async ({
 
     // Log shot to database
     try {
-      // Use custom shot cost for display purposes if provided
-      const displayAmount = customShotCost ? customShotCost : ethers.formatEther(Number(shotCost));
+      // Use actual first-shot amount from env or custom for display; otherwise use contract SHOT_COST
+      const displayAmount = isFirstShot
+        ? (customShotCost || ethers.formatEther(firstShotValue))
+        : (customShotCost || ethers.formatEther(shotCost));
       
       await db.recordShot({
         playerAddress: wallet.address,

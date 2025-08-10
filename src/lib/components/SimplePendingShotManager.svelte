@@ -180,38 +180,56 @@
   };
 
   const handleCleanupExpired = async () => {
+    if (loading) {
+      console.log('⏳ Cleanup already in progress, skipping...');
+      return;
+    }
+
+    // Guard: only allow cleanup when reveal window truly expired
+    if (!pendingShot?.revealExpired) {
+      console.warn('⚠️ Cleanup requested but pending shot is not expired yet.');
+      toastStore.error('Pending shot is not expired yet. Please reveal the shot or wait until it expires.');
+      return;
+    }
+
     loading = true;
     try {
       console.log('🧹 Starting cleanup of expired pending shot...');
-      
-      // Use the service function instead of utility
+
       const currentGameState = gameStore.getGameState();
       const currentWalletStore = gameStore.getWalletStore();
       const currentWallet = get(currentWalletStore);
-      
-      await GameActions.cleanupExpiredPendingShot({
+      const contract = gameStore.getContract();
+      const ethers = gameStore.getEthers();
+
+      if (!contract) {
+        throw new Error('Contract not available. Please refresh the page.');
+      }
+
+      // ABI sanity check: ensure the function exists to avoid sending empty-data tx
+      const hasCleanupFn =
+        typeof contract.cleanupExpiredPendingShot === 'function' ||
+        (contract.interface?.getFunction && !!contract.interface.getFunction('cleanupExpiredPendingShot'));
+
+      if (!hasCleanupFn) {
+        throw new Error('cleanupExpiredPendingShot not found in contract ABI. Refresh the app or update the ABI.');
+      }
+
+      // Use GameActions service (encodes proper calldata and gas params)
+      const res = await GameActions.cleanupExpiredPendingShot({
         playerAddress: currentWallet.address,
         gameState: currentGameState,
         wallet: currentWallet,
-        contract: gameStore.getContract(),
-        ethers: gameStore.getEthers()
+        contract,
+        ethers
       });
-      
-      console.log('✅ Cleanup successful!');
+
+      console.log('✅ Cleanup successful!', res);
       toastStore.success('Expired pending shot cleaned up successfully');
       await checkPendingShot();
     } catch (error) {
       console.error('❌ Failed to cleanup expired shot:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        code: error.code,
-        reason: error.reason
-      });
-      
-      // Show the actual error to the user - no fallbacks that hide issues
-      toastStore.error('Failed to cleanup expired shot: ' + error.message);
+      toastStore.error('Failed to cleanup expired shot: ' + (error?.message || String(error)));
     } finally {
       loading = false;
     }
