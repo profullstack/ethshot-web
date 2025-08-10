@@ -11,12 +11,8 @@ export async function load({ params, fetch }) {
 	}
 
 	try {
-		// Get player data to check if user exists
+		// Get player data - this may be null for new wallets
 		const playerData = await db.getPlayer(walletAddress);
-		
-		if (!playerData) {
-			throw error(404, 'User not found');
-		}
 
 		// Get user profile information (pass fetch for server-side compatibility)
 		const userProfile = await db.getUserProfile(walletAddress, fetch);
@@ -39,8 +35,15 @@ export async function load({ params, fetch }) {
 		// Get user discounts
 		const availableDiscounts = await db.getUserDiscounts(walletAddress);
 
+		// Handle new wallets gracefully - use default values if no player data exists
+		const totalShots = playerData?.total_shots || 0;
+		const totalSpent = parseFloat(playerData?.total_spent || '0');
+		const totalWon = parseFloat(playerData?.total_won || '0');
+		const lastShotTime = playerData?.last_shot_time || null;
+		const createdAt = playerData?.created_at || new Date().toISOString();
+		const updatedAt = playerData?.updated_at || new Date().toISOString();
+
 		// Calculate win rate
-		const totalShots = playerData.total_shots || 0;
 		const winCount = userWins.length;
 		const winRate = totalShots > 0 ? Math.round((winCount / totalShots) * 100) : 0;
 
@@ -50,8 +53,6 @@ export async function load({ params, fetch }) {
 			: 0;
 
 		// Calculate ROI
-		const totalSpent = parseFloat(playerData.total_spent || '0');
-		const totalWon = parseFloat(playerData.total_won || '0');
 		const roi = totalSpent > 0 ? Math.round(((totalWon - totalSpent) / totalSpent) * 100) : 0;
 
 		// Create user statistics object with the structure the component expects
@@ -66,20 +67,20 @@ export async function load({ params, fetch }) {
 				twitter_handle: userProfile?.twitter_handle || null,
 				discord_handle: userProfile?.discord_handle || null,
 				website_url: userProfile?.website_url || null,
-				created_at: userProfile?.created_at || playerData.created_at,
-				updated_at: userProfile?.updated_at || playerData.updated_at
+				created_at: userProfile?.created_at || createdAt,
+				updated_at: userProfile?.updated_at || updatedAt
 			},
 			
 			// Game statistics (for the stats cards)
 			game_stats: {
 				total_shots: totalShots,
-				total_spent: playerData.total_spent || '0',
-				total_won: playerData.total_won || '0',
+				total_spent: totalSpent.toString(),
+				total_won: totalWon.toString(),
 				win_rate: winRate,
 				biggest_win: biggestWin.toString(),
 				roi_percentage: roi,
 				current_win_streak: 0, // We don't have streak data yet
-				last_shot_time: playerData.last_shot_time,
+				last_shot_time: lastShotTime,
 				shots_rank: 0, // We don't have ranking data yet
 				winnings_rank: 0 // We don't have ranking data yet
 			},
