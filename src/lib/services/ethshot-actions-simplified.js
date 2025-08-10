@@ -785,8 +785,8 @@ export const sponsorRound = async ({
       gasPrice = ethers.parseUnits('20', 'gwei');
     }
     
-    const estimatedGasCost = Number(gasLimit) * Number(gasPrice);
-    const totalCost = Number(sponsorCost) + Number(estimatedGasCost);
+    const estimatedGasCost = gasLimit * gasPrice;
+    const totalCost = sponsorCost + estimatedGasCost;
     
     console.log('Sponsor gas estimation details:', {
       sponsorCost: ethers.formatEther(sponsorCost),

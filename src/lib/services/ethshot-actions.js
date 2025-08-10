@@ -399,8 +399,8 @@ export const sponsorRound = async ({
       gasPrice = ethers.parseUnits('20', 'gwei');
     }
     
-    const estimatedGasCost = Number(gasLimit) * Number(gasPrice);
-    const totalCost = Number(sponsorCost) + Number(estimatedGasCost);
+    const estimatedGasCost = gasLimit * gasPrice;
+    const totalCost = sponsorCost + estimatedGasCost;
     
     console.log('Sponsor gas estimation details:', {
       sponsorCost: ethers.formatEther(sponsorCost),
@@ -436,7 +436,7 @@ export const sponsorRound = async ({
       name,
       logoUrl,
       sponsorUrl,
-      amount: ethers.formatEther(Number(sponsorCost)),
+      amount: ethers.formatEther(sponsorCost),
       txHash: result?.hash || null,
       blockNumber: result?.receipt?.blockNumber || null,
       timestamp: new Date().toISOString(),
