@@ -92,3 +92,4 @@ docker-compose*
 .cache/
 pnpm-lock.yaml
 supabase/.temp/
+agent_runs/
