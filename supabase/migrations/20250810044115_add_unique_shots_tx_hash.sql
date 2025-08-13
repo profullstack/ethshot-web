@@ -13,7 +13,7 @@ begin
     -- Helpful query index for listing/filtering by player and time
     execute 'create index if not exists shots_player_ts_idx on public.shots (player_address, timestamp)';
   else
-    raise notice ''Table public.shots not found; skipping index creation'';
+    raise notice 'Table public.shots not found; skipping index creation';
   end if;
 end $$;
 
