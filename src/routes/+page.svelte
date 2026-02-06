@@ -118,7 +118,7 @@
   title="ETH Shot - Take Your Shot at the ETH Jackpot"
   description="A viral, pay-to-play, Ethereum-powered game where users take a chance to win an ETH jackpot by clicking a single button. {formatEth(GAME_CONFIG.SHOT_COST)} ETH per shot, {GAME_CONFIG.WIN_PERCENTAGE}% chance to win!"
   keywords="ethereum, eth, jackpot, game, crypto, blockchain, gambling, web3, defi, shot, viral, pay-to-play"
-  image="/favicon-32x32.png"
+  image="/banner.png"
   imageAlt="ETH Shot - Take your shot at the ETH jackpot"
   type="website"
   twitterCard="summary_large_image"
