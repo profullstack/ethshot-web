@@ -156,31 +156,99 @@ async function handleRecordShot(request, shotData) {
 }
 
 /**
- * Handle winner recording
+ * Handle winner recording with JWT authentication
  */
-async function handleRecordWinner(winnerData) {
+async function handleRecordWinner(request, winnerData) {
   try {
-    console.log('🏆 Recording winner via API:', {
+    // Validate and extract wallet address from JWT
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return json(
+        { success: false, error: 'Authorization header required' },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.substring(7);
+    let walletAddress;
+
+    try {
+      const payload = verifyJWTSecure(token);
+      walletAddress = payload.walletAddress || payload.wallet_address || payload.sub;
+
+      if (!walletAddress) {
+        console.error('❌ JWT payload missing wallet address:', payload);
+        return json(
+          { success: false, error: 'Invalid token: no wallet address' },
+          { status: 401 }
+        );
+      }
+    } catch (jwtError) {
+      console.error('❌ JWT verification failed:', jwtError);
+      return json(
+        { success: false, error: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the wallet address matches the winner data
+    if (!winnerData.winnerAddress ||
+        walletAddress.toLowerCase() !== winnerData.winnerAddress.toLowerCase()) {
+      return json(
+        { success: false, error: 'Wallet address mismatch' },
+        { status: 403 }
+      );
+    }
+
+    // Check if server-side Supabase is available
+    if (!isSupabaseServerAvailable()) {
+      console.error('❌ Server-side Supabase not configured');
+      return json(
+        {
+          success: false,
+          error: 'Server configuration error. Please check environment variables.'
+        },
+        { status: 500 }
+      );
+    }
+
+    console.log('🏆 Recording winner via secure API:', {
       winnerAddress: winnerData.winnerAddress,
       amount: winnerData.amount,
       txHash: winnerData.txHash
     });
 
-    const result = await db.recordWinner({
-      winnerAddress: winnerData.winnerAddress,
-      amount: winnerData.amount,
-      txHash: winnerData.txHash,
-      blockNumber: winnerData.blockNumber,
-      timestamp: winnerData.timestamp || new Date().toISOString(),
-      cryptoType: winnerData.cryptoType || 'ETH',
-      contractAddress: winnerData.contractAddress
+    // Use Supabase client with JWT authentication + the record_winner_secure RPC,
+    // mirroring handleRecordShot. The RPC re-verifies the wallet address server-side.
+    const supabase = getSupabaseJWTClient(token);
+
+    const { data, error } = await supabase.rpc('record_winner_secure', {
+      p_winner_address: winnerData.winnerAddress.toLowerCase(),
+      p_amount: winnerData.amount,
+      p_tx_hash: winnerData.txHash,
+      p_block_number: winnerData.blockNumber,
+      p_timestamp: winnerData.timestamp || new Date().toISOString(),
+      p_crypto_type: winnerData.cryptoType || 'ETH',
+      p_contract_address: winnerData.contractAddress
     });
 
-    console.log('✅ Winner recorded successfully via API:', result?.id);
+    if (error) {
+      console.error('❌ Supabase winner recording error:', error);
+      return json(
+        {
+          success: false,
+          error: 'Failed to record winner',
+          message: error.message
+        },
+        { status: 500 }
+      );
+    }
+
+    console.log('✅ Winner recorded successfully via secure API:', data);
 
     return json({
       success: true,
-      winner: result,
+      winner: data,
       message: 'Winner recorded successfully'
     });
 
