@@ -42,6 +42,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         bytes32 commitment;
         uint256 blockNumber;
         uint256 amount;
+        uint256 potAtCommit; // pot size right after this shot was added, caps this shot's payout
         bool exists;
     }
     
@@ -216,15 +217,24 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         // REMOVED: validPotSize - this was preventing first shots
     {
         require(commitment != bytes32(0), "Invalid commitment");
-        
-        // Store pending shot
+
+        // Add to pot first so the snapshot below includes this shot's own contribution
+        unchecked {
+            currentPot += SHOT_COST;
+        }
+
+        // Store pending shot. potAtCommit caps this shot's eventual payout to the pot as it
+        // stood right after this commit, so a player who has already secured a win cannot
+        // strategically delay revealShot (legal for up to MAX_REVEAL_DELAY blocks) to let
+        // other players' later shots inflate the pot and then snipe the larger jackpot.
         pendingShots[msg.sender] = PendingShot({
             commitment: commitment,
             blockNumber: block.number,
             amount: SHOT_COST,
+            potAtCommit: currentPot,
             exists: true
         });
-        
+
         // Update player stats
         PlayerStats storage stats = playerStats[msg.sender];
         unchecked {
@@ -232,12 +242,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
             stats.totalSpent += SHOT_COST;
         }
         lastShotTime[msg.sender] = block.timestamp;
-        
-        // Add to pot
-        unchecked {
-            currentPot += SHOT_COST;
-        }
-        
+
         emit ShotCommitted(msg.sender, commitment, SHOT_COST);
     }
     
@@ -257,15 +262,22 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
         require(commitment != bytes32(0), "Invalid commitment");
         require(msg.value >= SHOT_COST, "Payment too low");
         require(currentPot == 0, "Not a first shot - pot must be empty");
-        
-        // Store pending shot with actual amount paid
+
+        // Add full amount to pot first so the snapshot below includes this shot's contribution
+        unchecked {
+            currentPot += msg.value;
+        }
+
+        // Store pending shot with actual amount paid. See commitShot() for why potAtCommit
+        // is captured here.
         pendingShots[msg.sender] = PendingShot({
             commitment: commitment,
             blockNumber: block.number,
             amount: msg.value, // Store actual amount paid
+            potAtCommit: currentPot,
             exists: true
         });
-        
+
         // Update player stats with actual amount
         PlayerStats storage stats = playerStats[msg.sender];
         unchecked {
@@ -273,12 +285,7 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
             stats.totalSpent += msg.value;
         }
         lastShotTime[msg.sender] = block.timestamp;
-        
-        // Add full amount to pot
-        unchecked {
-            currentPot += msg.value;
-        }
-        
+
         emit ShotCommitted(msg.sender, commitment, msg.value);
     }
     
@@ -314,13 +321,18 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
             }
         }
         
+        // Capture values needed after cleanup: `shot` is a storage pointer, so reading its
+        // fields after delete would return the zeroed-out values, not the original shot data.
+        uint256 shotAmount = shot.amount;
+        uint256 potAtCommit = shot.potAtCommit;
+
         // Clean up pending shot
         delete pendingShots[msg.sender];
-        
-        emit ShotRevealed(msg.sender, shot.amount, won);
-        
+
+        emit ShotRevealed(msg.sender, shotAmount, won);
+
         if (won) {
-            _handleWin(msg.sender);
+            _handleWin(msg.sender, potAtCommit);
         }
     }
     
@@ -597,26 +609,34 @@ contract EthShot is Ownable, Pausable, ReentrancyGuard {
     /**
      * @dev Internal function to handle winning scenario
      * @param winner Address of the winner
+     * @param potAtCommit Pot size right after the winner's own commit — caps this win's payout
+     * so a player who already knows (via a simulated/off-chain call once the revealing block's
+     * hash is fixed) that they will win cannot strategically delay revealShot — legal for up to
+     * MAX_REVEAL_DELAY blocks — to let other players' later shots inflate the pot and then snipe
+     * the larger jackpot. Any pot growth from shots committed after this one stays in currentPot
+     * for the next round instead of being awarded to this winner.
      */
-    function _handleWin(address winner) private {
-        uint256 potAmount = currentPot;
+    function _handleWin(address winner, uint256 potAtCommit) private {
+        uint256 potAmount = currentPot < potAtCommit ? currentPot : potAtCommit;
         uint256 winnerAmount = (potAmount * WIN_PERCENTAGE_BP) / BASIS_POINTS;
         uint256 houseAmount = potAmount - winnerAmount;
-        
+
         // Update player stats
         PlayerStats storage stats = playerStats[winner];
         unchecked {
             stats.totalWon += winnerAmount;
         }
-        
+
         // Add to house funds
         unchecked {
             houseFunds += houseAmount;
         }
         
-        // Reset pot
-        currentPot = 0;
-        
+        // Deduct only the awarded amount — any pot growth from shots committed after this
+        // winner's own commit (potAtCommit) was excluded from potAmount above and rolls over
+        // into the next round instead of vanishing from accounting or being handed to this winner.
+        currentPot -= potAmount;
+
         // Clear sponsorship
         if (currentSponsor.active) {
             currentSponsor.active = false;
