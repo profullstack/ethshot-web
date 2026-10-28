@@ -1,10 +1,10 @@
 import '@nomicfoundation/hardhat-toolbox';
 import 'dotenv/config';
+import { accountsFor } from './scripts/lib/deployer-key.js';
 
 const {
   MAINNET_RPC_URL,
   SEPOLIA_RPC_URL,
-  PRIVATE_KEY,
   ETHERSCAN_API_KEY,
   BASESCAN_API_KEY,
   ARBISCAN_API_KEY,
@@ -77,22 +77,34 @@ const config = {
     },
     sepolia: {
       url: resolvedSepoliaUrl,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      // The deployer key is asked for (keyring or prompt) only when this network is used; never env.
+      get accounts() {
+        return accountsFor('sepolia');
+      },
       chainId: 11155111,
     },
     mainnet: {
       url: resolvedMainnetUrl,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      // The deployer key is asked for (keyring or prompt) only when this network is used; never env.
+      get accounts() {
+        return accountsFor('mainnet');
+      },
       chainId: 1,
     },
     base: {
       url: 'https://mainnet.base.org',
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      // The deployer key is asked for (keyring or prompt) only when this network is used; never env.
+      get accounts() {
+        return accountsFor('base');
+      },
       chainId: 8453,
     },
     arbitrum: {
       url: 'https://arb1.arbitrum.io/rpc',
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      // The deployer key is asked for (keyring or prompt) only when this network is used; never env.
+      get accounts() {
+        return accountsFor('arbitrum');
+      },
       chainId: 42161,
     },
   },

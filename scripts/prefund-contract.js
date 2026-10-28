@@ -6,6 +6,7 @@
  */
 
 import { ethers } from 'ethers';
+import { deployerKey } from './lib/deployer-key.js';
 import { config } from 'dotenv';
 
 // Load environment variables
@@ -123,13 +124,9 @@ async function prefundContract(network = 'sepolia', privateKey, fundingAmount = 
 async function main() {
   const args = process.argv.slice(2);
   const network = args[0] || 'sepolia';
-  const privateKey = args[1] || process.env.PRIVATE_KEY;
-  const fundingAmount = args[2] || '0.01';
-  
-  if (!privateKey) {
-    console.error('❌ Private key required. Provide as argument or set PRIVATE_KEY env var.');
-    process.exit(1);
-  }
+  // Never from argv (process lists, shell history) or env: keyring or prompt.
+  const fundingAmount = args[1] || '0.01';
+  const privateKey = deployerKey();
   
   await prefundContract(network, privateKey, fundingAmount);
 }
