@@ -84,8 +84,9 @@ function loadContractConfig() {
 function validateEnvironment() {
   log.step('Validating environment configuration...');
   
+  // The deployer key is not an env var any more (logicsrc keyring or a prompt,
+  // see scripts/lib/deployer-key.js); hardhat asks for it for --network sepolia.
   const required = [
-    'PRIVATE_KEY',
     'SEPOLIA_RPC_URL'
   ];
   
@@ -98,9 +99,8 @@ function validateEnvironment() {
     process.exit(1);
   }
   
-  // Validate private key format
-  if (!process.env.PRIVATE_KEY.startsWith('0x')) {
-    log.error('PRIVATE_KEY must start with 0x');
+  if (process.env.PRIVATE_KEY) {
+    log.error('PRIVATE_KEY is set in the environment; it is no longer read. Remove it (use DEPLOYER_KEYRING or the prompt).');
     process.exit(1);
   }
   

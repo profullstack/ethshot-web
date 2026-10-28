@@ -60,7 +60,6 @@ function checkEnvironmentFile() {
   // Read and check .env content
   const envContent = fs.readFileSync(envPath, 'utf8');
   const requiredVars = [
-    'PRIVATE_KEY',
     'SEPOLIA_RPC_URL',
     'VITE_CONTRACT_ADDRESS'
   ];
@@ -120,7 +119,7 @@ function showSetupInstructions() {
   
   console.log('\n5. ⚙️  Configure .env file:');
   console.log('   • Edit .env in your project root');
-  console.log('   • Set PRIVATE_KEY=your_private_key_from_phantom');
+  console.log('   • Store the deployer key: logicsrc keyring add <file> --name <entry> --type generic, then DEPLOYER_KEYRING=<entry> (or type it at the prompt). Never PRIVATE_KEY in .env.');
   console.log('   • Set SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/your_project_id');
   console.log('   • Set ETHERSCAN_API_KEY=your_etherscan_key (optional, for verification)');
   console.log('   • Configure game parameters (optional, defaults provided):');

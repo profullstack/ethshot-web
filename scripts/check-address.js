@@ -1,18 +1,14 @@
 import { ethers } from 'ethers';
 import 'dotenv/config';
+import { deployerKey } from './lib/deployer-key.js';
 
 async function checkAddresses() {
   console.log('🔍 Checking deployment addresses...\n');
 
-  // Check deployer address (from PRIVATE_KEY)
-  if (!process.env.PRIVATE_KEY) {
-    console.log('❌ No PRIVATE_KEY found in .env file');
-    return;
-  }
-
+  // The deployer key comes from the logicsrc keyring or a prompt, never env.
   try {
-    const wallet = new ethers.Wallet(process.env.PRIVATE_KEY);
-    console.log('👤 Deployer Address (from PRIVATE_KEY):');
+    const wallet = new ethers.Wallet(deployerKey());
+    console.log('👤 Deployer Address:');
     console.log(`   ${wallet.address}`);
     console.log('   → This address deploys the contract and pays gas fees\n');
 
